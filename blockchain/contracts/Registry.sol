@@ -2,9 +2,7 @@
 pragma solidity 0.8.37;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    Checkpoints
-} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
 

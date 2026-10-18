@@ -90,19 +90,27 @@ interface IRegistry {
     function isRegistered(address member) external view returns (bool);
 
     /// @notice Whether `member` was registered at the end of past block `blockNumber`.
-    function wasRegisteredAt(address member, uint256 blockNumber) external view returns (bool);
+    function wasRegisteredAt(
+        address member,
+        uint256 blockNumber
+    ) external view returns (bool);
 
     /// @notice Whether `member` is Ready now.
     function isReady(address member) external view returns (bool);
 
     /// @notice Whether `member` was Ready at the end of past block `blockNumber`.
-    function wasReadyAt(address member, uint256 blockNumber) external view returns (bool);
+    function wasReadyAt(
+        address member,
+        uint256 blockNumber
+    ) external view returns (bool);
 
     /// @notice Number of Ready members at the end of past block `blockNumber`.
     function readyCountAt(uint256 blockNumber) external view returns (uint256);
 
     /// @notice Number of registered members at the end of past block `blockNumber`.
-    function registeredCountAt(uint256 blockNumber) external view returns (uint256);
+    function registeredCountAt(
+        uint256 blockNumber
+    ) external view returns (uint256);
 
     /// @notice Number of Ready members now.
     function readyCount() external view returns (uint256);
@@ -116,7 +124,10 @@ interface IRegistry {
     /// @notice Whether `member` may open a request using the contribution tagged `proofTag`
     ///         (first request free; afterwards the tag must come from a contribution made since
     ///         their last request). Escrow's `canOpenRequest` adds the checks on the contribution.
-    function canRequestWith(address member, uint64 proofTag) external view returns (bool);
+    function canRequestWith(
+        address member,
+        uint64 proofTag
+    ) external view returns (bool);
 
     /// @notice Requests `member` has opened, not counting cancelled ones.
     function requestCount(address member) external view returns (uint256);

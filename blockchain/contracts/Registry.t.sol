@@ -73,7 +73,9 @@ contract RegistryTest is RegistryFixture {
     function test_RevertWhen_RegisterTwice() public {
         _register(alice);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.AlreadyRegistered.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.AlreadyRegistered.selector, alice)
+        );
         registry.register();
     }
 
@@ -103,7 +105,9 @@ contract RegistryTest is RegistryFixture {
     function test_RevertWhen_SetReadyNotRegistered() public {
         _fund(alice);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotRegistered.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotRegistered.selector, alice)
+        );
         registry.setReady(true);
     }
 
@@ -113,12 +117,16 @@ contract RegistryTest is RegistryFixture {
         _register(alice);
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.ReadyUnchanged.selector, false));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.ReadyUnchanged.selector, false)
+        );
         registry.setReady(false);
 
         _setReady(alice, true);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.ReadyUnchanged.selector, true));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.ReadyUnchanged.selector, true)
+        );
         registry.setReady(true);
     }
 
@@ -126,7 +134,9 @@ contract RegistryTest is RegistryFixture {
     function test_RevertWhen_SetReadyWithoutBalance() public {
         _register(alice);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NoTokenBalance.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NoTokenBalance.selector, alice)
+        );
         registry.setReady(true);
     }
 
@@ -186,7 +196,11 @@ contract RegistryTest is RegistryFixture {
         _join(alice);
         uint256 current = block.number;
 
-        bytes memory err = abi.encodeWithSelector(IRegistry.FutureLookup.selector, current, current);
+        bytes memory err = abi.encodeWithSelector(
+            IRegistry.FutureLookup.selector,
+            current,
+            current
+        );
         vm.expectRevert(err);
         registry.readyCountAt(current);
         vm.expectRevert(err);
@@ -196,7 +210,13 @@ contract RegistryTest is RegistryFixture {
         vm.expectRevert(err);
         registry.wasRegisteredAt(alice, current);
 
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.FutureLookup.selector, current + 1, current));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRegistry.FutureLookup.selector,
+                current + 1,
+                current
+            )
+        );
         registry.readyCountAt(current + 1);
 
         assertEq(registry.readyCountAt(current - 1), 0);
@@ -225,7 +245,9 @@ contract RegistryTest is RegistryFixture {
     function test_RevertWhen_SetEscrowNotDeployer() public {
         Registry fresh = new Registry(IERC20(address(token)));
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotDeployer.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotDeployer.selector, alice)
+        );
         fresh.setEscrow(alice);
     }
 
@@ -245,7 +267,10 @@ contract RegistryTest is RegistryFixture {
     // K2: nobody but Escrow can touch request/participation bookkeeping, including before wiring.
     function test_RevertWhen_EscrowOnlyCalledByOthers() public {
         _register(alice);
-        bytes memory err = abi.encodeWithSelector(IRegistry.NotEscrow.selector, alice);
+        bytes memory err = abi.encodeWithSelector(
+            IRegistry.NotEscrow.selector,
+            alice
+        );
 
         vm.startPrank(alice);
         vm.expectRevert(err);
@@ -447,7 +472,10 @@ contract RegistryTest is RegistryFixture {
             if (i + 1 < ops.length && blocks[i + 1] == blocks[i]) continue;
             assertEq(registry.readyCountAt(blocks[i]), counts[i]);
             for (uint256 a = 0; a < ACTORS; a++) {
-                assertEq(registry.wasReadyAt(actors[a], blocks[i]), (masks[i] >> a) & 1 == 1);
+                assertEq(
+                    registry.wasReadyAt(actors[a], blocks[i]),
+                    (masks[i] >> a) & 1 == 1
+                );
             }
         }
         assertEq(registry.readyCount(), _popcount(mask));
@@ -625,7 +653,8 @@ contract RegistryHandler is Test {
     }
 
     function _record() internal {
-        if (blocks.length == 0 || blocks[blocks.length - 1] != block.number) blocks.push(block.number);
+        if (blocks.length == 0 || blocks[blocks.length - 1] != block.number)
+            blocks.push(block.number);
         readyCountAtEnd[block.number] = registry.readyCount();
         registeredCountAtEnd[block.number] = registry.registeredCount();
     }
@@ -666,7 +695,10 @@ contract RegistryInvariantTest is Test {
             uint256 b = handler.blocks(i);
             if (b >= block.number) continue;
             assertEq(registry.readyCountAt(b), handler.readyCountAtEnd(b));
-            assertEq(registry.registeredCountAt(b), handler.registeredCountAtEnd(b));
+            assertEq(
+                registry.registeredCountAt(b),
+                handler.registeredCountAtEnd(b)
+            );
         }
     }
 }

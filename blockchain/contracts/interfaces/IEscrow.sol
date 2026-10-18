@@ -48,14 +48,26 @@ interface IEscrow {
     );
 
     /// @notice `member` contributed `amount` (always the request's share) to request `id`.
-    event Contributed(uint256 indexed id, address indexed member, uint256 amount);
+    event Contributed(
+        uint256 indexed id,
+        address indexed member,
+        uint256 amount
+    );
 
     /// @notice Request `id` was finalized after its deadline; `total` went to the requester
     ///         (0 means the request expired with nothing collected).
-    event RequestFinalized(uint256 indexed id, address indexed requester, uint256 total);
+    event RequestFinalized(
+        uint256 indexed id,
+        address indexed requester,
+        uint256 total
+    );
 
     /// @notice The requester cancelled request `id`; `total` is now claimable by its contributors.
-    event RequestCancelled(uint256 indexed id, address indexed requester, uint256 total);
+    event RequestCancelled(
+        uint256 indexed id,
+        address indexed requester,
+        uint256 total
+    );
 
     /// @notice `member` claimed back their `amount` from cancelled request `id`.
     event Refunded(uint256 indexed id, address indexed member, uint256 amount);
@@ -179,10 +191,16 @@ interface IEscrow {
     function canFinalize(uint256 id) external view returns (bool);
 
     /// @notice Whether `member` may contribute to request `id` now.
-    function canContribute(uint256 id, address member) external view returns (bool);
+    function canContribute(
+        uint256 id,
+        address member
+    ) external view returns (bool);
 
     /// @notice Whether `member` was in the snapshot of request `id`.
-    function isInSnapshot(uint256 id, address member) external view returns (bool);
+    function isInSnapshot(
+        uint256 id,
+        address member
+    ) external view returns (bool);
 
     /// @notice Whether `member` contributed to request `id`, and whether it was refunded.
     function contributionOf(
@@ -191,10 +209,16 @@ interface IEscrow {
     ) external view returns (bool contributed, bool refunded);
 
     /// @notice Whether `member` could open a request now using `proofId` (0 = none).
-    function canOpenRequest(address member, uint256 proofId) external view returns (bool);
+    function canOpenRequest(
+        address member,
+        uint256 proofId
+    ) external view returns (bool);
 
     /// @notice Amount `member` can claim back from request `id` now (0 if nothing).
-    function pendingRefund(uint256 id, address member) external view returns (uint256);
+    function pendingRefund(
+        uint256 id,
+        address member
+    ) external view returns (uint256);
 
     /// @notice Pending refunds of `member` across `ids` (e.g. the ids from their `Contributed`
     ///         logs), so the UI can show "you have X to claim" in one call.

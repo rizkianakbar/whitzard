@@ -13,7 +13,9 @@ import {WhitzardToken} from "./WhitzardToken.sol";
 /// @dev Shared setup: token, Registry and an Escrow (Ready filter on), plus helpers.
 abstract contract EscrowFixture is Test {
     bytes32 internal constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
     bytes32 internal constant EVIDENCE = keccak256("hospital-bill.pdf");
     uint64 internal constant DURATION = 1 days;
 
@@ -35,7 +37,11 @@ abstract contract EscrowFixture is Test {
 
         token = new WhitzardToken();
         registry = new Registry(IERC20(address(token)));
-        escrow = new Escrow(IERC20(address(token)), IRegistry(address(registry)), true);
+        escrow = new Escrow(
+            IERC20(address(token)),
+            IRegistry(address(registry)),
+            true
+        );
         registry.setEscrow(address(escrow));
 
         _join(alice);
@@ -69,7 +75,10 @@ abstract contract EscrowFixture is Test {
         vm.stopPrank();
     }
 
-    function _open(address requester, uint256 amount) internal returns (uint256 id) {
+    function _open(
+        address requester,
+        uint256 amount
+    ) internal returns (uint256 id) {
         vm.prank(requester);
         id = escrow.openRequest(amount, DURATION, EVIDENCE, 0);
     }
@@ -86,9 +95,18 @@ abstract contract EscrowFixture is Test {
         uint256 deadline
     ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
         bytes32 structHash = keccak256(
-            abi.encode(PERMIT_TYPEHASH, owner, address(escrow), value, token.nonces(owner), deadline)
+            abi.encode(
+                PERMIT_TYPEHASH,
+                owner,
+                address(escrow),
+                value,
+                token.nonces(owner),
+                deadline
+            )
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
         return vm.sign(key, digest);
     }
 
@@ -104,7 +122,15 @@ contract EscrowTest is EscrowFixture {
     function test_OpenRequest() public {
         uint256 expectedDeadline = block.timestamp + DURATION;
         vm.expectEmit(true, true, false, true, address(escrow));
-        emit IEscrow.RequestOpened(1, alice, 90 ether, 30 ether, block.number - 1, uint64(expectedDeadline), EVIDENCE);
+        emit IEscrow.RequestOpened(
+            1,
+            alice,
+            90 ether,
+            30 ether,
+            block.number - 1,
+            uint64(expectedDeadline),
+            EVIDENCE
+        );
         uint256 id = _open(alice, 90 ether);
 
         assertEq(id, 1);
@@ -150,7 +176,9 @@ contract EscrowTest is EscrowFixture {
         assertEq(escrow.getRequest(id).snapshotSize, 3);
         assertFalse(escrow.isInSnapshot(id, eve));
         vm.prank(eve);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.NotInSnapshot.selector, id, eve));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.NotInSnapshot.selector, id, eve)
+        );
         escrow.contribute(id);
     }
 
@@ -162,9 +190,23 @@ contract EscrowTest is EscrowFixture {
         assertEq(max, 30 days);
 
         vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.DurationOutOfRange.selector, min - 1, min, max));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DurationOutOfRange.selector,
+                min - 1,
+                min,
+                max
+            )
+        );
         escrow.openRequest(90 ether, min - 1, EVIDENCE, 0);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.DurationOutOfRange.selector, max + 1, min, max));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DurationOutOfRange.selector,
+                max + 1,
+                min,
+                max
+            )
+        );
         escrow.openRequest(90 ether, max + 1, EVIDENCE, 0);
 
         escrow.openRequest(90 ether, min, EVIDENCE, 0); // bounds are inclusive
@@ -182,7 +224,9 @@ contract EscrowTest is EscrowFixture {
     function test_RevertWhen_AmountTooLarge() public {
         uint256 amount = uint256(type(uint128).max) + 1;
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.AmountTooLarge.selector, amount));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.AmountTooLarge.selector, amount)
+        );
         escrow.openRequest(amount, DURATION, EVIDENCE, 0);
     }
 
@@ -192,7 +236,9 @@ contract EscrowTest is EscrowFixture {
         _contribute(alice, _open(bob, 90 ether)); // alice now holds a valid proof
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.HasOpenRequest.selector, id));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.HasOpenRequest.selector, id)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, 2);
     }
 
@@ -214,7 +260,9 @@ contract EscrowTest is EscrowFixture {
     // K2
     function test_RevertWhen_ShareTooSmall() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.ShareTooSmall.selector, 2, 3));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.ShareTooSmall.selector, 2, 3)
+        );
         escrow.openRequest(2, DURATION, EVIDENCE, 0);
     }
 
@@ -222,7 +270,9 @@ contract EscrowTest is EscrowFixture {
     function test_RevertWhen_OpenerNotRegistered() public {
         address stranger = makeAddr("stranger");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, stranger));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, stranger)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, 0);
     }
 
@@ -234,7 +284,9 @@ contract EscrowTest is EscrowFixture {
         vm.warp(_deadlineOf(id));
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, 0);
         assertFalse(escrow.canOpenRequest(alice, 0));
     }
@@ -255,7 +307,9 @@ contract EscrowTest is EscrowFixture {
         vm.warp(_deadlineOf(second));
         assertFalse(escrow.canOpenRequest(alice, bobs));
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, bobs);
     }
 
@@ -267,7 +321,9 @@ contract EscrowTest is EscrowFixture {
 
         assertFalse(escrow.canOpenRequest(alice, bobs));
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.InvalidProof.selector, bobs));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.InvalidProof.selector, bobs)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, bobs);
     }
 
@@ -283,7 +339,9 @@ contract EscrowTest is EscrowFixture {
 
         assertFalse(escrow.canOpenRequest(alice, bobs));
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.InvalidProof.selector, bobs));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.InvalidProof.selector, bobs)
+        );
         escrow.openRequest(90 ether, DURATION, EVIDENCE, bobs);
     }
 
@@ -347,7 +405,12 @@ contract EscrowTest is EscrowFixture {
         uint256 id = _open(alice, 90 ether);
 
         uint256 permitDeadline = block.timestamp + 1 hours;
-        (uint8 v, bytes32 r, bytes32 s) = _signPermit(bobKey, bob, 30 ether, permitDeadline);
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(
+            bobKey,
+            bob,
+            30 ether,
+            permitDeadline
+        );
         vm.prank(bob);
         escrow.contributeWithPermit(id, permitDeadline, v, r, s);
 
@@ -363,7 +426,12 @@ contract EscrowTest is EscrowFixture {
         uint256 id = _open(alice, 90 ether);
 
         uint256 permitDeadline = block.timestamp + 1 hours;
-        (uint8 v, bytes32 r, bytes32 s) = _signPermit(bobKey, bob, 30 ether, permitDeadline);
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(
+            bobKey,
+            bob,
+            30 ether,
+            permitDeadline
+        );
         vm.prank(carol);
         token.permit(bob, address(escrow), 30 ether, permitDeadline, v, r, s);
 
@@ -387,7 +455,13 @@ contract EscrowTest is EscrowFixture {
                 30 ether
             )
         );
-        escrow.contributeWithPermit(id, block.timestamp, 27, bytes32(0), bytes32(0));
+        escrow.contributeWithPermit(
+            id,
+            block.timestamp,
+            27,
+            bytes32(0),
+            bytes32(0)
+        );
     }
 
     // K2: late contributions are rejected, including exactly at the deadline.
@@ -401,7 +475,13 @@ contract EscrowTest is EscrowFixture {
         vm.warp(deadline);
         assertFalse(escrow.canContribute(id, carol));
         vm.prank(carol);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.DeadlinePassed.selector, id, deadline));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DeadlinePassed.selector,
+                id,
+                deadline
+            )
+        );
         escrow.contribute(id);
     }
 
@@ -409,7 +489,12 @@ contract EscrowTest is EscrowFixture {
     function test_RevertWhen_RequesterContributes() public {
         uint256 id = _open(alice, 90 ether);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequesterCannotContribute.selector, id));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.RequesterCannotContribute.selector,
+                id
+            )
+        );
         escrow.contribute(id);
     }
 
@@ -418,7 +503,9 @@ contract EscrowTest is EscrowFixture {
         uint256 id = _open(alice, 90 ether);
         assertFalse(escrow.canContribute(id, eve));
         vm.prank(eve);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.NotInSnapshot.selector, id, eve));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.NotInSnapshot.selector, id, eve)
+        );
         escrow.contribute(id);
     }
 
@@ -427,22 +514,34 @@ contract EscrowTest is EscrowFixture {
         uint256 id = _open(alice, 90 ether);
         _contribute(bob, id);
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.AlreadyContributed.selector, id, bob));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.AlreadyContributed.selector, id, bob)
+        );
         escrow.contribute(id);
     }
 
     // K2
     function test_RevertWhen_RequestNotFound() public {
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7)
+        );
         escrow.contribute(7);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7)
+        );
         escrow.finalize(7);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7)
+        );
         escrow.cancelRequest(7);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7)
+        );
         escrow.claimRefund(7);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.RequestNotFound.selector, 7)
+        );
         escrow.getRequest(7);
     }
 
@@ -453,7 +552,11 @@ contract EscrowTest is EscrowFixture {
         escrow.cancelRequest(id);
         vm.prank(bob);
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, id, IEscrow.Status.Cancelled)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                id,
+                IEscrow.Status.Cancelled
+            )
         );
         escrow.contribute(id);
 
@@ -463,7 +566,11 @@ contract EscrowTest is EscrowFixture {
         escrow.finalize(other);
         vm.prank(dave);
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, other, IEscrow.Status.Finalized)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                other,
+                IEscrow.Status.Finalized
+            )
         );
         escrow.contribute(other);
     }
@@ -524,7 +631,13 @@ contract EscrowTest is EscrowFixture {
         uint64 deadline = _deadlineOf(id);
         vm.warp(deadline - 1);
         assertFalse(escrow.canFinalize(id));
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.DeadlineNotReached.selector, id, deadline));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DeadlineNotReached.selector,
+                id,
+                deadline
+            )
+        );
         escrow.finalize(id);
     }
 
@@ -535,7 +648,11 @@ contract EscrowTest is EscrowFixture {
         vm.warp(_deadlineOf(id));
         escrow.finalize(id);
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, id, IEscrow.Status.Finalized)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                id,
+                IEscrow.Status.Finalized
+            )
         );
         escrow.finalize(id);
     }
@@ -547,7 +664,11 @@ contract EscrowTest is EscrowFixture {
         escrow.cancelRequest(id);
         vm.warp(_deadlineOf(id));
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, id, IEscrow.Status.Cancelled)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                id,
+                IEscrow.Status.Cancelled
+            )
         );
         escrow.finalize(id);
     }
@@ -591,7 +712,9 @@ contract EscrowTest is EscrowFixture {
     function test_RevertWhen_CancelNotRequester() public {
         uint256 id = _open(alice, 90 ether);
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.NotRequester.selector, id, bob));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.NotRequester.selector, id, bob)
+        );
         escrow.cancelRequest(id);
     }
 
@@ -601,7 +724,13 @@ contract EscrowTest is EscrowFixture {
         uint64 deadline = _deadlineOf(id);
         vm.warp(deadline);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.DeadlinePassed.selector, id, deadline));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DeadlinePassed.selector,
+                id,
+                deadline
+            )
+        );
         escrow.cancelRequest(id);
     }
 
@@ -611,7 +740,11 @@ contract EscrowTest is EscrowFixture {
         vm.startPrank(alice);
         escrow.cancelRequest(id);
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, id, IEscrow.Status.Cancelled)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                id,
+                IEscrow.Status.Cancelled
+            )
         );
         escrow.cancelRequest(id);
         vm.stopPrank();
@@ -648,7 +781,9 @@ contract EscrowTest is EscrowFixture {
 
         vm.startPrank(bob);
         escrow.claimRefund(id);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.NothingToRefund.selector, id, bob));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.NothingToRefund.selector, id, bob)
+        );
         escrow.claimRefund(id);
         vm.stopPrank();
     }
@@ -659,7 +794,9 @@ contract EscrowTest is EscrowFixture {
         _contribute(bob, id);
         vm.startPrank(alice);
         escrow.cancelRequest(id);
-        vm.expectRevert(abi.encodeWithSelector(IEscrow.NothingToRefund.selector, id, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEscrow.NothingToRefund.selector, id, alice)
+        );
         escrow.claimRefund(id);
         vm.stopPrank();
     }
@@ -670,7 +807,11 @@ contract EscrowTest is EscrowFixture {
         _contribute(bob, id);
         vm.prank(bob);
         vm.expectRevert(
-            abi.encodeWithSelector(IEscrow.RequestNotActive.selector, id, IEscrow.Status.Funding)
+            abi.encodeWithSelector(
+                IEscrow.RequestNotActive.selector,
+                id,
+                IEscrow.Status.Funding
+            )
         );
         escrow.claimRefund(id);
     }
@@ -693,7 +834,10 @@ contract EscrowTest is EscrowFixture {
         ids[1] = c;
         ids[2] = d;
         ids[3] = 99; // unknown ids are just 0
-        (uint256 total, uint256[] memory amounts) = escrow.pendingRefunds(bob, ids);
+        (uint256 total, uint256[] memory amounts) = escrow.pendingRefunds(
+            bob,
+            ids
+        );
         assertEq(total, 50 ether);
         assertEq(amounts[0], 30 ether);
         assertEq(amounts[1], 0);
@@ -711,7 +855,11 @@ contract EscrowTest is EscrowFixture {
     // K4: without the filter the snapshot is every registered member, Ready or not.
     function test_NoReadyFilterUsesRegisteredMembers() public {
         Registry reg2 = new Registry(IERC20(address(token)));
-        Escrow esc2 = new Escrow(IERC20(address(token)), IRegistry(address(reg2)), false);
+        Escrow esc2 = new Escrow(
+            IERC20(address(token)),
+            IRegistry(address(reg2)),
+            false
+        );
         reg2.setEscrow(address(esc2));
         assertFalse(esc2.useReadyFilter());
 
@@ -738,7 +886,11 @@ contract EscrowTest is EscrowFixture {
 
     // K1 / K2: random amounts, contributors and timing; contributions after the deadline are
     // rejected and the requester receives exactly what was collected.
-    function testFuzz_ContributionsAndTiming(uint96 amount, uint8 mask, uint32[3] calldata waits) public {
+    function testFuzz_ContributionsAndTiming(
+        uint96 amount,
+        uint8 mask,
+        uint32[3] calldata waits
+    ) public {
         amount = uint96(bound(amount, 3, 300 ether));
         uint256 id = _open(alice, amount);
         IEscrow.RequestView memory req = escrow.getRequest(id);
@@ -750,7 +902,13 @@ contract EscrowTest is EscrowFixture {
             if ((mask >> i) & 1 == 0) continue;
             vm.prank(members[i]);
             if (block.timestamp >= req.deadline) {
-                vm.expectRevert(abi.encodeWithSelector(IEscrow.DeadlinePassed.selector, id, req.deadline));
+                vm.expectRevert(
+                    abi.encodeWithSelector(
+                        IEscrow.DeadlinePassed.selector,
+                        id,
+                        req.deadline
+                    )
+                );
                 escrow.contribute(id);
             } else {
                 escrow.contribute(id);
@@ -794,7 +952,12 @@ contract EscrowTest is EscrowFixture {
         token.approve(address(escrow), 0);
         uint256 id = _open(alice, 90 ether);
         uint256 permitDeadline = block.timestamp + 1 hours;
-        (uint8 v, bytes32 r, bytes32 s) = _signPermit(bobKey, bob, 30 ether, permitDeadline);
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(
+            bobKey,
+            bob,
+            30 ether,
+            permitDeadline
+        );
 
         vm.prank(bob);
         vm.startSnapshotGas("contributeWithPermit");
@@ -853,7 +1016,8 @@ contract EscrowHandler is Test {
     mapping(uint256 id => uint256) public ghostRefunded;
     mapping(uint256 id => uint256) public ghostPaid;
     mapping(uint256 id => uint256) public ghostContributors;
-    mapping(uint256 id => mapping(address member => uint256)) public ghostContributionCount;
+    mapping(uint256 id => mapping(address member => uint256))
+        public ghostContributionCount;
 
     // How often each action really did something (coverage check).
     uint256 public opens;
@@ -904,11 +1068,12 @@ contract EscrowHandler is Test {
     function contribute(uint256 seed, uint256 idSeed) external {
         uint256 count = escrow.requestCount();
         for (uint256 j = 0; j < count; j++) {
-            uint256 id = (idSeed + j) % count + 1;
+            uint256 id = ((idSeed + j) % count) + 1;
             uint256 share = escrow.getRequest(id).share;
             for (uint256 i = 0; i < actors.length; i++) {
                 address a = actors[(seed + i) % actors.length];
-                if (!escrow.canContribute(id, a) || token.balanceOf(a) < share) continue;
+                if (!escrow.canContribute(id, a) || token.balanceOf(a) < share)
+                    continue;
                 vm.prank(a);
                 escrow.contribute(id);
                 ghostContributed[id] += share;
@@ -923,9 +1088,10 @@ contract EscrowHandler is Test {
     function cancel(uint256 idSeed) external {
         uint256 count = escrow.requestCount();
         for (uint256 j = 0; j < count; j++) {
-            uint256 id = (idSeed + j) % count + 1;
+            uint256 id = ((idSeed + j) % count) + 1;
             IEscrow.RequestView memory req = escrow.getRequest(id);
-            bool active = req.status == IEscrow.Status.Open || req.status == IEscrow.Status.Funding;
+            bool active = req.status == IEscrow.Status.Open ||
+                req.status == IEscrow.Status.Funding;
             if (!active || block.timestamp >= req.deadline) continue;
             vm.prank(req.requester);
             escrow.cancelRequest(id);
@@ -937,7 +1103,7 @@ contract EscrowHandler is Test {
     function claim(uint256 seed, uint256 idSeed) external {
         uint256 count = escrow.requestCount();
         for (uint256 j = 0; j < count; j++) {
-            uint256 id = (idSeed + j) % count + 1;
+            uint256 id = ((idSeed + j) % count) + 1;
             for (uint256 i = 0; i < actors.length; i++) {
                 address a = actors[(seed + i) % actors.length];
                 uint256 amount = escrow.pendingRefund(id, a);
@@ -954,7 +1120,7 @@ contract EscrowHandler is Test {
     function finalize(uint256 idSeed) external {
         uint256 count = escrow.requestCount();
         for (uint256 j = 0; j < count; j++) {
-            uint256 id = (idSeed + j) % count + 1;
+            uint256 id = ((idSeed + j) % count) + 1;
             if (!escrow.canFinalize(id)) continue;
             address requester = escrow.getRequest(id).requester;
             uint256 before = token.balanceOf(requester);
@@ -998,7 +1164,11 @@ contract EscrowInvariantTest is Test {
         vm.warp(1_700_000_000);
         token = new WhitzardToken();
         registry = new Registry(IERC20(address(token)));
-        escrow = new Escrow(IERC20(address(token)), IRegistry(address(registry)), true);
+        escrow = new Escrow(
+            IERC20(address(token)),
+            IRegistry(address(registry)),
+            true
+        );
         registry.setEscrow(address(escrow));
         handler = new EscrowHandler(token, registry, escrow);
         vm.roll(block.number + 1);
@@ -1050,7 +1220,10 @@ contract EscrowInvariantTest is Test {
             assertLe(req.refunds, req.contributors);
             assertEq(req.contributors, handler.ghostContributors(id));
             for (uint256 i = 0; i < handler.actorCount(); i++) {
-                assertLe(handler.ghostContributionCount(id, handler.actors(i)), 1);
+                assertLe(
+                    handler.ghostContributionCount(id, handler.actors(i)),
+                    1
+                );
             }
         }
     }

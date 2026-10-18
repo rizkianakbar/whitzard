@@ -80,13 +80,15 @@ contract Escrow is IEscrow, ReentrancyGuard {
     mapping(address member => uint256) public latestRequestOf;
 
     mapping(uint256 id => Request) private _requests;
-    mapping(uint256 id => mapping(address member => Contribution)) private _contributions;
+    mapping(uint256 id => mapping(address member => Contribution))
+        private _contributions;
 
     /// @param token_ The contribution token; must support EIP-2612 for `contributeWithPermit`.
     /// @param registry_ The Registry; its `setEscrow` must be called with this contract.
     /// @param useReadyFilter_ Snapshot Ready members (true) or all registered members (false, RM5).
     constructor(IERC20 token_, IRegistry registry_, bool useReadyFilter_) {
-        if (address(token_) == address(0) || address(registry_) == address(0)) revert ZeroAddress();
+        if (address(token_) == address(0) || address(registry_) == address(0))
+            revert ZeroAddress();
         token = token_;
         registry = registry_;
         useReadyFilter = useReadyFilter_;
@@ -108,7 +110,8 @@ contract Escrow is IEscrow, ReentrancyGuard {
         if (amount > type(uint128).max) revert AmountTooLarge(amount);
 
         uint256 latest = latestRequestOf[msg.sender];
-        if (latest != 0 && _isOpen(_requests[latest])) revert HasOpenRequest(latest);
+        if (latest != 0 && _isOpen(_requests[latest]))
+            revert HasOpenRequest(latest);
 
         uint64 proofTag = _proofTag(msg.sender, proofId);
         if (proofTag == type(uint64).max) revert InvalidProof(proofId);
@@ -139,7 +142,15 @@ contract Escrow is IEscrow, ReentrancyGuard {
         });
         latestRequestOf[msg.sender] = id;
 
-        emit RequestOpened(id, msg.sender, amount, share, snapshotBlock, deadline, evidenceHash);
+        emit RequestOpened(
+            id,
+            msg.sender,
+            amount,
+            share,
+            snapshotBlock,
+            deadline,
+            evidenceHash
+        );
     }
 
     /// @inheritdoc IEscrow
@@ -175,8 +186,10 @@ contract Escrow is IEscrow, ReentrancyGuard {
     function cancelRequest(uint256 id) external {
         Request storage req = _get(id);
         if (msg.sender != req.requester) revert NotRequester(id, msg.sender);
-        if (req.state != State.Active) revert RequestNotActive(id, _status(req));
-        if (block.timestamp >= req.deadline) revert DeadlinePassed(id, req.deadline);
+        if (req.state != State.Active)
+            revert RequestNotActive(id, _status(req));
+        if (block.timestamp >= req.deadline)
+            revert DeadlinePassed(id, req.deadline);
 
         req.state = State.Cancelled;
         registry.recordCancel(req.requester);
@@ -187,7 +200,8 @@ contract Escrow is IEscrow, ReentrancyGuard {
     /// @inheritdoc IEscrow
     function claimRefund(uint256 id) external nonReentrant {
         Request storage req = _get(id);
-        if (req.state != State.Cancelled) revert RequestNotActive(id, _status(req));
+        if (req.state != State.Cancelled)
+            revert RequestNotActive(id, _status(req));
         Contribution storage c = _contributions[id][msg.sender];
         if (c.tag == 0 || c.refunded) revert NothingToRefund(id, msg.sender);
 
@@ -203,8 +217,10 @@ contract Escrow is IEscrow, ReentrancyGuard {
     /// @inheritdoc IEscrow
     function finalize(uint256 id) external nonReentrant {
         Request storage req = _get(id);
-        if (req.state != State.Active) revert RequestNotActive(id, _status(req));
-        if (block.timestamp < req.deadline) revert DeadlineNotReached(id, req.deadline);
+        if (req.state != State.Active)
+            revert RequestNotActive(id, _status(req));
+        if (block.timestamp < req.deadline)
+            revert DeadlineNotReached(id, req.deadline);
 
         uint256 total = req.collected;
         req.state = total > 0 ? State.Finalized : State.Expired;
@@ -246,7 +262,10 @@ contract Escrow is IEscrow, ReentrancyGuard {
     }
 
     /// @inheritdoc IEscrow
-    function canContribute(uint256 id, address member) external view returns (bool) {
+    function canContribute(
+        uint256 id,
+        address member
+    ) external view returns (bool) {
         Request storage req = _requests[id];
         return
             _isOpen(req) &&
@@ -256,9 +275,13 @@ contract Escrow is IEscrow, ReentrancyGuard {
     }
 
     /// @inheritdoc IEscrow
-    function isInSnapshot(uint256 id, address member) external view returns (bool) {
+    function isInSnapshot(
+        uint256 id,
+        address member
+    ) external view returns (bool) {
         Request storage req = _get(id);
-        return member != req.requester && _inSnapshot(member, req.snapshotBlock);
+        return
+            member != req.requester && _inSnapshot(member, req.snapshotBlock);
     }
 
     /// @inheritdoc IEscrow
@@ -273,7 +296,10 @@ contract Escrow is IEscrow, ReentrancyGuard {
     /// @inheritdoc IEscrow
     /// @dev The snapshot check uses the latest mined block, which is the block a transaction sent
     ///      now would snapshot.
-    function canOpenRequest(address member, uint256 proofId) external view returns (bool) {
+    function canOpenRequest(
+        address member,
+        uint256 proofId
+    ) external view returns (bool) {
         uint256 latest = latestRequestOf[member];
         if (latest != 0 && _isOpen(_requests[latest])) return false;
 
@@ -287,7 +313,10 @@ contract Escrow is IEscrow, ReentrancyGuard {
     }
 
     /// @inheritdoc IEscrow
-    function pendingRefund(uint256 id, address member) public view returns (uint256) {
+    function pendingRefund(
+        uint256 id,
+        address member
+    ) public view returns (uint256) {
         Request storage req = _requests[id];
         Contribution storage c = _contributions[id][member];
         if (req.state != State.Cancelled || c.tag == 0 || c.refunded) return 0;
@@ -310,10 +339,13 @@ contract Escrow is IEscrow, ReentrancyGuard {
 
     function _contribute(uint256 id, address member) private {
         Request storage req = _get(id);
-        if (req.state != State.Active) revert RequestNotActive(id, _status(req));
-        if (block.timestamp >= req.deadline) revert DeadlinePassed(id, req.deadline);
+        if (req.state != State.Active)
+            revert RequestNotActive(id, _status(req));
+        if (block.timestamp >= req.deadline)
+            revert DeadlinePassed(id, req.deadline);
         if (member == req.requester) revert RequesterCannotContribute(id);
-        if (!_inSnapshot(member, req.snapshotBlock)) revert NotInSnapshot(id, member);
+        if (!_inSnapshot(member, req.snapshotBlock))
+            revert NotInSnapshot(id, member);
         Contribution storage c = _contributions[id][member];
         if (c.tag != 0) revert AlreadyContributed(id, member);
 
@@ -347,20 +379,35 @@ contract Escrow is IEscrow, ReentrancyGuard {
     }
 
     /// @dev Returns the proof's Registry tag, 0 for no proof, or `type(uint64).max` if invalid.
-    function _proofTag(address member, uint256 proofId) private view returns (uint64) {
+    function _proofTag(
+        address member,
+        uint256 proofId
+    ) private view returns (uint64) {
         if (proofId == 0) return 0;
         Contribution storage c = _contributions[proofId][member];
-        if (c.tag == 0 || c.refunded || _requests[proofId].state == State.Cancelled) {
+        if (
+            c.tag == 0 ||
+            c.refunded ||
+            _requests[proofId].state == State.Cancelled
+        ) {
             return type(uint64).max;
         }
         return c.tag;
     }
 
-    function _snapshotCount(uint256 blockNumber) private view returns (uint256) {
-        return useReadyFilter ? registry.readyCountAt(blockNumber) : registry.registeredCountAt(blockNumber);
+    function _snapshotCount(
+        uint256 blockNumber
+    ) private view returns (uint256) {
+        return
+            useReadyFilter
+                ? registry.readyCountAt(blockNumber)
+                : registry.registeredCountAt(blockNumber);
     }
 
-    function _inSnapshot(address member, uint256 blockNumber) private view returns (bool) {
+    function _inSnapshot(
+        address member,
+        uint256 blockNumber
+    ) private view returns (bool) {
         return
             useReadyFilter
                 ? registry.wasReadyAt(member, blockNumber)

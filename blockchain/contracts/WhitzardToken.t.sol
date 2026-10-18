@@ -4,9 +4,7 @@ pragma solidity 0.8.37;
 import {WhitzardToken} from "./WhitzardToken.sol";
 import {Test} from "forge-std/Test.sol";
 import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
-import {
-    ERC20Permit
-} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 /// @dev Shared EIP-2612 signing helper.
 abstract contract PermitSigner is Test {
