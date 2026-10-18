@@ -16,15 +16,18 @@ import {IRegistry} from "./interfaces/IRegistry.sol";
 ///      over members. Lookups for the current or a future block revert, so a member cannot change
 ///      the snapshot of a request opened in the same block.
 ///
-///      Request rule: a member's first request is free. After that they need at least one
-///      contribution to someone else's request since their own last request. Contributions are
-///      tagged with the member's current `round` (incremented by each request). A refunded
-///      contribution is taken back only if it still counts toward the member's next request;
-///      one already used to open a request stays used. Cancelling one's own request restores the
-///      right to request one had before opening it.
+///      Request rule: a member's first request is free. After that they must prove one
+///      contribution to someone else's request made since their own last request. Every
+///      contribution is tagged with the member's current `round` (incremented by each request);
+///      Escrow checks that the proof contribution exists, was not refunded and belongs to a
+///      request that was not cancelled, and passes its tag here. The Registry checks that the
+///      tag's round still counts (`floor <= round`). A contribution already used to open a
+///      request stays used. Cancelling one's own request restores the floor one had before
+///      opening it, so the right to request comes back.
 ///
 ///      The escrow-only bookkeeping functions emit no events of their own: Escrow's
-///      `RequestOpened`, `Contributed` and cancellation events record the same facts.
+///      `RequestOpened`, `Contributed`, `RequestCancelled` and `Refunded` events record the
+///      same facts.
 contract Registry is IRegistry {
     using Checkpoints for Checkpoints.Trace208;
 
@@ -36,9 +39,7 @@ contract Registry is IRegistry {
         uint24 participations; // contributions not refunded
         uint32 round; // incremented by every request; tags contributions
         uint32 floor; // lowest round whose contributions count toward the next request
-        uint24 liveCount; // contributions in rounds >= floor
         uint32 savedFloor; // `floor` before the open request, restored on cancel
-        uint24 savedCount; // contributions in [savedFloor, floor), restored on cancel
     }
 
     /// @notice The token whose balance is required to turn Ready on.
@@ -100,15 +101,16 @@ contract Registry is IRegistry {
     // ------------------------------------------------------------------ escrow-only
 
     /// @inheritdoc IRegistry
-    function recordRequest(address member) external onlyEscrow {
-        if (!canRequest(member)) revert NotEligible(member);
+    function recordRequest(
+        address member,
+        uint64 proofTag
+    ) external onlyEscrow {
+        if (!canRequestWith(member, proofTag)) revert NotEligible(member);
         Member storage m = _members[member];
 
         m.savedFloor = m.floor;
-        m.savedCount = m.liveCount;
         m.round += 1;
         m.floor = m.round;
-        m.liveCount = 0;
         m.requestCount += 1;
     }
 
@@ -119,37 +121,22 @@ contract Registry is IRegistry {
 
         m.requestCount -= 1;
         m.floor = m.savedFloor;
-        m.liveCount += m.savedCount;
-        m.savedCount = 0;
     }
 
     /// @inheritdoc IRegistry
     function recordParticipation(
         address member
-    ) external onlyEscrow returns (uint32 round) {
+    ) external onlyEscrow returns (uint64 tag) {
         Member storage m = _members[member];
         if (!m.registered) revert NotRegistered(member);
 
         m.participations += 1;
-        m.liveCount += 1;
-        return m.round;
+        return uint64(m.round) + 1;
     }
 
     /// @inheritdoc IRegistry
-    function revokeParticipation(
-        address member,
-        uint32 round
-    ) external onlyEscrow {
-        Member storage m = _members[member];
-        if (round > m.round) revert InvalidRound(member, round);
-
-        m.participations -= 1;
-        if (round >= m.floor) {
-            m.liveCount -= 1;
-        } else if (round >= m.savedFloor) {
-            m.savedCount -= 1;
-        }
-        // Older rounds were already used to open a request; nothing left to take back.
+    function revokeParticipation(address member) external onlyEscrow {
+        _members[member].participations -= 1;
     }
 
     // ------------------------------------------------------------------ wiring
@@ -224,9 +211,16 @@ contract Registry is IRegistry {
     }
 
     /// @inheritdoc IRegistry
-    function canRequest(address member) public view returns (bool) {
+    function canRequestWith(
+        address member,
+        uint64 proofTag
+    ) public view returns (bool) {
         Member storage m = _members[member];
-        return m.registered && (m.requestCount == 0 || m.liveCount > 0);
+        if (!m.registered) return false;
+        if (m.requestCount == 0) return true;
+        if (proofTag == 0) return false;
+        uint64 round = proofTag - 1;
+        return round >= m.floor && round <= m.round;
     }
 
     /// @inheritdoc IRegistry
@@ -235,10 +229,8 @@ contract Registry is IRegistry {
     }
 
     /// @inheritdoc IRegistry
-    function participationsSinceLastRequest(
-        address member
-    ) external view returns (uint256) {
-        return _members[member].liveCount;
+    function currentTag(address member) external view returns (uint64) {
+        return uint64(_members[member].round) + 1;
     }
 
     // ------------------------------------------------------------------ internal

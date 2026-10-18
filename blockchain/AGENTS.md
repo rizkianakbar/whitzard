@@ -83,39 +83,45 @@ Membership book. Read by Escrow, the indexer and the frontend; written by Escrow
 
 - `register()` once per address. `setReady(bool)` registered members only; turning Ready **on requires a token balance > 0** (thesis §1.3 point 3); turning it off is always allowed; setting the current value reverts `ReadyUnchanged`.
 - Ready history stored with **OpenZeppelin `Checkpoints`, keyed by block number**, per member, plus checkpointed **total Ready count** and **total registered count** (the latter for the no-Ready-filter comparison, RM5). Lookups for the current or a future block revert `FutureLookup`.
-- Views: `isRegistered`, `wasRegisteredAt`, `isReady`, `wasReadyAt(addr, block)`, `readyCountAt(block)`, `registeredCountAt(block)`, `readyCount`, `registeredCount`, `hasParticipated`, `canRequest`, `requestCount`, `participationsSinceLastRequest`.
+- Views: `isRegistered`, `wasRegisteredAt`, `isReady`, `wasReadyAt(addr, block)`, `readyCountAt(block)`, `registeredCountAt(block)`, `readyCount`, `registeredCount`, `hasParticipated`, `canRequestWith(addr, proofTag)`, `requestCount`, `currentTag`.
 - **Request rule:** every member may open their **first** request without participating. After that, they need at least one contribution to someone else's request **since their last request**. (Deliberate change from the thesis's "permanent eligibility after one contribution", which deadlocks at launch; the thesis text needs updating.)
-- **Cancel and refunds (thesis KF-8/KF-9):** a refunded contribution is taken back only if it still counts toward the member's next request; one already used to open a request stays used. Cancelling one's own request restores the right to request one had before opening it (a cancelled first request is free again).
-- Implementation: one packed `Member` slot per address; each request starts a new `round`, and contributions are tagged with it so a refund knows which counter to decrement.
-- Escrow-only: `recordRequest(addr)`, `recordCancel(addr)`, `recordParticipation(addr) returns (uint32 round)`, `revokeParticipation(addr, round)`. These emit **no events** by design: Escrow's events record the same facts (saves gas per `contribute`).
+- **Proof model:** the requester names one contribution as proof (`proofId` on `openRequest`). Escrow checks it exists, was not refunded and its request is not Cancelled, then passes its tag; the Registry checks the tag's round is `>= floor` (made since the last request). So cancelling a request invalidates every contribution to it as proof **immediately, without a loop**, even before refunds are claimed. A proof already used to open a request stays used if its request is cancelled later (documented edge case).
+- Cancelling one's own request restores the floor from before it (a cancelled first request is free again; the used proof counts again).
+- Implementation: one packed `Member` slot per address; each request starts a new `round`; contributions get tag `round + 1` (never 0).
+- Escrow-only: `recordRequest(addr, proofTag)`, `recordCancel(addr)`, `recordParticipation(addr) returns (uint64 tag)`, `revokeParticipation(addr)` (only updates `hasParticipated`, on refund claim). These emit **no events** by design: Escrow's events record the same facts (saves gas per `contribute`).
 - `setEscrow(address)` callable **once, by the deployer only**, then locked forever (solves the deploy-order loop without an owner; deployer-only prevents front-running on Sepolia).
 - Events: `Registered(address indexed member)`, `ReadyChanged(address indexed member, bool ready)`, `EscrowSet(address indexed escrow)`.
 
-## 3. Escrow — NEXT
+## 3. Escrow — DONE
 
-**One singleton contract**, all requests in `mapping(uint256 => Request)` with an on-chain incrementing ID. Not one contract per request.
+**One singleton contract**, all requests in `mapping(uint256 => Request)` (4 packed slots) with an on-chain incrementing ID starting at 1. Interface: `contracts/interfaces/IEscrow.sol`.
 
-- Status (thesis Tabel 3.4): `Open` (no contributions yet) → `Funding` (≥ 1 contribution) → `Finalized` (deadline passed, funds sent) or `Expired` (deadline passed, nothing collected); `Cancelled` if the requester cancels before the deadline.
-- `openRequest(uint256 amount, uint64 duration, bytes32 metadataHash)`
-  - calls `registry.recordRequest` (reverts unless `canRequest`); one open request per requester; duration within min/max bounds
-  - `snapshotBlock = block.number - 1` (prevents same-block Ready toggling)
-  - `n = readyCountAt(snapshotBlock)`, minus 1 if the requester was Ready then; revert if `n == 0`
-  - `share = amount / n` (floor; rounding dust accepted and documented)
-  - constructor flag `useReadyFilter`: when false, use registered membership (`registeredCountAt` / `wasRegisteredAt`) instead of Ready (RM5)
-- `contribute(id)` / `contributeWithPermit(id, deadline, v, r, s)`
-  - before deadline, request Open/Funding, caller in snapshot, not the requester, not already contributed
-  - pulls exactly `share` via `SafeERC20`; calls `registry.recordParticipation` and stores the returned round with the contribution (pack it into the "has contributed" slot)
-- `cancelRequest(id)` — **requester only**, before the deadline. Status → `Cancelled`; every contributor gets exactly their contribution back; nothing goes to the requester; calls `registry.recordCancel(requester)` and `registry.revokeParticipation(member, round)` per contributor. **Open question for the Escrow task:** refund all contributors in one transaction (push, as the thesis reads) vs. each contributor claims (pull, safer pattern).
-- `finalize(id)` — **anyone** after the deadline (backend keeper normally). Mark finalized **before** transfer, `nonReentrant`, send whatever was collected (possibly 0 → `Expired`). No target requirement.
-- No withdraw/rescue function. Funds leave **only** through `finalize` (to the requester) or cancellation refunds (to contributors).
-- Invariants (thesis): I1 pool balance of a request == its recorded contributions; I2 after `finalize` the request's pool is 0; I3 requester receives exactly the total contributed; I4 no double contribution per member per request; I5 on cancellation the refunds equal the total contributed and nothing reaches the requester.
+- Status (thesis Tabel 3.4), from `status(id)`: `Open` (no contributions, before deadline) → `Funding` (≥ 1 contribution; also after the deadline until `finalize`) → `Finalized` (funds sent) or `Expired` (deadline passed with nothing collected); `Cancelled` by the requester before the deadline.
+- `MIN_DURATION = 5 minutes`, `MAX_DURATION = 30 days` (inclusive).
+- `openRequest(uint256 amount, uint64 duration, bytes32 evidenceHash, uint256 proofId)`
+  - `evidenceHash` = SHA-256 of the evidence document (thesis name); `proofId` = a request the caller contributed to since their last request, `0` for none (first request)
+  - one open request per requester (`latestRequestOf`); after its deadline a new one may be opened even before `finalize`
+  - `snapshotBlock = block.number - 1`; `n = readyCountAt(snapshotBlock)`, minus 1 if the requester was Ready then; revert `EmptySnapshot` if `n == 0`
+  - `share = amount / n` (floor; rounding dust accepted and documented); revert `ShareTooSmall` if 0
+  - constructor flag `useReadyFilter`: when false, use `registeredCountAt` / `wasRegisteredAt` instead (RM5). A Registry is wired to exactly one Escrow, so the comparison needs a second Registry.
+- `contribute(id)` / `contributeWithPermit(id, permitDeadline, v, r, s)`
+  - before deadline, request Active, caller in snapshot, not the requester, not already contributed
+  - pulls exactly `share` via `SafeERC20`; stores the Registry tag with the contribution
+  - the permit call is wrapped in try/catch, so a front-run permit cannot block the contribution
+- `cancelRequest(id)` — **requester only**, before the deadline. Status → `Cancelled`; calls `registry.recordCancel`; **moves no funds**.
+- `claimRefund(id)` — **the contributor only**, after a cancel; pays back exactly their share; calls `registry.revokeParticipation`.
+- `finalize(id)` — **anyone** after the deadline (backend keeper normally). State set **before** transfer, `nonReentrant`; sends whatever was collected (0 → `Expired`). No target requirement.
+- Views for backend/frontend: `getRequest`, `status`, `canFinalize` (keeper), `canContribute`, `isInSnapshot`, `contributionOf`, `canOpenRequest(member, proofId)`, `pendingRefund(id, member)`, `pendingRefunds(member, ids[])` (UI: ids from the member's `Contributed` logs; no on-chain per-member list, to keep `contribute` cheap).
+- No withdraw/rescue function. Funds leave **only** through `finalize` (to the requester) or `claimRefund` (to contributors).
+- Invariants (thesis): I1 escrow balance == Σ (collected − refunds·share) over open/cancelled requests; I2 finalized requests hold nothing; I3 requester receives exactly the total contributed; I4 no double contribution per member per request; I5 a cancelled request pays its requester nothing and refunds never exceed contributions.
 - Events (indexer depends on these):
-  `RequestOpened(uint256 indexed id, address indexed requester, uint256 amount, uint256 share, uint256 snapshotBlock, uint64 deadline, bytes32 metadataHash)`,
+  `RequestOpened(uint256 indexed id, address indexed requester, uint256 amount, uint256 share, uint256 snapshotBlock, uint64 deadline, bytes32 evidenceHash)`,
   `Contributed(uint256 indexed id, address indexed member, uint256 amount)`,
   `RequestFinalized(uint256 indexed id, address indexed requester, uint256 total)`,
-  plus cancellation/refund events — names and fields to be agreed in the Escrow task.
+  `RequestCancelled(uint256 indexed id, address indexed requester, uint256 total)`,
+  `Refunded(uint256 indexed id, address indexed member, uint256 amount)`
 
-## 4. Test-only contracts — NOT YET, context only
+## 4. Test-only contracts — NEXT
 
 In `contracts/test/`:
 

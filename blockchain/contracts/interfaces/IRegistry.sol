@@ -32,9 +32,6 @@ interface IRegistry {
     /// @notice `member` has no request to cancel.
     error NoRequestToCancel(address member);
 
-    /// @notice `round` is not a round `member` has reached.
-    error InvalidRound(address member, uint32 round);
-
     /// @notice History can only be read for past blocks (`blockNumber < currentBlock`).
     error FutureLookup(uint256 blockNumber, uint256 currentBlock);
 
@@ -62,18 +59,22 @@ interface IRegistry {
     // ------------------------------------------------------------------ escrow-only
 
     /// @notice Records that `member` opened a request. Reverts {NotEligible} if they may not.
-    function recordRequest(address member) external;
+    /// @param proofTag Tag of the contribution that proves the right to request (0 = none, only
+    ///        valid for a member's first request). Escrow has already checked that the
+    ///        contribution exists, was not refunded and belongs to a request that was not cancelled.
+    function recordRequest(address member, uint64 proofTag) external;
 
     /// @notice Records that `member` cancelled their open request, restoring the right to request
     ///         they had before opening it.
     function recordCancel(address member) external;
 
     /// @notice Records a contribution by `member`.
-    /// @return round The member's current round; Escrow stores it so a refund can be revoked later.
-    function recordParticipation(address member) external returns (uint32 round);
+    /// @return tag The member's current round + 1 (never 0). Escrow stores it with the
+    ///         contribution; it is the `proofTag` when that contribution is used to open a request.
+    function recordParticipation(address member) external returns (uint64 tag);
 
-    /// @notice Takes back a contribution by `member` made in `round` (its request was cancelled).
-    function revokeParticipation(address member, uint32 round) external;
+    /// @notice Takes back a refunded contribution by `member` from {hasParticipated}.
+    function revokeParticipation(address member) external;
 
     // ------------------------------------------------------------------ wiring
 
@@ -112,13 +113,14 @@ interface IRegistry {
     /// @notice Whether `member` has at least one contribution that was not refunded.
     function hasParticipated(address member) external view returns (bool);
 
-    /// @notice Whether `member` may open a request now (first request free, then one contribution
-    ///         to someone else's request since their last request).
-    function canRequest(address member) external view returns (bool);
+    /// @notice Whether `member` may open a request using the contribution tagged `proofTag`
+    ///         (first request free; afterwards the tag must come from a contribution made since
+    ///         their last request). Escrow's `canOpenRequest` adds the checks on the contribution.
+    function canRequestWith(address member, uint64 proofTag) external view returns (bool);
 
     /// @notice Requests `member` has opened, not counting cancelled ones.
     function requestCount(address member) external view returns (uint256);
 
-    /// @notice Contributions by `member` that count toward their next request.
-    function participationsSinceLastRequest(address member) external view returns (uint256);
+    /// @notice The tag a contribution by `member` made now would get.
+    function currentTag(address member) external view returns (uint64);
 }

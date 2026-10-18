@@ -59,7 +59,7 @@ contract RegistryTest is RegistryFixture {
         assertTrue(registry.isRegistered(alice));
         assertFalse(registry.isReady(alice));
         assertEq(registry.registeredCount(), 1);
-        assertTrue(registry.canRequest(alice));
+        assertTrue(registry.canRequestWith(alice, 0));
 
         vm.roll(block.number + 1);
         assertEq(registry.registeredCountAt(block.number - 1), 1);
@@ -249,13 +249,13 @@ contract RegistryTest is RegistryFixture {
 
         vm.startPrank(alice);
         vm.expectRevert(err);
-        registry.recordRequest(alice);
+        registry.recordRequest(alice, 0);
         vm.expectRevert(err);
         registry.recordCancel(alice);
         vm.expectRevert(err);
         registry.recordParticipation(alice);
         vm.expectRevert(err);
-        registry.revokeParticipation(alice, 0);
+        registry.revokeParticipation(alice);
         vm.stopPrank();
 
         Registry unwired = new Registry(IERC20(address(token)));
@@ -269,160 +269,146 @@ contract RegistryTest is RegistryFixture {
     // K1
     function test_FirstRequestIsFree() public {
         _register(alice);
-        registry.recordRequest(alice);
+        assertTrue(registry.canRequestWith(alice, 0));
+        registry.recordRequest(alice, 0);
 
         assertEq(registry.requestCount(alice), 1);
-        assertFalse(registry.canRequest(alice));
+        assertFalse(registry.canRequestWith(alice, 0));
     }
 
     // K2
     function test_RevertWhen_RecordRequestNotRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, alice));
-        registry.recordRequest(alice);
+        assertFalse(registry.canRequestWith(alice, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
+        registry.recordRequest(alice, 0);
     }
 
     // K2
-    function test_RevertWhen_SecondRequestWithoutContributing() public {
+    function test_RevertWhen_SecondRequestWithoutProof() public {
         _register(alice);
-        registry.recordRequest(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, alice));
-        registry.recordRequest(alice);
+        registry.recordRequest(alice, 0);
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
+        registry.recordRequest(alice, 0);
     }
 
     // K1
-    function test_ContributionRestoresRight() public {
+    function test_TagsAreNeverZero() public {
         _register(alice);
-        registry.recordRequest(alice);
-        registry.recordParticipation(alice);
-
-        assertTrue(registry.canRequest(alice));
-        assertEq(registry.participationsSinceLastRequest(alice), 1);
-
-        registry.recordRequest(alice);
-        assertFalse(registry.canRequest(alice));
-        assertEq(registry.requestCount(alice), 2);
-        assertEq(registry.participationsSinceLastRequest(alice), 0);
+        assertEq(registry.currentTag(alice), 1);
+        assertEq(registry.recordParticipation(alice), 1);
+        registry.recordRequest(alice, 0);
+        assertEq(registry.currentTag(alice), 2);
+        assertEq(registry.recordParticipation(alice), 2);
     }
 
-    // K1: contributions made before the first (free) request do not carry over to the second.
-    function test_ContributionsBeforeFirstRequestAreUsedByIt() public {
+    // K1
+    function test_ProofSinceLastRequestGivesRight() public {
         _register(alice);
-        registry.recordParticipation(alice);
-        registry.recordRequest(alice);
-        assertFalse(registry.canRequest(alice));
+        registry.recordRequest(alice, 0);
+        uint64 tag = registry.recordParticipation(alice);
+
+        assertTrue(registry.canRequestWith(alice, tag));
+        registry.recordRequest(alice, tag);
+        assertEq(registry.requestCount(alice), 2);
+
+        // The proof is used: it does not open a third request.
+        assertFalse(registry.canRequestWith(alice, tag));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
+        registry.recordRequest(alice, tag);
+    }
+
+    // K1: contributions made before the first (free) request are used by it.
+    function test_ProofBeforeFirstRequestIsUsedByIt() public {
+        _register(alice);
+        uint64 tag = registry.recordParticipation(alice);
+        registry.recordRequest(alice, 0);
+        assertFalse(registry.canRequestWith(alice, tag));
+    }
+
+    // K2
+    function test_RevertWhen_ProofFromFutureRound() public {
+        _register(alice);
+        registry.recordRequest(alice, 0);
+        uint64 future = registry.currentTag(alice) + 1;
+        assertFalse(registry.canRequestWith(alice, future));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotEligible.selector, alice)
+        );
+        registry.recordRequest(alice, future);
     }
 
     // K1
     function test_HasParticipated() public {
         _register(alice);
         assertFalse(registry.hasParticipated(alice));
-        uint32 round = registry.recordParticipation(alice);
+        registry.recordParticipation(alice);
         assertTrue(registry.hasParticipated(alice));
-        registry.revokeParticipation(alice, round);
+        registry.revokeParticipation(alice);
         assertFalse(registry.hasParticipated(alice));
     }
 
     // K2
     function test_RevertWhen_RecordParticipationNotRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NotRegistered.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NotRegistered.selector, alice)
+        );
         registry.recordParticipation(alice);
     }
 
-    // ---------------------------------------------------------------- cancel / refund
-
-    // K2: a refunded contribution that was still counting is taken back.
-    function test_RefundTakesBackUnusedContribution() public {
-        _register(alice);
-        registry.recordRequest(alice);
-        uint32 round = registry.recordParticipation(alice);
-        registry.revokeParticipation(alice, round);
-
-        assertFalse(registry.canRequest(alice));
-        assertEq(registry.participationsSinceLastRequest(alice), 0);
-    }
-
-    // K2
-    function test_RefundOfOneOfTwoKeepsRight() public {
-        _register(alice);
-        registry.recordRequest(alice);
-        uint32 round = registry.recordParticipation(alice);
-        registry.recordParticipation(alice);
-        registry.revokeParticipation(alice, round);
-
-        assertTrue(registry.canRequest(alice));
-        assertEq(registry.participationsSinceLastRequest(alice), 1);
-    }
-
-    // K2: a contribution already used to open a request stays used when it is refunded.
-    function test_RefundOfUsedContribution() public {
-        _register(alice);
-        registry.recordRequest(alice);
-        uint32 round = registry.recordParticipation(alice);
-        registry.recordRequest(alice);
-
-        registry.revokeParticipation(alice, round);
-        assertEq(registry.requestCount(alice), 2);
-        assertFalse(registry.canRequest(alice));
-        assertFalse(registry.hasParticipated(alice));
-
-        // Cancelling the second request does not bring the refunded contribution back.
-        registry.recordCancel(alice);
-        assertFalse(registry.canRequest(alice));
-        assertEq(registry.participationsSinceLastRequest(alice), 0);
-    }
+    // ---------------------------------------------------------------- cancel
 
     // K1
     function test_CancelRestoresFreeFirstRequest() public {
         _register(alice);
-        registry.recordRequest(alice);
+        registry.recordRequest(alice, 0);
         registry.recordCancel(alice);
 
         assertEq(registry.requestCount(alice), 0);
-        assertTrue(registry.canRequest(alice));
+        assertTrue(registry.canRequestWith(alice, 0));
     }
 
     // K1
-    function test_CancelRestoresPreviousRight() public {
+    function test_CancelRestoresUsedProof() public {
         _register(alice);
-        registry.recordRequest(alice);
-        registry.recordParticipation(alice);
-        registry.recordRequest(alice);
+        registry.recordRequest(alice, 0);
+        uint64 tag = registry.recordParticipation(alice);
+        registry.recordRequest(alice, tag);
         registry.recordCancel(alice);
 
         assertEq(registry.requestCount(alice), 1);
-        assertTrue(registry.canRequest(alice));
-        assertEq(registry.participationsSinceLastRequest(alice), 1);
+        assertTrue(registry.canRequestWith(alice, tag));
     }
 
-    // K1: contributions made while one's own request was open survive its cancellation.
-    function test_ContributionsDuringOpenRequestSurviveCancel() public {
+    // K1: a contribution made while one's own request is open counts toward the next request,
+    // whether that request finishes or is cancelled.
+    function test_ContributionDuringOpenRequest() public {
         _register(alice);
-        registry.recordRequest(alice);
-        uint32 before = registry.recordParticipation(alice);
-        registry.recordRequest(alice);
-        uint32 during = registry.recordParticipation(alice);
+        registry.recordRequest(alice, 0);
+        uint64 before = registry.recordParticipation(alice);
+        registry.recordRequest(alice, before);
+        uint64 during = registry.recordParticipation(alice);
+
+        assertTrue(registry.canRequestWith(alice, during));
+        assertFalse(registry.canRequestWith(alice, before));
+
         registry.recordCancel(alice);
-
-        assertEq(registry.participationsSinceLastRequest(alice), 2);
-
-        // Both remain revocable after the merge.
-        registry.revokeParticipation(alice, before);
-        registry.revokeParticipation(alice, during);
-        assertFalse(registry.canRequest(alice));
+        assertTrue(registry.canRequestWith(alice, during));
+        assertTrue(registry.canRequestWith(alice, before));
     }
 
     // K2
     function test_RevertWhen_CancelWithoutRequest() public {
         _register(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.NoRequestToCancel.selector, alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRegistry.NoRequestToCancel.selector, alice)
+        );
         registry.recordCancel(alice);
-    }
-
-    // K2
-    function test_RevertWhen_RevokeFutureRound() public {
-        _register(alice);
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.InvalidRound.selector, alice, uint32(1)));
-        registry.revokeParticipation(alice, 1);
     }
 
     // ---------------------------------------------------------------- fuzz
@@ -468,30 +454,40 @@ contract RegistryTest is RegistryFixture {
     }
 
     // Reference model for the request rule.
-    struct Contribution {
-        uint32 round;
+    struct ModelContribution {
+        uint64 tag;
         uint256 opIndex;
-        bool refunded;
     }
 
-    Contribution[] modelContributions;
+    ModelContribution[] modelContributions;
     uint256[] modelRequests; // op index of each request that was not cancelled
     bool modelOpen;
+    uint256 modelParticipations;
 
-    // K2: random request / cancel / finish / contribute / refund sequences match a simple model.
+    // K2: random request / cancel / finish / contribute / refund sequences match a simple model:
+    // a proof is valid iff it was made after the member's latest non-cancelled request.
     function testFuzz_RequestRuleMatchesModel(uint8[40] calldata ops) public {
         _register(alice);
 
         for (uint256 i = 0; i < ops.length; i++) {
             uint256 kind = ops[i] % 5;
             if (kind == 0 && !modelOpen) {
-                if (_modelCanRequest()) {
-                    registry.recordRequest(alice);
+                uint256 pick = ops[i] / 5;
+                uint64 tag = modelContributions.length == 0 || pick % 4 == 0
+                    ? 0
+                    : modelContributions[pick % modelContributions.length].tag;
+                if (_modelValid(tag)) {
+                    registry.recordRequest(alice, tag);
                     modelRequests.push(i);
                     modelOpen = true;
                 } else {
-                    vm.expectRevert(abi.encodeWithSelector(IRegistry.NotEligible.selector, alice));
-                    registry.recordRequest(alice);
+                    vm.expectRevert(
+                        abi.encodeWithSelector(
+                            IRegistry.NotEligible.selector,
+                            alice
+                        )
+                    );
+                    registry.recordRequest(alice, tag);
                 }
             } else if (kind == 1 && modelOpen) {
                 registry.recordCancel(alice);
@@ -500,40 +496,34 @@ contract RegistryTest is RegistryFixture {
             } else if (kind == 2) {
                 modelOpen = false; // the open request finished (finalized or expired)
             } else if (kind == 3) {
-                uint32 round = registry.recordParticipation(alice);
-                modelContributions.push(Contribution(round, i, false));
-            } else if (kind == 4 && modelContributions.length > 0) {
-                Contribution storage c = modelContributions[(ops[i] / 5) % modelContributions.length];
-                if (!c.refunded) {
-                    registry.revokeParticipation(alice, c.round);
-                    c.refunded = true;
-                }
+                uint64 tag = registry.recordParticipation(alice);
+                modelContributions.push(ModelContribution(tag, i));
+                modelParticipations++;
+            } else if (kind == 4 && modelParticipations > 0) {
+                registry.revokeParticipation(alice);
+                modelParticipations--;
             }
 
-            assertEq(registry.canRequest(alice), _modelCanRequest());
             assertEq(registry.requestCount(alice), modelRequests.length);
-            assertEq(registry.participationsSinceLastRequest(alice), _modelLiveCount());
-            assertEq(registry.hasParticipated(alice), _modelParticipations() > 0);
+            assertEq(registry.hasParticipated(alice), modelParticipations > 0);
+            assertEq(registry.canRequestWith(alice, 0), _modelValid(0));
+            for (uint256 c = 0; c < modelContributions.length; c++) {
+                uint64 tag = modelContributions[c].tag;
+                assertEq(registry.canRequestWith(alice, tag), _modelValid(tag));
+            }
         }
     }
 
-    function _modelLiveCount() internal view returns (uint256 n) {
-        bool any = modelRequests.length > 0;
-        uint256 last = any ? modelRequests[modelRequests.length - 1] : 0;
-        for (uint256 i = 0; i < modelContributions.length; i++) {
-            Contribution storage c = modelContributions[i];
-            if (!c.refunded && (!any || c.opIndex > last)) n++;
+    function _modelValid(uint64 tag) internal view returns (bool) {
+        if (modelRequests.length == 0) return true;
+        if (tag == 0) return false;
+        uint256 last = modelRequests[modelRequests.length - 1];
+        for (uint256 c = 0; c < modelContributions.length; c++) {
+            if (modelContributions[c].tag == tag) {
+                return modelContributions[c].opIndex > last;
+            }
         }
-    }
-
-    function _modelParticipations() internal view returns (uint256 n) {
-        for (uint256 i = 0; i < modelContributions.length; i++) {
-            if (!modelContributions[i].refunded) n++;
-        }
-    }
-
-    function _modelCanRequest() internal view returns (bool) {
-        return modelRequests.length == 0 || _modelLiveCount() > 0;
+        return false;
     }
 
     function _popcount(uint256 x) internal pure returns (uint256 n) {
@@ -564,7 +554,7 @@ contract RegistryTest is RegistryFixture {
     function test_Gas_RecordRequest() public {
         _register(alice);
         vm.startSnapshotGas("recordRequest");
-        registry.recordRequest(alice);
+        registry.recordRequest(alice, 0);
         vm.stopSnapshotGas();
     }
 

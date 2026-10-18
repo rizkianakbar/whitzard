@@ -10,7 +10,7 @@ The on-chain part of [Whitzard](../README.md), and the main contribution of the 
 | --------------- | ------------------------------------------------------------------ | ----------- |
 | `WhitzardToken` | ERC-20 + permit (EIP-2612). The only source of tokens is a faucet. | Done        |
 | `Registry`      | Membership book and Ready history (block-number checkpoints)       | Done        |
-| `Escrow`        | Requests, snapshot, contributions, automatic payout                | Not started |
+| `Escrow`        | Requests, snapshot, contributions, payout, cancel and refunds      | Done        |
 
 There are no admin powers anywhere: no owner, no pause, no upgrade, no withdraw.
 
@@ -40,12 +40,32 @@ Interface: [`contracts/interfaces/IRegistry.sol`](contracts/interfaces/IRegistry
 - **History:** Ready status, the Ready total and the registered total are checkpointed per block, so
   Escrow reads the snapshot at `block.number - 1` without looping over members
   (`wasReadyAt`, `readyCountAt`, `registeredCountAt`). The current block can't be looked up.
-- **Right to request:** the first request is free. After that you need one contribution to someone
-  else's request since your last one (`canRequest`). A refunded contribution stops counting, and
-  cancelling your own request gives back the right you had before opening it.
+- **Right to request:** the first request is free. After that you name one contribution to someone
+  else's request, made since your last one, as proof (Escrow's `canOpenRequest`). Contributions to
+  a cancelled request stop counting right away, and cancelling your own request gives back the
+  right you had before opening it.
 - **Escrow-only:** `recordRequest`, `recordCancel`, `recordParticipation`, `revokeParticipation`.
   The Escrow address is wired once by the deployer (`setEscrow`) and then locked forever.
 - **Events:** `Registered(member)`, `ReadyChanged(member, ready)`, `EscrowSet(escrow)`.
+
+### Escrow
+
+Interface: [`contracts/interfaces/IEscrow.sol`](contracts/interfaces/IEscrow.sol).
+
+| Step       | Function                                                     | Who                      | When                 |
+| ---------- | ------------------------------------------------------------ | ------------------------ | -------------------- |
+| Open       | `openRequest(amount, duration, evidenceHash, proofId)`       | a member with the right  | duration 5 min–30 days |
+| Contribute | `contribute(id)` or `contributeWithPermit(id, …)` (1 tx)     | members in the snapshot  | before the deadline  |
+| Finalize   | `finalize(id)`: everything collected goes to the requester   | anyone (backend keeper)  | after the deadline   |
+| Cancel     | `cancelRequest(id)`: moves no funds                          | the requester            | before the deadline  |
+| Refund     | `claimRefund(id)`: exactly your share back                   | each contributor         | after a cancel       |
+
+- **Snapshot:** the Ready members at `block.number - 1`, minus the requester. `share = amount / n`,
+  rounded down. With `useReadyFilter = false`, every registered member counts instead (RM5).
+- **Status:** `Open` → `Funding` → `Finalized` or `Expired` (nothing collected), or `Cancelled`.
+- **Pending refunds for the UI:** `pendingRefunds(member, ids)`, with the ids taken from the
+  member's `Contributed` logs.
+- **Events:** `RequestOpened`, `Contributed`, `RequestFinalized`, `RequestCancelled`, `Refunded`.
 
 ## Setup
 
@@ -84,8 +104,8 @@ pnpm hardhat keystore set ETHERSCAN_API_KEY      # only for verification
 ```
 
 ```shell
-pnpm hardhat ignition deploy ignition/modules/Registry.ts                          # local dry run (Token + Registry)
-pnpm hardhat ignition deploy ignition/modules/Registry.ts --network sepolia
+pnpm hardhat ignition deploy ignition/modules/Escrow.ts                            # local dry run (full stack)
+pnpm hardhat ignition deploy ignition/modules/Escrow.ts --network sepolia
 pnpm hardhat verify --network sepolia YOUR_CONTRACT_ADDRESS
 ```
 
