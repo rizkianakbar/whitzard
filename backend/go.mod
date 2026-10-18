@@ -3,6 +3,7 @@ module github.com/rizkianakbar/whitzard/backend
 go 1.27.2
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/ethereum/go-ethereum v1.17.8
 	github.com/jackc/pgx/v5 v5.11.0
 )

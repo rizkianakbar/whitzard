@@ -27,6 +27,15 @@ type Config struct {
 	Confirmations uint64
 	BatchSize     uint64
 	PollInterval  time.Duration
+
+	HTTPAddr       string
+	ChainID        int64
+	SIWEDomain     string
+	SIWEURI        string
+	CORSOrigins    []string
+	EvidenceDir    string
+	MaxUploadBytes int64
+	SessionTTL     time.Duration
 }
 
 // Load reads `.env` (without overriding variables already set) and then the environment.
@@ -46,11 +55,20 @@ func Load() (*Config, error) {
 	c.StartBlock = uintVar("START_BLOCK", 0, &errs)
 	c.Confirmations = uintVar("CONFIRMATIONS", 2, &errs)
 	c.BatchSize = uintVar("BATCH_SIZE", 500, &errs)
-	if d, err := time.ParseDuration(get("POLL_INTERVAL", "4s")); err != nil {
-		errs = append(errs, fmt.Errorf("POLL_INTERVAL: %w", err))
-	} else {
-		c.PollInterval = d
+	c.PollInterval = duration("POLL_INTERVAL", "4s", &errs)
+
+	c.HTTPAddr = get("HTTP_ADDR", "127.0.0.1:8080")
+	c.ChainID = int64(uintVar("CHAIN_ID", 11155111, &errs))
+	c.SIWEURI = get("SIWE_URI", "http://localhost:3000")
+	c.SIWEDomain = get("SIWE_DOMAIN", "localhost:3000")
+	for _, o := range strings.Split(get("CORS_ORIGINS", "http://localhost:3000"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			c.CORSOrigins = append(c.CORSOrigins, o)
+		}
 	}
+	c.EvidenceDir = get("EVIDENCE_DIR", "./data/evidence")
+	c.MaxUploadBytes = int64(uintVar("MAX_UPLOAD_BYTES", 10<<20, &errs))
+	c.SessionTTL = duration("SESSION_TTL", "168h", &errs)
 	return c, errors.Join(errs...)
 }
 
@@ -90,6 +108,14 @@ func address(key string, errs *[]error) common.Address {
 		return common.Address{}
 	}
 	return common.HexToAddress(v)
+}
+
+func duration(key, fallback string, errs *[]error) time.Duration {
+	d, err := time.ParseDuration(get(key, fallback))
+	if err != nil {
+		*errs = append(*errs, fmt.Errorf("%s: %w", key, err))
+	}
+	return d
 }
 
 func uintVar(key string, fallback uint64, errs *[]error) uint64 {
