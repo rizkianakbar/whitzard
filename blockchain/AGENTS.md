@@ -43,9 +43,9 @@ Docs: Hardhat 3 — https://hardhat.org/llms.txt · viem — https://viem.sh/llm
 
 ---
 
-## 1. Token — `WhitzardToken` ← CURRENT TASK
+## 1. Token — `WhitzardToken` — DONE
 
-> Symbol: the thesis calls the token **ARSN**. Use whatever the thesis says; if the code and thesis disagree, ask.
+> Name `Whitzard`, symbol `WHZD` (decided with the author; the thesis still says ARSN and needs updating).
 
 ERC-20 + ERC20Permit (EIP-2612), 18 decimals. Permit exists so contributing to a request is **one transaction** (`contributeWithPermit`), not approve + contribute.
 
@@ -77,37 +77,43 @@ ERC-20 + ERC20Permit (EIP-2612), 18 decimals. Permit exists so contributing to a
 
 ---
 
-## 2. Registry — NOT YET, context only
+## 2. Registry — DONE
 
-Membership book. Read by Escrow; written by Escrow only for request/participation bookkeeping.
+Membership book. Read by Escrow, the indexer and the frontend; written by Escrow only for request/participation bookkeeping. Interface: `contracts/interfaces/IRegistry.sol`.
 
-- `register()` once per address; `setReady(bool)` registered members only.
-- Ready history stored with **OpenZeppelin `Checkpoints`, keyed by block number**, per member, plus checkpointed **total Ready count** and **total registered count** (the latter for the no-Ready-filter comparison, RM5).
-- Views: `isReady`, `wasReadyAt(addr, block)`, `readyCountAt(block)`, `registeredCountAt(block)`, `hasParticipated`, `canRequest`.
-- **Request rule (thesis):** every member may open their **first** request without participating. After that, they must contribute to someone else's request **since their last request** before opening another. Track `requestCount[addr]` and `participatedSinceLastRequest[addr]`.
-- Escrow-only: `recordRequest(addr)`, `recordParticipation(addr)`.
-- `setEscrow(address)` callable **once**, then locked forever (solves the deploy-order loop without an owner).
-- Events: `Registered`, `ReadyChanged(address indexed member, bool ready)`, `EscrowSet`.
+- `register()` once per address. `setReady(bool)` registered members only; turning Ready **on requires a token balance > 0** (thesis §1.3 point 3); turning it off is always allowed; setting the current value reverts `ReadyUnchanged`.
+- Ready history stored with **OpenZeppelin `Checkpoints`, keyed by block number**, per member, plus checkpointed **total Ready count** and **total registered count** (the latter for the no-Ready-filter comparison, RM5). Lookups for the current or a future block revert `FutureLookup`.
+- Views: `isRegistered`, `wasRegisteredAt`, `isReady`, `wasReadyAt(addr, block)`, `readyCountAt(block)`, `registeredCountAt(block)`, `readyCount`, `registeredCount`, `hasParticipated`, `canRequest`, `requestCount`, `participationsSinceLastRequest`.
+- **Request rule:** every member may open their **first** request without participating. After that, they need at least one contribution to someone else's request **since their last request**. (Deliberate change from the thesis's "permanent eligibility after one contribution", which deadlocks at launch; the thesis text needs updating.)
+- **Cancel and refunds (thesis KF-8/KF-9):** a refunded contribution is taken back only if it still counts toward the member's next request; one already used to open a request stays used. Cancelling one's own request restores the right to request one had before opening it (a cancelled first request is free again).
+- Implementation: one packed `Member` slot per address; each request starts a new `round`, and contributions are tagged with it so a refund knows which counter to decrement.
+- Escrow-only: `recordRequest(addr)`, `recordCancel(addr)`, `recordParticipation(addr) returns (uint32 round)`, `revokeParticipation(addr, round)`. These emit **no events** by design: Escrow's events record the same facts (saves gas per `contribute`).
+- `setEscrow(address)` callable **once, by the deployer only**, then locked forever (solves the deploy-order loop without an owner; deployer-only prevents front-running on Sepolia).
+- Events: `Registered(address indexed member)`, `ReadyChanged(address indexed member, bool ready)`, `EscrowSet(address indexed escrow)`.
 
-## 3. Escrow — NOT YET, context only
+## 3. Escrow — NEXT
 
 **One singleton contract**, all requests in `mapping(uint256 => Request)` with an on-chain incrementing ID. Not one contract per request.
 
+- Status (thesis Tabel 3.4): `Open` (no contributions yet) → `Funding` (≥ 1 contribution) → `Finalized` (deadline passed, funds sent) or `Expired` (deadline passed, nothing collected); `Cancelled` if the requester cancels before the deadline.
 - `openRequest(uint256 amount, uint64 duration, bytes32 metadataHash)`
-  - requires `registry.canRequest`; one open request per requester; duration within min/max bounds
+  - calls `registry.recordRequest` (reverts unless `canRequest`); one open request per requester; duration within min/max bounds
   - `snapshotBlock = block.number - 1` (prevents same-block Ready toggling)
   - `n = readyCountAt(snapshotBlock)`, minus 1 if the requester was Ready then; revert if `n == 0`
   - `share = amount / n` (floor; rounding dust accepted and documented)
-  - constructor flag `useReadyFilter`: when false, use registered membership instead of Ready (RM5)
+  - constructor flag `useReadyFilter`: when false, use registered membership (`registeredCountAt` / `wasRegisteredAt`) instead of Ready (RM5)
 - `contribute(id)` / `contributeWithPermit(id, deadline, v, r, s)`
-  - before deadline, request open, caller in snapshot, not the requester, not already contributed
-  - pulls exactly `share` via `SafeERC20`; calls `registry.recordParticipation`
-- `finalize(id)` — **anyone** after the deadline (backend keeper normally). Mark finalized **before** transfer, `nonReentrant`, send whatever was collected (possibly 0). Keep-it-all: no refunds, no target requirement.
-- No withdraw/rescue function. Funds leave only through `finalize`.
+  - before deadline, request Open/Funding, caller in snapshot, not the requester, not already contributed
+  - pulls exactly `share` via `SafeERC20`; calls `registry.recordParticipation` and stores the returned round with the contribution (pack it into the "has contributed" slot)
+- `cancelRequest(id)` — **requester only**, before the deadline. Status → `Cancelled`; every contributor gets exactly their contribution back; nothing goes to the requester; calls `registry.recordCancel(requester)` and `registry.revokeParticipation(member, round)` per contributor. **Open question for the Escrow task:** refund all contributors in one transaction (push, as the thesis reads) vs. each contributor claims (pull, safer pattern).
+- `finalize(id)` — **anyone** after the deadline (backend keeper normally). Mark finalized **before** transfer, `nonReentrant`, send whatever was collected (possibly 0 → `Expired`). No target requirement.
+- No withdraw/rescue function. Funds leave **only** through `finalize` (to the requester) or cancellation refunds (to contributors).
+- Invariants (thesis): I1 pool balance of a request == its recorded contributions; I2 after `finalize` the request's pool is 0; I3 requester receives exactly the total contributed; I4 no double contribution per member per request; I5 on cancellation the refunds equal the total contributed and nothing reaches the requester.
 - Events (indexer depends on these):
   `RequestOpened(uint256 indexed id, address indexed requester, uint256 amount, uint256 share, uint256 snapshotBlock, uint64 deadline, bytes32 metadataHash)`,
   `Contributed(uint256 indexed id, address indexed member, uint256 amount)`,
-  `RequestFinalized(uint256 indexed id, address indexed requester, uint256 total)`
+  `RequestFinalized(uint256 indexed id, address indexed requester, uint256 total)`,
+  plus cancellation/refund events — names and fields to be agreed in the Escrow task.
 
 ## 4. Test-only contracts — NOT YET, context only
 
@@ -120,6 +126,6 @@ In `contracts/test/`:
 ## Thesis evaluation criteria (Tabel 1.1)
 
 - **K1 Functional** — normal flow passes; requester receives exactly the recorded total.
-- **K2 Robustness** — reentrancy fails; late contributions rejected; partial funding still released; nobody but Escrow moves pooled funds.
+- **K2 Robustness** — reentrancy fails; late contributions rejected; partial funding still released; cancellation refunds every contributor exactly; nobody but Escrow moves pooled funds.
 - **K3 Cost & time** — gas per function and per full cycle vs. direct transfer; snapshot scaling vs. block gas limit; Sepolia confirmation time.
 - **K4 Ready status** — snapshot size, gas per cycle, contribution-value-to-gas ratio, with vs. without the Ready filter.

@@ -16,12 +16,13 @@ No admin, no voting, no manual approval: the rules are the code, and every step 
 4. **Contribute.** Each member in the snapshot pays exactly one share, in one transaction (EIP-2612 permit).
 5. **Finalize.** After the deadline anyone can call `finalize()`, and the requester receives everything collected,
    even if the request was only partly funded.
+6. **Or cancel.** Before the deadline the requester can cancel, and every contributor gets their share back.
 
 ## Repository
 
 | Folder                       | What                                         | Stack                       | Status      |
 | ---------------------------- | -------------------------------------------- | --------------------------- | ----------- |
-| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests    | Solidity, Hardhat 3, viem   | Token done  |
+| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests    | Solidity, Hardhat 3, viem   | Token, Registry done |
 | `backend/`                   | REST API, event indexer, `finalize()` keeper | Go, go-ethereum, PostgreSQL | Not started |
 | `frontend/`                  | Demo UI and wallet connection                | Next.js, wagmi              | Not started |
 | [`docs/`](docs/)             | [Thesis](docs/thesis.pdf): the design source of truth |                    |             |
