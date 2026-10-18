@@ -1,57 +1,92 @@
-# Sample Hardhat 3 Project (`node:test` and `viem`)
+# Whitzard — Smart Contracts
 
-This project showcases a Hardhat 3 project using the native Node.js test runner (`node:test`) and the `viem` library for Ethereum interactions.
+The on-chain part of [Whitzard](../README.md), and the main contribution of the thesis.
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+**Stack:** Solidity 0.8.37 · OpenZeppelin Contracts 5.7 · Hardhat 3 · viem · pnpm
 
-## Project Overview
+## Contracts
 
-This example project includes:
+| Contract        | Role                                                                | Status      |
+| --------------- | ------------------------------------------------------------------- | ----------- |
+| `WhitzardToken` | ERC-20 + permit (EIP-2612). The only source of tokens is a faucet.  | Done        |
+| `Registry`      | Membership book and Ready history (block-number checkpoints)        | Not started |
+| `Escrow`        | Requests, snapshot, contributions, automatic payout                 | Not started |
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using [`node:test`](nodejs.org/api/test.html), the new Node.js native test runner, and [`viem`](https://viem.sh/).
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+There are no admin powers anywhere: no owner, no pause, no upgrade, no withdraw.
 
-## Usage
+### WhitzardToken (`WHZD`)
 
-### Running Tests
+There is no `mint()`, no owner, and the supply starts at 0. Tokens come only from the faucet:
 
-To run all the tests in the project, execute the following command:
+| Rule             | Value                                       |
+| ---------------- | ------------------------------------------- |
+| Per claim        | 100 WHZD                                    |
+| Cooldown         | 1 day per address                           |
+| Lifetime cap     | 1,000 WHZD per address; the last claim gets only the remainder |
+
+| Function / view          | Notes                                                                 |
+| ------------------------ | --------------------------------------------------------------------- |
+| `faucet()`               | Reverts `FaucetCooldown(nextClaimAt)` or `FaucetCapReached()`          |
+| `claimedTotal(address)`  | Total claimed so far                                                  |
+| `nextClaimAt(address)`   | `0` or a past timestamp means the address can claim now               |
+| `permit(...)`            | Approve by signature, so contributing takes one transaction           |
+| `FaucetClaimed(account, amount)` | Event, read by the backend indexer                            |
+
+## Setup
 
 ```shell
-npx hardhat test
+pnpm install
+pnpm hardhat build
 ```
 
-You can also selectively run the Solidity or `node:test` tests:
+## Test
 
 ```shell
-npx hardhat test solidity
-npx hardhat test nodejs
+pnpm hardhat test               # everything
+pnpm hardhat test solidity      # unit, fuzz, invariant
+pnpm hardhat test nodejs        # TypeScript integration tests
+pnpm hardhat test --gas-stats   # gas per function
+pnpm hardhat test --snapshot    # write .gas-snapshot and snapshots/
+pnpm hardhat test --coverage
 ```
 
-### Make a deployment to Sepolia
+| Layer                  | Where                    | Covers                                                    |
+| ---------------------- | ------------------------ | --------------------------------------------------------- |
+| Solidity (forge-std)   | `contracts/*.t.sol`      | Every behavior and revert, fuzz and invariants (10,000 runs each) |
+| TypeScript (viem)      | `test/*.ts`              | Chain-level flows: events across blocks, wallet-signed permits |
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+Tests are tagged with the thesis evaluation criteria (`// K1` … `// K4`):
+**K1** functional · **K2** robustness · **K3** cost and time · **K4** effect of the Ready status.
 
-To run the deployment to a local chain:
+## Deploy to Sepolia
+
+Store the secrets in the Hardhat keystore (or as environment variables). They are never committed.
 
 ```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+pnpm hardhat keystore set SEPOLIA_RPC_URL
+pnpm hardhat keystore set SEPOLIA_PRIVATE_KEY
+pnpm hardhat keystore set ETHERSCAN_API_KEY      # only for verification
 ```
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
-
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
-
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
-
 ```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+pnpm hardhat ignition deploy ignition/modules/WhitzardToken.ts                     # local dry run
+pnpm hardhat ignition deploy ignition/modules/WhitzardToken.ts --network sepolia --verify
 ```
 
-After setting the variable, you can run the deployment with the Sepolia network:
+## Claim from the faucet
 
 ```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+pnpm hardhat run scripts/faucet.ts                                         # local: deploys a fresh token first
+TOKEN_ADDRESS=0x... pnpm hardhat run scripts/faucet.ts --network sepolia
+```
+
+## Layout
+
+```
+contracts/            contracts and their Solidity tests (*.t.sol)
+contracts/interfaces/ interfaces the backend and frontend rely on
+contracts/test/       test-only contracts (mocks, attackers, baselines), never deployed
+test/                 TypeScript integration tests
+ignition/modules/     deployment modules
+scripts/              hardhat run scripts
 ```
