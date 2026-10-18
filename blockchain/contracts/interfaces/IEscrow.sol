@@ -144,8 +144,10 @@ interface IEscrow {
     function contribute(uint256 id) external;
 
     /// @notice Approves by EIP-2612 signature and contributes in one transaction.
-    /// @dev If the permit was already used (e.g. front-run), the contribution still goes ahead as
-    ///      long as the allowance is in place.
+    /// @dev The permit is skipped when the existing allowance already covers the share, so a
+    ///      larger standing approval is not overwritten. If the permit fails (e.g. it was already
+    ///      used by a front-runner), the contribution still goes ahead as long as the allowance is
+    ///      in place.
     function contributeWithPermit(
         uint256 id,
         uint256 permitDeadline,

@@ -440,6 +440,26 @@ contract EscrowTest is EscrowFixture {
         assertEq(escrow.getRequest(id).collected, 30 ether);
     }
 
+    // K1: with a standing approval that covers the share, the permit is skipped and the approval
+    // is left as it was (the signature's nonce is not used up).
+    function test_ContributeWithPermitKeepsLargerApproval() public {
+        uint256 id = _open(alice, 90 ether);
+        uint256 permitDeadline = block.timestamp + 1 hours;
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(
+            bobKey,
+            bob,
+            30 ether,
+            permitDeadline
+        );
+
+        vm.prank(bob);
+        escrow.contributeWithPermit(id, permitDeadline, v, r, s);
+
+        assertEq(escrow.getRequest(id).collected, 30 ether);
+        assertEq(token.allowance(bob, address(escrow)), type(uint256).max);
+        assertEq(token.nonces(bob), 0);
+    }
+
     // K2
     function test_RevertWhen_ContributeWithBadPermitAndNoAllowance() public {
         vm.prank(bob);
@@ -573,6 +593,54 @@ contract EscrowTest is EscrowFixture {
             )
         );
         escrow.contribute(other);
+    }
+
+    // K2
+    function test_RevertWhen_ConstructedWithZeroAddress() public {
+        vm.expectRevert(IEscrow.ZeroAddress.selector);
+        new Escrow(IERC20(address(0)), IRegistry(address(registry)), true);
+        vm.expectRevert(IEscrow.ZeroAddress.selector);
+        new Escrow(IERC20(address(token)), IRegistry(address(0)), true);
+    }
+
+    // K2: nobody but Escrow moves pooled funds. Escrow never approves anyone, so the pool cannot
+    // be pulled with transferFrom; only finalize (to the requester, after the deadline) and
+    // claimRefund (to a contributor, after a cancel) send tokens out.
+    function test_NobodyElseCanMovePooledFunds() public {
+        uint256 id = _open(alice, 90 ether);
+        _contribute(bob, id);
+        _contribute(carol, id);
+        address attacker = makeAddr("attacker");
+
+        assertEq(token.allowance(address(escrow), attacker), 0);
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientAllowance.selector,
+                attacker,
+                0,
+                60 ether
+            )
+        );
+        token.transferFrom(address(escrow), attacker, 60 ether);
+
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEscrow.DeadlineNotReached.selector,
+                id,
+                _deadlineOf(id)
+            )
+        );
+        escrow.finalize(id);
+
+        // Even when the attacker triggers finalize, the funds go to the requester.
+        vm.warp(_deadlineOf(id));
+        uint256 aliceBefore = token.balanceOf(alice);
+        vm.prank(attacker);
+        escrow.finalize(id);
+        assertEq(token.balanceOf(attacker), 0);
+        assertEq(token.balanceOf(alice), aliceBefore + 60 ether);
     }
 
     // ---------------------------------------------------------------- finalize

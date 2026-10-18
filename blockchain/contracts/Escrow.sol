@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
 
@@ -130,7 +131,7 @@ contract Escrow is IEscrow, ReentrancyGuard {
         _requests[id] = Request({
             requester: msg.sender,
             deadline: deadline,
-            snapshotSize: uint32(members),
+            snapshotSize: SafeCast.toUint32(members),
             snapshotBlock: uint48(snapshotBlock),
             state: State.Active,
             contributors: 0,
@@ -166,19 +167,23 @@ contract Escrow is IEscrow, ReentrancyGuard {
         bytes32 r,
         bytes32 s
     ) external nonReentrant {
-        // A failed permit (e.g. already used by a front-runner) is ignored; the transfer below
-        // still requires the allowance to be in place.
-        try
-            IERC20Permit(address(token)).permit(
-                msg.sender,
-                address(this),
-                _requests[id].share,
-                permitDeadline,
-                v,
-                r,
-                s
-            )
-        {} catch {}
+        // Skip the permit if the allowance already covers the share: a permit would overwrite a
+        // larger standing approval. A failed permit (e.g. already used by a front-runner) is
+        // ignored; the transfer below still requires the allowance to be in place.
+        uint256 share = _requests[id].share;
+        if (token.allowance(msg.sender, address(this)) < share) {
+            try
+                IERC20Permit(address(token)).permit(
+                    msg.sender,
+                    address(this),
+                    share,
+                    permitDeadline,
+                    v,
+                    r,
+                    s
+                )
+            {} catch {}
+        }
         _contribute(id, msg.sender);
     }
 
@@ -294,8 +299,9 @@ contract Escrow is IEscrow, ReentrancyGuard {
     }
 
     /// @inheritdoc IEscrow
-    /// @dev The snapshot check uses the latest mined block, which is the block a transaction sent
-    ///      now would snapshot.
+    /// @dev A best-effort preview: a view can only read Registry history up to the block before
+    ///      the one it runs in, so a Ready change in the latest block is not reflected yet (the
+    ///      transaction itself snapshots one block later). `openRequest` remains the authority.
     function canOpenRequest(
         address member,
         uint256 proofId

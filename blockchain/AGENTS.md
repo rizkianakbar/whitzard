@@ -121,13 +121,17 @@ Membership book. Read by Escrow, the indexer and the frontend; written by Escrow
   `RequestCancelled(uint256 indexed id, address indexed requester, uint256 total)`,
   `Refunded(uint256 indexed id, address indexed member, uint256 amount)`
 
-## 4. Test-only contracts — NEXT
+## 4. Test-only contracts — DONE
 
-In `contracts/test/`:
+In `contracts/test/` (never deployed to Sepolia), tested in `contracts/Reentrancy.t.sol` and `contracts/Baselines.t.sol`:
 
-- `DirectTransferBaseline` — non-escrow gas baseline (RM4).
-- `NaiveSnapshotEscrow` — loops over Ready members in `openRequest`; shows linear gas growth and the block-gas-limit ceiling vs. the checkpoint design (RM4c).
-- Reentrancy (RM3): `HookToken` (ERC-20 with a receiver hook on transfer), `VulnerableEscrow` (state updated after transfer, no guard), `ReentrancyAttacker`. Tests must show the attack **drains `VulnerableEscrow`** and **fails against `Escrow`**.
+- `DirectTransferBaseline` — non-escrow gas baseline (RM4): `send(to, amount)` = `transferFrom` member → requester + event.
+- `NaiveSnapshotEscrow` — own member list; `openRequest` loops over it and stores every Ready member (RM4c). ~27,100 gas per member: **614 members max** under the EIP-7825 per-transaction cap (2^24 = 16,777,216 gas, Osaka/Fusaka, live on Sepolia), which binds before any block gas limit. Escrow's `openRequest` stays ~181–195k gas at any size.
+- Reentrancy (RM3): `HookToken` (ERC-20 calling opted-in receivers after each transfer; anyone can mint), `VulnerableEscrow` (finalize pays before marking finalized, no guard), `ReentrancyAttacker` (re-enters `finalize` / `claimRefund` from the callback; can swallow the failure). Shown: the attack **drains `VulnerableEscrow`** (owed 1 share, took 4); against `Escrow` it reverts the payout, or, if swallowed, the attacker gets exactly what it is owed, once.
+
+### Gas report — `scripts/gas-report.ts`
+
+`pnpm hardhat run scripts/gas-report.ts` measures **real transaction gas** (receipt `gasUsed`, incl. 21,000 intrinsic + calldata) on the local simulated network and writes `reports/gas-report.md` / `.json`: K3a per function, K3b full cycle vs direct transfer (1/3/10/50 contributors), K3c snapshot scaling (10–1000 members, with the ceiling checked on-chain), K4a/b with vs without the Ready filter. K4c (value/gas ratio) needs `REF_GAS_PRICE_GWEI`, `REF_ETH_PRICE`, `REF_TOKEN_PRICE` (Bab III reference prices). Still open: K3d Sepolia confirmation time (needs a live deployment).
 
 ## Thesis evaluation criteria (Tabel 1.1)
 
