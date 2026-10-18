@@ -38,6 +38,8 @@ internal/testutil      throwaway test database + simulated chain with the real c
 - Evidence documents are health data (UU 27/2022): only the requester and the request's snapshot
   members may download them; never log their contents.
 - Addresses and hashes are stored lowercase 0x-hex; token amounts as `numeric(78,0)` / decimal strings.
+- Keeper: decide "due" by chain time (latest block), confirm with `Escrow.canFinalize` before
+  sending, skip requests that collected nothing, never resend within `RetryAfter`.
 - Secrets (RPC URL, keeper key) only in `.env`, never committed.
 
 ## Working
@@ -45,6 +47,7 @@ internal/testutil      throwaway test database + simulated chain with the real c
 ```shell
 docker compose up -d                      # PostgreSQL on 127.0.0.1:5433
 go test ./...                             # needs the database above
+./scripts/e2e.sh                          # full stack against a local Hardhat node
 gofmt -l . && go vet ./...
 go run ./cmd/whitzard migrate
 ```

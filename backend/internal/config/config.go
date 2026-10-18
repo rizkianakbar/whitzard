@@ -3,6 +3,7 @@ package config
 
 import (
 	"bufio"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Config holds every setting; which ones are required depends on the command.
@@ -36,6 +38,9 @@ type Config struct {
 	EvidenceDir    string
 	MaxUploadBytes int64
 	SessionTTL     time.Duration
+
+	KeeperKey          *ecdsa.PrivateKey // nil if KEEPER_PRIVATE_KEY is not set
+	KeeperPollInterval time.Duration
 }
 
 // Load reads `.env` (without overriding variables already set) and then the environment.
@@ -69,6 +74,15 @@ func Load() (*Config, error) {
 	c.EvidenceDir = get("EVIDENCE_DIR", "./data/evidence")
 	c.MaxUploadBytes = int64(uintVar("MAX_UPLOAD_BYTES", 10<<20, &errs))
 	c.SessionTTL = duration("SESSION_TTL", "168h", &errs)
+
+	if v := os.Getenv("KEEPER_PRIVATE_KEY"); v != "" {
+		key, err := crypto.HexToECDSA(strings.TrimPrefix(v, "0x"))
+		if err != nil {
+			errs = append(errs, errors.New("KEEPER_PRIVATE_KEY is not a valid private key"))
+		}
+		c.KeeperKey = key
+	}
+	c.KeeperPollInterval = duration("KEEPER_POLL_INTERVAL", "15s", &errs)
 	return c, errors.Join(errs...)
 }
 

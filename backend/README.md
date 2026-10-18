@@ -1,7 +1,7 @@
 # Whitzard — Backend
 
 Demo-support backend for [Whitzard](../README.md): mirrors the contracts into PostgreSQL, stores
-evidence documents off-chain, serves the frontend, and (soon) finalizes due requests.
+evidence documents off-chain, serves the frontend, and finalizes due requests.
 
 **It never holds member keys or moves member funds.** Members sign every transaction in their
 own wallet; the API only serves data.
@@ -13,15 +13,26 @@ own wallet; the API only serves data.
 ```shell
 docker compose up -d                   # PostgreSQL on 127.0.0.1:5433
 cp .env.example .env                   # fill in RPC_URL, contract addresses, START_BLOCK
-go run ./cmd/whitzard all              # indexer + API (or: indexer | api | migrate)
+go run ./cmd/whitzard all              # indexer + API + keeper (or: indexer | api | keeper | migrate)
 ```
+
+| Part | What it does |
+| --- | --- |
+| indexer | mirrors Registry + Escrow events into PostgreSQL, rebuilds each snapshot, creates notifications |
+| api | REST + WebSocket for the frontend (below) |
+| keeper | sends `finalize()` for funded requests past their deadline, from its own wallet (`KEEPER_PRIVATE_KEY`), which only pays gas; empty requests expire without a transaction |
 
 ## Test
 
 ```shell
 docker compose up -d
-go test ./...
+go test ./...              # unit + integration (simulated chain, real PostgreSQL)
+./scripts/e2e.sh           # full stack: Hardhat node, deploy, `whitzard all`, scripted user flow
 ```
+
+`e2e.sh` runs `../blockchain/scripts/e2e-flow.ts`: four members sign in with their wallets, a
+request is opened with an uploaded document, members are notified live, respond and contribute
+(one with a permit), the keeper finalizes after the deadline, and a cancelled request is refunded.
 
 Tests run against a fresh database each and go-ethereum's simulated chain with the real compiled
 contracts. After a contract change: `(cd ../blockchain && pnpm hardhat build) && ./scripts/gen-bindings.sh`.

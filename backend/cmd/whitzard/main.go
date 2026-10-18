@@ -3,7 +3,8 @@
 //	whitzard migrate   apply database migrations
 //	whitzard indexer   mirror contract events into PostgreSQL
 //	whitzard api       serve the REST + WebSocket API
-//	whitzard all       indexer and api in one process
+//	whitzard keeper    send finalize() for due requests (needs KEEPER_PRIVATE_KEY)
+//	whitzard all       indexer + api (+ keeper if KEEPER_PRIVATE_KEY is set) in one process
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,10 +26,11 @@ import (
 	"github.com/rizkianakbar/whitzard/backend/internal/config"
 	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
 	"github.com/rizkianakbar/whitzard/backend/internal/indexer"
+	"github.com/rizkianakbar/whitzard/backend/internal/keeper"
 	"github.com/rizkianakbar/whitzard/backend/internal/store"
 )
 
-const usage = "usage: whitzard migrate | indexer | api | all"
+const usage = "usage: whitzard migrate | indexer | api | keeper | all"
 
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -84,9 +87,19 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
 	case "api":
 		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
+	case "keeper":
+		if cfg.KeeperKey == nil {
+			return errors.New("KEEPER_PRIVATE_KEY is required for the keeper")
+		}
+		tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
 	case "all":
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
 		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
+		if cfg.KeeperKey != nil {
+			tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
+		} else {
+			log.Warn("KEEPER_PRIVATE_KEY not set: requests will not be finalized automatically")
+		}
 	default:
 		return fmt.Errorf("unknown command %q; %s", command, usage)
 	}
@@ -109,6 +122,26 @@ func indexerTask(cfg *config.Config, client *ethclient.Client, st *store.Store, 
 		}
 		log.Info("indexer started", "escrow", cfg.EscrowAddress.Hex(), "from", cfg.StartBlock, "confirmations", cfg.Confirmations)
 		return ix.Run(ctx)
+	}
+}
+
+func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, chainID *big.Int, log *slog.Logger) func(context.Context) error {
+	return func(ctx context.Context) error {
+		k, err := keeper.New(keeper.Config{
+			Escrow: cfg.EscrowAddress, Key: cfg.KeeperKey, ChainID: chainID, PollInterval: cfg.KeeperPollInterval,
+		}, client, st, log.With("component", "keeper"))
+		if err != nil {
+			return err
+		}
+		balance, err := client.BalanceAt(ctx, k.Address(), nil)
+		if err != nil {
+			return err
+		}
+		log.Info("keeper started", "wallet", k.Address().Hex(), "balanceWei", balance)
+		if balance.Sign() == 0 {
+			log.Warn("keeper wallet has no ETH for gas", "wallet", k.Address().Hex())
+		}
+		return k.Run(ctx)
 	}
 }
 

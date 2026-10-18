@@ -243,3 +243,30 @@ func (t *IndexTx) contributors(ctx context.Context, requestID uint64) ([]string,
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
+
+// ---------------------------------------------------------------- keeper
+
+// DueRequests returns requests whose deadline has passed at chain time `chainNow`, that
+// collected something (an empty request expires on its own; finalizing it would only cost gas),
+// and that have no finalize transaction sent after `retryBefore`.
+func (s *Store) DueRequests(ctx context.Context, chainNow, retryBefore time.Time, limit int) ([]int64, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT r.id FROM requests r
+		LEFT JOIN keeper_finalizations k ON k.request_id = r.id
+		WHERE r.status IN ('open', 'funding') AND r.deadline <= $1 AND r.collected > 0
+		  AND (k.request_id IS NULL OR k.sent_at < $2)
+		ORDER BY r.deadline LIMIT $3`, chainNow, retryBefore, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[int64])
+}
+
+// RecordFinalization remembers the finalize transaction sent for a request.
+func (s *Store) RecordFinalization(ctx context.Context, requestID int64, txHash string, sentAt time.Time) error {
+	_, err := s.Pool.Exec(ctx, `
+		INSERT INTO keeper_finalizations (request_id, tx_hash, sent_at) VALUES ($1, $2, $3)
+		ON CONFLICT (request_id) DO UPDATE SET tx_hash = EXCLUDED.tx_hash, sent_at = EXCLUDED.sent_at`,
+		requestID, txHash, sentAt)
+	return err
+}

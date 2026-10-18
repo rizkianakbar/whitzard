@@ -23,7 +23,7 @@ No admin, no voting, no manual approval: the rules are the code, and every step 
 | Folder                       | What                                         | Stack                       | Status      |
 | ---------------------------- | -------------------------------------------- | --------------------------- | ----------- |
 | [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests    | Solidity, Hardhat 3, viem   | Contracts done       |
-| `backend/`                   | REST API, event indexer, `finalize()` keeper | Go, go-ethereum, PostgreSQL | Not started |
+| [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper | Go, go-ethereum, PostgreSQL | Done        |
 | `frontend/`                  | Demo UI and wallet connection                | Next.js, wagmi              | Not started |
 | [`docs/`](docs/)             | [Thesis](docs/thesis.pdf): the design source of truth |                    |             |
 
