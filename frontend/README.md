@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Whitzard — Frontend
 
-## Getting Started
+Demo UI for [Whitzard](../README.md): members sign in with their wallet, ask for help, chip in their
+share and follow every step on-chain. Indonesian-language, mobile-first.
 
-First, run the development server:
+**It never holds keys or moves funds.** Every state-changing action is a transaction (or signature)
+the member approves in their own wallet, sent straight to the contracts. The [backend](../backend/)
+only serves data: profiles, the indexed history, evidence documents and notifications.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Stack:** Next.js 16 (App Router, React Compiler) · wagmi + viem · TanStack Query · Tailwind CSS 4 ·
+Base UI (shadcn) · Sonner
+
+## Run
+
+```shell
+pnpm install
+cp .env.example .env.local     # contract addresses + API URL (Sepolia by default)
+pnpm dev                       # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend must be running (`NEXT_PUBLIC_API_URL`, default `http://127.0.0.1:8080`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Local chain instead of Sepolia:** `../backend/scripts/dev.sh` starts a Hardhat node, deploys the
+contracts, runs the backend and writes `.env.development.local` (it overrides `.env.local` under
+`pnpm dev`, and is removed when the script stops), with the Hardhat test accounts offered as
+wallets. Then run `pnpm dev` in another terminal.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | backend base URL |
+| `NEXT_PUBLIC_CHAIN_ID` | `11155111` (Sepolia) or `31337` (local Hardhat) |
+| `NEXT_PUBLIC_RPC_URL` | optional RPC for reads; defaults to the chain's public RPC |
+| `NEXT_PUBLIC_TOKEN_ADDRESS` · `_REGISTRY_` · `_ESCROW_` | deployed contract addresses |
+| `NEXT_PUBLIC_DEV_ACCOUNTS` | local chain only: offer the Hardhat accounts as wallets |
 
-## Learn More
+All of these are public (bundled into the browser). Never put secrets here.
 
-To learn more about Next.js, take a look at the following resources:
+```shell
+pnpm lint
+pnpm build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Pages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Route | |
+| --- | --- |
+| `/` | Landing page: how it works, community totals |
+| `/gabung` | Onboarding: test ETH for gas, top up WHZD, register, profile, turn on _Siap membantu_ |
+| `/beranda` | Dashboard: balance and totals, _Siap membantu_ switch, whether you can open a request, running requests for you (carousel, unanswered first) and yours, the member list |
+| `/permintaan` | Every request, filtered (all / for me / mine, running / finished) and searchable |
+| `/permintaan/[id]` | One request: funding and share grid, story, evidence (checked against its on-chain hash), actions, and the full history with a transaction link for each step |
+| `/ajukan` | Open a request: story, amount, duration, evidence document; or why you can't yet |
+| `/notifikasi` | All notifications (the bell in the header shows the latest) |
+| `/profil` | Your profile and photo |
 
-## Deploy on Vercel
+## How it talks to the chain
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Sign in** is Sign-In with Ethereum: the wallet signs a message from the backend, which returns a
+  session token for API calls (`src/lib/session.tsx`).
+- **Transactions** go through `useTx()` (`src/lib/tx.ts`): wallet → mined → indexed by the backend →
+  refresh. Every call names what the member is approving; while the wallet is open the page shows
+  it, with the contract and function the wallet will display (`src/lib/wallet-prompt.ts`), since a
+  site can't put its own words in the wallet's popup.
+- **Contributing** takes one transaction: `contribute` if the Escrow already has an allowance,
+  otherwise an EIP-2612 permit signature followed by `contributeWithPermit`.
+- **Transparency:** each on-chain step in a request's history links to its transaction on Etherscan;
+  evidence documents are hashed in the browser and compared with the hash stored on-chain.
+- **Privacy:** who declined or didn't answer is only counted, never named.
+- **Live updates:** a WebSocket to the backend pushes notifications, which refresh the affected data.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Layout
+
+```
+src/app/(public)/      landing page
+src/app/(app)/         signed-in pages (wrapped in MemberGate)
+src/components/        pages and their parts; ui/ is shadcn (Base UI) primitives
+src/lib/api.ts         backend client and response types
+src/lib/queries.ts     TanStack Query hooks and keys
+src/lib/abi/           GENERATED contract ABIs (scripts/gen-abi.mjs)
+src/lib/contracts.ts   contract addresses + ABIs for wagmi
+```
+
+After a contract change: `(cd ../blockchain && pnpm hardhat build) && node scripts/gen-abi.mjs`.

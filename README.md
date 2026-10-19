@@ -20,12 +20,12 @@ No admin, no voting, no manual approval: the rules are the code, and every step 
 
 ## Repository
 
-| Folder                       | What                                         | Stack                       | Status      |
-| ---------------------------- | -------------------------------------------- | --------------------------- | ----------- |
-| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests    | Solidity, Hardhat 3, viem   | Contracts done       |
-| [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper | Go, go-ethereum, PostgreSQL | Done        |
-| `frontend/`                  | Demo UI and wallet connection                | Next.js, wagmi              | Not started |
-| [`docs/`](docs/)             | [Thesis](docs/thesis.pdf): the design source of truth |                    |             |
+| Folder                       | What                                                    | Stack                       | Status         |
+| ---------------------------- | ------------------------------------------------------- | --------------------------- | -------------- |
+| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests               | Solidity, Hardhat 3, viem   | Contracts done |
+| [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper, evidence  | Go, go-ethereum, PostgreSQL | Done           |
+| [`frontend/`](frontend/)     | Demo UI: wallet sign-in, requests, history, dashboard   | Next.js, wagmi              | Working demo   |
+| [`docs/`](docs/)             | [Thesis](docs/thesis.pdf): the design source of truth   |                             |                |
 
 The backend never holds member keys or moves funds. Users sign every transaction in their own wallet.
 
@@ -33,10 +33,20 @@ The backend never holds member keys or moves funds. Users sign every transaction
 
 ## Quick start
 
+Contracts and their tests:
+
 ```shell
 cd blockchain
 pnpm install
 pnpm hardhat test
 ```
 
-Full guide: [`blockchain/README.md`](blockchain/README.md).
+The whole stack on a local chain (PostgreSQL in Docker, Hardhat node, contracts, backend):
+
+```shell
+cd backend && ./scripts/dev.sh        # runs until Ctrl-C
+cd frontend && pnpm install && pnpm dev   # in another terminal → http://localhost:3000
+```
+
+Against Sepolia instead, see [`backend/README.md`](backend/README.md) and
+[`frontend/README.md`](frontend/README.md). Contracts in depth: [`blockchain/README.md`](blockchain/README.md).
