@@ -1,0 +1,65 @@
+import Link from "next/link";
+import { Check, ChevronRight, Clock, X } from "lucide-react";
+
+import { StatusBadge } from "@/components/status-badge";
+import type { Request } from "@/lib/api";
+import { formatWhzd } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+const shortDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" });
+
+/** Still collecting: open or funding, and not yet past its deadline. */
+export function isLive(r: Request) {
+  return (r.status === "open" || r.status === "funding") && !r.awaitingFinalize;
+}
+
+/** When a finished request finished (for sorting and display). */
+export function endedAt(r: Request): string {
+  return r.finalizedAt ?? r.cancelledAt ?? r.deadline;
+}
+
+/** A finished request, reduced to its outcome. `mine`: the viewer is the requester. */
+export function PastRequestRow({ request: r, first, mine }: { request: Request; first: boolean; mine?: boolean }) {
+  const outcome =
+    r.status === "finalized"
+      ? {
+          icon: <Check className="size-4.5" strokeWidth={2.5} />,
+          tone: "bg-daun-soft text-daun-ink",
+          text: (
+            <>
+              <strong className="tabular font-semibold text-arang">{formatWhzd(r.collected)} WHZD</strong>{" "}
+              {mine ? "diterima" : "terkirim"} dari {r.contributors} anggota
+            </>
+          ),
+        }
+      : r.status === "cancelled"
+        ? {
+            icon: <X className="size-4.5" />,
+            tone: "bg-bata-soft text-bata-ink",
+            text: mine ? "Kamu membatalkannya" : "Dibatalkan oleh peminta",
+          }
+        : r.awaitingFinalize
+          ? { icon: <Clock className="size-4.5" />, tone: "bg-kunyit-soft text-kunyit-ink", text: "Waktu habis, dana sedang dikirim" }
+          : { icon: <Clock className="size-4.5" />, tone: "bg-muted text-batu", text: "Berakhir tanpa iuran" };
+
+  return (
+    <li className={cn(!first && "border-t")}>
+      <Link href={`/permintaan/${r.id}`} className="group flex items-center gap-4 p-4 transition-colors hover:bg-muted/60 sm:px-5">
+        <span aria-hidden="true" className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", outcome.tone)}>
+          {outcome.icon}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate font-semibold">{r.title ?? `Permintaan nomor ${r.id}`}</span>
+          <span className="truncate text-sm text-batu">
+            {outcome.text} · {shortDate.format(new Date(endedAt(r)))}
+          </span>
+        </span>
+        <StatusBadge request={r} className="hidden sm:inline-flex" />
+        <ChevronRight
+          aria-hidden="true"
+          className="size-4 shrink-0 text-batu transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+        />
+      </Link>
+    </li>
+  );
+}

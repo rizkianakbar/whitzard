@@ -3,15 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, RotateCcw } from "lucide-react";
+import { ArrowRight, Check, HandHeart, RotateCcw, Send } from "lucide-react";
 import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { toast } from "sonner";
 
 import { Avatar, callName } from "@/components/avatar";
 import { CountdownPill } from "@/components/countdown";
-import { FundingProgress, percentCollected } from "@/components/funding";
-import { StatusBadge } from "@/components/status-badge";
+import { FundingProgress } from "@/components/funding";
+import { isLive, PastRequestRow } from "@/components/request-row";
+import { ShareGrid } from "@/components/share-grid";
 import { BusyLabel, TxLabel } from "@/components/tx-label";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -203,11 +204,6 @@ function RefundNotice() {
 
 // ---------------------------------------------------------------- lists
 
-/** Still collecting: open or funding, and not yet past its deadline. */
-function isLive(r: Request) {
-  return (r.status === "open" || r.status === "funding") && !r.awaitingFinalize;
-}
-
 function SectionTitle({ id, children, action }: { id: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
@@ -319,13 +315,17 @@ function DeclineButton({ id, token }: { id: number; token: string | null }) {
 
 function MyRequests() {
   const { data, isPending } = useRequests("mine");
-  const mine = (data ?? []).slice(0, 3);
+  // Waiting to be sent still counts as running for the requester: the money hasn't arrived yet.
+  const running = (r: Request) => isLive(r) || r.awaitingFinalize;
+  const live = (data ?? []).filter(running);
+  const past = (data ?? []).filter((r) => !running(r)).slice(0, 3);
+  const any = live.length + past.length > 0;
   return (
     <section aria-labelledby="mine" className="flex flex-col gap-4">
       <SectionTitle
         id="mine"
         action={
-          mine.length > 0 && (
+          any && (
             <Link href="/permintaan" className="font-semibold text-pandan underline underline-offset-4">
               Semua permintaan
             </Link>
@@ -335,43 +335,83 @@ function MyRequests() {
         Permintaanmu
       </SectionTitle>
       {isPending ? (
-        <Skeleton className="h-24 w-full rounded-3xl" />
-      ) : mine.length === 0 ? (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 rounded-3xl border border-dashed bg-card p-7">
-          <p className="min-w-72 flex-1 leading-relaxed text-batu">
-            Kamu belum pernah mengajukan. Saat butuh biaya berobat, ajukan di sini dan anggota yang siap membantu
-            langsung diberi tahu.
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      ) : !any ? (
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed bg-card p-6 sm:flex-row sm:items-center sm:gap-5">
+          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-pandan-soft text-pandan">
+            <HandHeart className="size-6" />
+          </span>
+          <p className="flex-1 leading-relaxed text-batu">
+            <span className="block font-bold text-arang">Belum pernah mengajukan</span>
+            Saat butuh biaya berobat, ajukan di sini. Anggota yang siap membantu langsung diberi tahu.
           </p>
-          <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
+          <Link href="/ajukan" className={buttonVariants({ variant: "outline", className: "w-full sm:w-auto" })}>
             Ajukan bantuan
           </Link>
         </div>
       ) : (
-        <ul className="flex flex-col overflow-hidden rounded-3xl border bg-card">
-          {mine.map((r, i) => (
-            <li key={r.id} className={cn(i > 0 && "border-t")}>
-              <Link href={`/permintaan/${r.id}`} className="flex flex-col gap-3 p-5 transition-colors hover:bg-muted/60">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="min-w-0 font-bold">{r.title ?? `Permintaan nomor ${r.id}`}</span>
-                  <div className="flex items-center gap-2">
-                    {isLive(r) && <CountdownPill deadline={r.deadline} className="py-1 text-[13px]" />}
-                    <StatusBadge request={r} />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full origin-left rounded-full bg-kunyit" style={{ scale: `${percentCollected(r) / 100} 1` }} />
-                  </div>
-                  <span className="tabular shrink-0 text-sm text-batu">
-                    <strong className="font-semibold text-arang">{formatWhzd(r.collected)}</strong> dari {formatWhzd(r.amount)} WHZD
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-4">
+          {live.length > 0 && (
+            <ul className="flex flex-col gap-4">
+              {live.map((r) => (
+                <LiveRequestCard key={r.id} request={r} />
+              ))}
+            </ul>
+          )}
+          {past.length > 0 && (
+            <ul className="overflow-hidden rounded-2xl border bg-card">
+              {past.map((r, i) => (
+                <PastRequestRow key={r.id} request={r} first={i === 0} mine />
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
+  );
+}
+
+/** Your request while it collects: everything you'd want to know at a glance, and what happens next. */
+function LiveRequestCard({ request: r }: { request: Request }) {
+  const sending = r.awaitingFinalize;
+  return (
+    <li>
+      <Link
+        href={`/permintaan/${r.id}`}
+        className="group flex flex-col gap-5 rounded-2xl border bg-card p-5 transition-colors duration-200 hover:border-pandan/40 sm:p-6"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-2 text-[13px] font-semibold text-pandan">
+              <span aria-hidden="true" className="relative flex size-2">
+                <span className="absolute inset-0 rounded-full bg-kunyit motion-safe:animate-ping" />
+                <span className="relative size-2 rounded-full bg-kunyit" />
+              </span>
+              {sending ? "Sedang dikirim ke dompetmu" : "Sedang mengumpulkan"}
+            </span>
+            <span className="text-xl leading-snug font-bold text-balance">{r.title ?? `Permintaan nomor ${r.id}`}</span>
+          </div>
+          {!sending && <CountdownPill deadline={r.deadline} />}
+        </div>
+
+        <div className="flex flex-col gap-4 rounded-xl bg-embun p-4">
+          <FundingProgress request={r} />
+          <ShareGrid variant="small" size={r.snapshotSize} contributed={r.contributors} declined={0} />
+        </div>
+
+
+        <div className="flex items-center justify-between gap-3 border-t pt-4 text-sm">
+          <span className="flex min-w-0 items-center gap-2 text-batu">
+            <Send aria-hidden="true" className="size-4 shrink-0" />
+            {sending ? "Tidak perlu melakukan apa pun." : "Dikirim otomatis ke dompetmu saat waktu habis."}
+          </span>
+          <span className="flex shrink-0 items-center gap-1 font-semibold text-pandan">
+            Lihat
+            <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+          </span>
+        </div>
+      </Link>
+    </li>
   );
 }
 
