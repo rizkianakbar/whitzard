@@ -39,7 +39,7 @@ Docs: Hardhat 3 — https://hardhat.org/llms.txt · viem — https://viem.sh/llm
 - Every behavior has a test; every revert path has a test asserting the exact custom error. Tag tests with the thesis criterion they support (`// K1` … `// K4`).
 - `pnpm hardhat test` must be green before calling a task done. Report gas output at the end of each task.
 - Don't add dependencies without asking. Don't change event signatures without asking (the Go indexer depends on them).
-- Existing Sepolia deployments in `ignition/deployments/` (Counter, old WhitzardToken) are throwaway experiments; don't build on them.
+- Live Sepolia deployment: `ignition/deployments/chain-11155111` (Token, Registry, Escrow with the Ready filter; addresses in `README.md`). The backend and frontend env files point at it — don't redeploy over it without asking.
 
 ---
 

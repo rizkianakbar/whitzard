@@ -1,3 +1,5 @@
 {
-  "WhitzardTokenModule#WhitzardToken": "0x903709b3c1849BD243682D1Ba254767B93E37449"
+  "WhitzardTokenModule#WhitzardToken": "0x903709b3c1849BD243682D1Ba254767B93E37449",
+  "RegistryModule#Registry": "0xED0466f45E9aD8593315D8eFd648E4C236cb3105",
+  "EscrowModule#Escrow": "0x2e902611e0Ab6Ae51BA191608b8FcA89487484AF"
 }

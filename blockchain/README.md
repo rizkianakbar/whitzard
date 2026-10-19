@@ -116,6 +116,16 @@ Tests are tagged with the thesis evaluation criteria (`// K1` … `// K4`):
 
 ## Deploy to Sepolia
 
+Live deployment (chain ID 11155111, `ignition/deployments/chain-11155111`, Ready filter on):
+
+| Contract      | Address                                      | Block    |
+| ------------- | -------------------------------------------- | -------- |
+| WhitzardToken | `0x903709b3c1849BD243682D1Ba254767B93E37449` | 11940135 |
+| Registry      | `0xED0466f45E9aD8593315D8eFd648E4C236cb3105` | 11944936 |
+| Escrow        | `0x2e902611e0Ab6Ae51BA191608b8FcA89487484AF` | 11944988 |
+
+`Registry.setEscrow` was called at block 11944994. The backend indexer starts at `START_BLOCK=11944936`.
+
 Store the secrets in the Hardhat keystore (or as environment variables). They are never committed.
 
 ```shell
