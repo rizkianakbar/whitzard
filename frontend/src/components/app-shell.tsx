@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, Suspense, useEffect } from "react";
+import { type ReactNode, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, LogOut, Plus, UserRound } from "lucide-react";
@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatWhzd, shortAddress } from "@/lib/format";
 import { useMe, useNotifications } from "@/lib/queries";
 import { useSession } from "@/lib/session";
@@ -57,7 +56,7 @@ function ActiveNavLinks({ placement }: { placement: "top" | "bottom" }) {
   return <NavLinks placement={placement} pathname={usePathname()} />;
 }
 
-/** The members-only area: sends signed-out visitors to the landing page and non-members to /gabung. */
+/** The members-only area's frame. Each page guards its own content with <MemberGate>. */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
@@ -83,9 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <WrongNetwork />
       <main className="mx-auto w-full max-w-290 flex-1 px-4 pt-8 pb-16 sm:px-6 sm:pt-10">
-        <Suspense fallback={<PageSkeleton />}>
-          <Gate>{children}</Gate>
-        </Suspense>
+        {children}
       </main>
       <MemberOnly>
         <nav
@@ -107,32 +104,6 @@ function MemberOnly({ children }: { children: ReactNode }) {
   return me?.chain.registered ? children : null;
 }
 
-function PageSkeleton() {
-  return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-10 w-64 rounded-full" />
-      <Skeleton className="h-48 w-full rounded-3xl" />
-      <Skeleton className="h-72 w-full rounded-3xl" />
-    </div>
-  );
-}
-
-function Gate({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { status } = useSession();
-  const { data: me } = useMe();
-  const joining = pathname === "/gabung";
-  const registered = me?.chain.registered;
-
-  useEffect(() => {
-    if (status === "disconnected" || status === "signed-out") router.replace("/");
-    else if (registered === false && !joining) router.replace("/gabung");
-  }, [status, registered, joining, router]);
-
-  if (status !== "signed-in" || !me || (!registered && !joining)) return <PageSkeleton />;
-  return children;
-}
 
 function Wallet() {
   const { status } = useSession();

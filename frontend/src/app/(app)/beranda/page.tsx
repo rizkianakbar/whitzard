@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 
 import { Dashboard } from "@/components/dashboard";
+import { MemberGate } from "@/components/member-gate";
 
 export const metadata: Metadata = { title: "Beranda" };
-export const instant = false
 
 export default function Page() {
-  return <Dashboard />;
+  return (
+    <MemberGate>
+      <Dashboard />
+    </MemberGate>
+  );
 }
