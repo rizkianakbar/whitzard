@@ -1,0 +1,126 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* `dark:` styles only apply under a .dark class (never set: the app is light-only for now),
+   not whenever the operating system prefers dark mode. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Whitzard tokens (design direction: "buku kas bertinta nila").
+ * nila    #1E2B63  all primary text and actions
+ * kunyit  #E2A21F  filled shares and progress only, never text; also the focus ring
+ * kapur   #F5F7FA  background (panels are white)
+ * batu    #5A6275  secondary text
+ * garis   #D9DEE7  lines and borders
+ * daun    #2E7D57  finalized      bata #B3412E  cancelled / errors
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-jakarta);
+  --font-heading: var(--font-jakarta);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --color-nila: #1e2b63;
+  --color-nila-soft: #e8ebf5;
+  --color-kunyit: #e2a21f;
+  --color-kunyit-soft: #fbefd3;
+  --color-kunyit-ink: #6b4a06;
+  --color-batu: #5a6275;
+  --color-garis: #d9dee7;
+  --color-kapur: #f5f7fa;
+  --color-daun: #2e7d57;
+  --color-daun-soft: #e3f1ea;
+  --color-daun-ink: #1f5a3e;
+  --color-bata: #b3412e;
+  --color-bata-soft: #f7e3df;
+  --color-bata-ink: #8a2e1f;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 14px;
+  --radius-2xl: 14px;
+  --radius-panel: 14px;
+}
+
+:root {
+  --background: #f5f7fa;
+  --foreground: #1e2b63;
+  --card: #ffffff;
+  --card-foreground: #1e2b63;
+  --popover: #ffffff;
+  --popover-foreground: #1e2b63;
+  --primary: #1e2b63;
+  --primary-foreground: #ffffff;
+  --secondary: #ffffff;
+  --secondary-foreground: #1e2b63;
+  --muted: #eef0f4;
+  --muted-foreground: #5a6275;
+  --accent: #e8ebf5;
+  --accent-foreground: #1e2b63;
+  --destructive: #b3412e;
+  --border: #d9dee7;
+  --input: #d9dee7;
+  --ring: #e2a21f;
+  --radius: 8px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* Plus Jakarta Sans turns the "x" in "0x7099" into "×" via contextual alternates. */
+    font-feature-settings: "calt" 0;
+  }
+  /* One visible focus style everywhere: a 3px turmeric ring. */
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* The one orchestrated motion: your share cell filling in once your contribution is recorded. */
+@keyframes share-fill {
+  from {
+    background-color: #ffffff;
+    transform: scale(0.85);
+  }
+  to {
+    background-color: var(--color-kunyit);
+    transform: scale(1);
+  }
+}
+.share-fill {
+  animation: share-fill 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-fill {
+    animation: none;
+  }
+}

@@ -1,0 +1,103 @@
+"use client";
+
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
+import { useConnection, useConfig } from "wagmi";
+import { signMessage } from "wagmi/actions";
+import type { Address } from "viem";
+
+import { api, ApiError } from "@/lib/api";
+
+type Stored = { token: string; expiresAt: string };
+
+type Session = {
+  /** The connected wallet, if any. */
+  address: Address | undefined;
+  /** The backend session token for that wallet, if signed in. */
+  token: string | null;
+  /** "loading" until the stored session (if any) has been read in the browser. */
+  status: "disconnected" | "loading" | "signed-out" | "signed-in";
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+};
+
+const SessionContext = createContext<Session | null>(null);
+const key = (address: string) => `whitzard.session.${address.toLowerCase()}`;
+
+function read(address: string): Stored | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(key(address)) ?? "null") as Stored | null;
+    return stored && new Date(stored.expiresAt) > new Date() ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+// Sessions live in localStorage; this store lets React read them and hear changes (this tab or others).
+const listeners = new Set<() => void>();
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+function write(address: string, value: Stored | null) {
+  if (value) localStorage.setItem(key(address), JSON.stringify(value));
+  else localStorage.removeItem(key(address));
+  listeners.forEach((l) => l());
+}
+
+/** Sign-In with Ethereum against the backend, one session per connected wallet. */
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const config = useConfig();
+  const { address } = useConnection();
+  const token = useSyncExternalStore(
+    subscribe,
+    () => (address ? (read(address)?.token ?? null) : null),
+    () => undefined,
+  );
+
+  // A stored token may have been revoked or the backend reset: check it once per wallet.
+  useEffect(() => {
+    if (!address || !token) return;
+    api.member("me", token).catch((error) => {
+      if (error instanceof ApiError && error.status === 401) write(address, null);
+    });
+  }, [address, token]);
+
+  const status: Session["status"] = !address
+    ? "disconnected"
+    : token === undefined
+      ? "loading"
+      : token
+        ? "signed-in"
+        : "signed-out";
+
+  const signIn = useCallback(async () => {
+    if (!address) throw new Error("Hubungkan dompet dulu.");
+    const { nonce, message } = await api.nonce(address);
+    const signature = await signMessage(config, { message });
+    const session = await api.verify(address, nonce, signature);
+    write(address, { token: session.token, expiresAt: session.expiresAt });
+  }, [address, config]);
+
+  const signOut = useCallback(async () => {
+    if (!address) return;
+    const current = read(address);
+    write(address, null);
+    if (current) await api.logout(current.token).catch(() => undefined);
+  }, [address]);
+
+  return (
+    <SessionContext.Provider value={{ address, token: token ?? null, status, signIn, signOut }}>
+      {children}
+    </SessionContext.Provider>
+  );
+}
+
+export function useSession(): Session {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error("useSession must be used inside <SessionProvider>");
+  return session;
+}
