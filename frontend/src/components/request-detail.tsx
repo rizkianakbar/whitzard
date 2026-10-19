@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Check, Clock, FileText, Hand, HeartHandshake, Hourglass, TriangleAlert, UserRound } from "lucide-react";
+import { ArrowLeft, Check, Clock, FileText, Hand, HeartHandshake, Hourglass, LoaderCircle, TriangleAlert, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
 import { readContract, signTypedData, writeContract } from "wagmi/actions";
@@ -34,6 +34,7 @@ import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
 import { formatDate, formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useMe, useMember, useRequest } from "@/lib/queries";
+import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
 import { cn } from "@/lib/utils";
@@ -276,7 +277,7 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
 
   if (r.status === "finalized") {
     return (
-      <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah diteruskan">
+      <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah terkirim">
         <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sampai ke {requesterName}
         {r.finalizedAt ? ` pada ${formatDate(r.finalizedAt)}` : ""}.
       </Summary>
@@ -521,34 +522,104 @@ function RequesterPanel({ detail }: { detail: Detail }) {
   );
 }
 
+// The keeper usually lands finalize within a minute of the deadline; a manual send is only offered
+// as a fallback once it is clearly taking longer than that.
+const MANUAL_AFTER = 3 * 60_000;
+const OPEN_ON_CHAIN = [0, 1]; // IEscrow.Status.Open, IEscrow.Status.Funding
+
+/**
+ * Time is up and the keeper is sending finalize. Nothing for the viewer to do, so the panel just
+ * follows the transfer (refetching until the request is finalized) instead of asking for a click.
+ * finalize can only ever run once (the contract reverts a second call), so the manual fallback
+ * can't pay twice; it still checks the chain first so nobody signs a transaction that would fail.
+ */
 function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requesterName: string }) {
   const config = useConfig();
+  const queryClient = useQueryClient();
   const { token: session } = useSession();
   const tx = useTx();
   const r = detail.request;
+  const empty = BigInt(r.collected) === 0n;
+  const recipient = detail.you?.isRequester ? "dompetmu" : requesterName;
+  const overdue = useNow() - new Date(r.deadline).getTime() > MANUAL_AFTER;
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: keys.request(r.id) });
+    }, 4000);
+    return () => {
+      clearInterval(timer);
+      // Unmounts once the request is finalized: the requester's balance and the lists changed too.
+      void queryClient.invalidateQueries({ queryKey: ["member"] });
+      void queryClient.invalidateQueries({ queryKey: ["requests"] });
+    };
+  }, [queryClient, r.id]);
+
+  const forward = async () => {
+    const status = await readContract(config, { ...escrow, functionName: "status", args: [BigInt(r.id)] });
+    if (!OPEN_ON_CHAIN.includes(status)) {
+      await queryClient.invalidateQueries({ queryKey: keys.request(r.id) });
+      toast("Dananya sudah terkirim otomatis.");
+      return;
+    }
+    await tx.run({
+      send: () => writeContract(config, { ...escrow, functionName: "finalize", args: [BigInt(r.id)] }),
+      synced: async () => (await api.request(r.id, session)).request.status !== r.status,
+      success: empty ? "Permintaan ditutup." : `Dana terkirim ke ${recipient}.`,
+      invalidate: [keys.request(r.id), ["requests"], ["member"]],
+    });
+  };
+
+  const steps = [
+    { label: "Waktu pengumpulan habis", state: "done" },
+    { label: empty ? "Menutup permintaan" : `Mengirim ${formatWhzd(r.collected)} WHZD otomatis`, state: "active" },
+    { label: empty ? "Selesai" : `Diterima ${recipient}`, state: "todo" },
+  ] as const;
+
   return (
     <>
-      <Summary icon={<Hourglass className="size-5" />} title="Waktu sudah habis">
-        <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sedang diteruskan ke {requesterName}. Biasanya
-        selesai dalam beberapa menit.
+      <Summary icon={<Hourglass className="size-5" />} title={empty ? "Waktu habis" : "Waktu habis, dana segera dikirim"}>
+        {empty ? (
+          "Tidak ada iuran yang masuk, jadi tidak ada dana yang dikirim. Permintaan ini ditutup otomatis."
+        ) : (
+          <>
+            Tinggal tunggu sebentar. <strong className="tabular text-arang">{formatWhzd(r.collected)} WHZD</strong> dikirim
+            otomatis ke {recipient}, tidak perlu menekan apa pun. Halaman ini berubah sendiri begitu dananya sampai.
+          </>
+        )}
       </Summary>
-      <Button
-        variant="outline"
-        disabled={tx.busy}
-        onClick={() =>
-          void tx.run({
-            send: () => writeContract(config, { ...escrow, functionName: "finalize", args: [BigInt(r.id)] }),
-            synced: async () => (await api.request(r.id, session)).request.status === "finalized",
-            success: `Dana diteruskan ke ${requesterName}.`,
-            invalidate: [keys.request(r.id), ["requests"]],
-          })
-        }
-      >
-        <Swap>{tx.busy ? phaseLabel[tx.phase] : "Teruskan sekarang"}</Swap>
-      </Button>
-      <p className="text-[13px] leading-relaxed text-batu">
-        Siapa pun boleh meneruskannya. Dananya hanya bisa pergi ke {requesterName}.
-      </p>
+
+      <ol aria-label="Proses" className="flex flex-col gap-3 rounded-xl bg-embun p-4">
+        {steps.map((step) => (
+          <li key={step.label} className="flex items-center gap-3 text-sm">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-full",
+                step.state === "done" && "bg-pandan text-white",
+                step.state === "active" && "bg-kunyit-soft text-kunyit-ink",
+                step.state === "todo" && "border-2 border-garis",
+              )}
+            >
+              {step.state === "done" && <Check className="size-3.5" strokeWidth={3} />}
+              {step.state === "active" && <LoaderCircle className="size-4 motion-safe:animate-spin" />}
+            </span>
+            <span className={cn(step.state === "todo" ? "text-batu" : "font-semibold")}>{step.label}</span>
+          </li>
+        ))}
+      </ol>
+
+      {overdue && (
+        <div className="settle-in flex flex-col gap-3 border-t pt-5">
+          <p className="text-[13px] leading-relaxed text-batu">
+            Pengirimannya lebih lama dari biasanya. Kalau tidak mau menunggu, kamu bisa mengirimnya sendiri. Dananya tetap
+            hanya bisa sampai ke {requesterName}, dan tidak mungkin terkirim dua kali.
+          </p>
+          <Button variant="outline" disabled={tx.busy} onClick={() => void forward()}>
+            <Swap>{tx.busy ? phaseLabel[tx.phase] : "Kirim sekarang"}</Swap>
+          </Button>
+        </div>
+      )}
     </>
   );
 }

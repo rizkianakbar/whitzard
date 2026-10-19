@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 const styles = {
   open: ["Terbuka", "bg-pandan-soft text-pandan"],
   funding: ["Mengumpulkan", "bg-kunyit-soft text-kunyit-ink"],
-  awaiting: ["Menunggu diteruskan", "bg-kunyit-soft text-kunyit-ink"],
-  finalized: ["Diteruskan", "bg-daun-soft text-daun-ink"],
+  awaiting: ["Sedang dikirim", "bg-kunyit-soft text-kunyit-ink"],
+  finalized: ["Terkirim", "bg-daun-soft text-daun-ink"],
   expired: ["Berakhir", "bg-muted text-batu"],
   cancelled: ["Dibatalkan", "bg-bata-soft text-bata-ink"],
 } as const;
