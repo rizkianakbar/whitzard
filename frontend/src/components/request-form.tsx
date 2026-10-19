@@ -23,6 +23,7 @@ import { formatWhzd } from "@/lib/format";
 import { keys, useMe, useProof } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
+import { useFieldErrors } from "@/lib/use-field-errors";
 import { cn } from "@/lib/utils";
 
 const DAY = 24 * 60 * 60;
@@ -99,29 +100,31 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
   const [amount, setAmount] = useState("");
   const [duration, setDuration] = useState(durations.find((d) => d.label === "3 hari")!.seconds);
   const [file, setFile] = useState<File | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: readyCount } = useReadContract({ ...registry, functionName: "readyCount" });
   const members = readyCount === undefined ? undefined : Number(readyCount) - (meReady ? 1 : 0);
   const amountWei = parseAmount(amount);
   const share = amountWei && members && members > 0 ? amountWei / BigInt(members) : null;
 
-  const validate = () => {
-    const next: Record<string, string> = {};
-    if (!title.trim()) next.title = "Isi judul permintaan.";
-    else if (title.trim().length > 120) next.title = "Judul paling banyak 120 karakter.";
-    if (!description.trim()) next.description = "Ceritakan untuk apa dana ini.";
-    if (!amountWei) next.amount = "Isi jumlah dalam WHZD, misalnya 300.";
-    if (!file) next.file = "Lampirkan tagihan atau surat dokter.";
-    else if (file.size > MAX_BYTES) next.file = "Dokumen lebih dari 10 MB.";
-    if (members !== undefined && members <= 0) next.amount = "Belum ada anggota lain yang siap membantu.";
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
+  const { errors, validateAll, change, blur } = useFieldErrors({ title, description, amount, file }, (field, v) => {
+    switch (field) {
+      case "title":
+        if (!v.title.trim()) return "Isi judul permintaan.";
+        return v.title.trim().length > 120 ? "Judul paling banyak 120 karakter." : null;
+      case "description":
+        return v.description.trim() ? null : "Ceritakan untuk apa dana ini.";
+      case "amount":
+        if (members !== undefined && members <= 0) return "Belum ada anggota lain yang siap membantu.";
+        return parseAmount(v.amount) ? null : "Isi jumlah dalam WHZD, misalnya 300.";
+      case "file":
+        if (!v.file) return "Lampirkan tagihan atau surat dokter.";
+        return v.file.size > MAX_BYTES ? "Dokumen lebih dari 10 MB." : null;
+    }
+  });
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!validate() || !file || !amountWei) return;
+    if (!validateAll() || !file || !amountWei) return;
 
     let evidenceHash: `0x${string}`;
     setUploading(true);
@@ -167,11 +170,31 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         className="flex min-w-0 flex-[999_1_560px] flex-col gap-7 rounded-3xl border bg-card p-6 sm:p-8"
       >
         <Field id="title" label="Judul" error={errors.title}>
-          <Input id="title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} aria-invalid={!!errors.title} />
+          <Input
+            id="title"
+            value={title}
+            maxLength={120}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              change("title", e.target.value);
+            }}
+            onBlur={() => blur("title")}
+            aria-invalid={!!errors.title}
+          />
         </Field>
 
         <Field id="description" label="Ceritamu" hint="Apa yang terjadi, dan untuk apa dana ini. Tidak perlu menyebut diagnosis lengkap." error={errors.description}>
-          <Textarea id="description" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} aria-invalid={!!errors.description} />
+          <Textarea
+            id="description"
+            rows={5}
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              change("description", e.target.value);
+            }}
+            onBlur={() => blur("description")}
+            aria-invalid={!!errors.description}
+          />
         </Field>
 
         <div className="flex flex-wrap gap-6">
@@ -182,7 +205,11 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
                 inputMode="decimal"
                 placeholder="300"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  change("amount", e.target.value);
+                }}
+                onBlur={() => blur("amount")}
                 aria-invalid={!!errors.amount}
                 className="tabular min-w-0 flex-1 bg-transparent text-xl font-semibold outline-none"
               />
@@ -231,7 +258,12 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
                 PDF atau foto, maksimal 10 MB. Hanya anggota yang diminta membantu yang bisa melihatnya.
               </span>
             </span>
-            <input id="file" type="file" accept={ACCEPT} className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <input id="file" type="file" accept={ACCEPT} className="sr-only" onChange={(e) => {
+                const picked = e.target.files?.[0] ?? null;
+                setFile(picked);
+                change("file", picked, { commit: true });
+              }}
+            />
           </label>
         </Field>
 

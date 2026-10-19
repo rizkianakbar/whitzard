@@ -14,6 +14,7 @@ import { api, type Member } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { keys } from "@/lib/queries";
 import { useSession } from "@/lib/session";
+import { useFieldErrors } from "@/lib/use-field-errors";
 import { cn } from "@/lib/utils";
 
 const MAX_PHOTO = 2 * 1024 * 1024;
@@ -30,17 +31,17 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
+  const { errors, validateAll, change, blur } = useFieldErrors({ displayName, birthDate }, (field, v) => {
+    if (field === "displayName") return v.displayName.trim() ? null : "Isi nama lengkapmu.";
+    return v.birthDate && v.birthDate > today ? "Tanggal lahir tidak boleh di masa depan." : null;
+  });
 
   const pickPhoto = (file: File | null) => {
     if (!file) return;
-    if (file.size > MAX_PHOTO) return setErrors((e) => ({ ...e, photo: "Foto lebih dari 2 MB." }));
-    setErrors((e) => {
-      const next = { ...e };
-      delete next.photo;
-      return next;
-    });
+    if (file.size > MAX_PHOTO) return setPhotoError("Foto lebih dari 2 MB.");
+    setPhotoError(null);
     setPhoto(file);
     setPreview((old) => {
       if (old) URL.revokeObjectURL(old);
@@ -50,11 +51,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    const next: Record<string, string> = {};
-    if (!displayName.trim()) next.displayName = "Isi nama lengkapmu.";
-    if (birthDate && birthDate > today) next.birthDate = "Tanggal lahir tidak boleh di masa depan.";
-    setErrors(next);
-    if (Object.keys(next).length) return;
+    if (!validateAll()) return;
 
     setSaving(true);
     try {
@@ -113,7 +110,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
           <span className="text-sm leading-relaxed text-batu">
             Opsional. PNG, JPG atau WebP, maksimal 2 MB. Hanya anggota yang sudah masuk yang bisa melihatnya.
           </span>
-          {errors.photo && <span role="alert" className="text-sm font-medium text-bata-ink">{errors.photo}</span>}
+          {photoError && <span role="alert" className="text-sm font-medium text-bata-ink">{photoError}</span>}
           {p?.photo && !photo && (
             <button type="button" onClick={() => void removePhoto()} className="self-start text-sm font-semibold text-bata-ink underline underline-offset-4">
               Hapus foto
@@ -124,7 +121,13 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field id="displayName" label="Nama lengkap" error={errors.displayName} className="sm:col-span-2">
-          <Input id="displayName" value={displayName} maxLength={50} autoComplete="name" onChange={(e) => setDisplayName(e.target.value)} aria-invalid={!!errors.displayName} />
+          <Input id="displayName" value={displayName} maxLength={50} autoComplete="name" onChange={(e) => {
+              setDisplayName(e.target.value);
+              change("displayName", e.target.value);
+            }}
+            onBlur={() => blur("displayName")}
+            aria-invalid={!!errors.displayName}
+          />
         </Field>
         <Field id="nickname" label="Nama panggilan" hint="Dipakai untuk menyapamu.">
           <Input id="nickname" value={nickname} maxLength={30} autoComplete="nickname" onChange={(e) => setNickname(e.target.value)} />
@@ -133,7 +136,13 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
           <Input id="city" value={city} maxLength={60} autoComplete="address-level2" onChange={(e) => setCity(e.target.value)} />
         </Field>
         <Field id="birthDate" label="Tanggal lahir" hint="Hanya terlihat olehmu." error={errors.birthDate}>
-          <Input id="birthDate" type="date" value={birthDate} max={today} autoComplete="bday" onChange={(e) => setBirthDate(e.target.value)} aria-invalid={!!errors.birthDate} />
+          <Input id="birthDate" type="date" value={birthDate} max={today} autoComplete="bday" onChange={(e) => {
+              setBirthDate(e.target.value);
+              change("birthDate", e.target.value);
+            }}
+            onBlur={() => blur("birthDate")}
+            aria-invalid={!!errors.birthDate}
+          />
         </Field>
       </div>
 
