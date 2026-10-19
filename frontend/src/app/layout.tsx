@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
 import { Providers } from "@/components/providers";
@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   title: { default: "Whitzard", template: "%s | Whitzard" },
   description: "Saling bantu biaya berobat antaranggota, dengan iuran yang sama dan tercatat untuk semua.",
 };
+
+// viewport-fit=cover makes env(safe-area-inset-*) real, so the bottom nav clears the home indicator.
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#ffffff" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

@@ -45,7 +45,7 @@ export function ProfilePage() {
             <span className="text-white/70">Alamat dompet</span>
             <button type="button" onClick={() => void copy()} className="tabular flex items-center gap-2 self-start font-semibold hover:underline">
               {shortAddress(me.address)}
-              {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+              {copied ? <Check aria-hidden="true" className="pop-in size-4" /> : <Copy aria-hidden="true" className="pop-in size-4" />}
               <span className="sr-only">{copied ? "Tersalin" : "Salin alamat"}</span>
             </button>
           </div>

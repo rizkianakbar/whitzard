@@ -17,6 +17,14 @@
  * daun    #2E7D57  finalized      bata #B3412E  cancelled / errors
  */
 
+/* Motion vocabulary: strong curves, because the built-in CSS easings are too weak to feel intentional.
+   Overriding --ease-out / --ease-in-out also upgrades Tailwind's ease-out / ease-in-out utilities. */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -106,6 +114,196 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* Pressables give their own feedback (scale on press), so no grey tap flash, no double-tap-zoom
+     delay, and a long press doesn't select the label. Body text stays selectable. */
+  button,
+  a,
+  summary,
+  [role="button"],
+  [role="menuitem"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  button,
+  summary,
+  [role="button"],
+  [role="menuitem"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Press feedback for elements that aren't <Button> (chips, pills, icon links). */
+@utility pressable {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Content that replaces other content in place (a step, a button label): it settles in instead
+   of teleporting. Keyed in React, so each new value enters once. */
+@utility settle-in {
+  transition:
+    opacity 300ms var(--ease-out),
+    transform 300ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@utility swap-in {
+  transition:
+    opacity 200ms var(--ease-out),
+    filter 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+@utility pop-in {
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/* FAQ answers reveal instead of snapping open, where the browser can animate to height: auto. */
+@supports (interpolate-size: allow-keywords) {
+  .accordion {
+    interpolate-size: allow-keywords;
+  }
+  .accordion::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size 250ms var(--ease-out),
+      content-visibility 250ms allow-discrete;
+  }
+  .accordion[open]::details-content {
+    block-size: auto;
+  }
+}
+
+/* Anchor links on the landing page glide instead of jumping. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
+ * Landing page scroll reveals. Content is visible by default (server render, no JS, already on
+ * screen at load): useReveal() only marks a block data-reveal="hidden" when it starts below the
+ * fold, then "shown" once it scrolls in. So nothing on screen ever blinks on load.
+ * .rise children enter in order via --i (70ms apart).
+ */
+[data-reveal] .rise {
+  transition:
+    opacity 700ms var(--ease-out),
+    transform 700ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+[data-reveal="hidden"] .rise {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: none;
+}
+
+/* "Cara kerja" mini grids: each step's grid plays out what that step does once it scrolls in.
+   --d is each cell's delay; the hidden state is the step's "before". */
+[data-reveal] .cell {
+  transition:
+    opacity 450ms var(--ease-out),
+    transform 450ms var(--ease-out),
+    background-color 450ms var(--ease-out),
+    border-color 450ms var(--ease-out);
+  transition-delay: var(--d, 0ms);
+}
+[data-reveal="hidden"] .cell {
+  transition: none;
+}
+[data-reveal="hidden"] .cell-appear {
+  opacity: 0;
+  transform: scale(0.8);
+}
+[data-reveal="hidden"] .cell-fill {
+  background-color: var(--color-card);
+  border-color: var(--color-garis);
+}
+[data-reveal="hidden"] .cell-send {
+  background-color: var(--color-kunyit);
+}
+
+/* Hero demo: a share being chipped in pops, slightly past full size and back (playful, rare). */
+@keyframes chip-in {
+  0% {
+    transform: scale(0.85);
+    background-color: var(--color-kunyit-soft);
+  }
+  60% {
+    transform: scale(1.06);
+    background-color: var(--color-kunyit);
+  }
+  100% {
+    transform: scale(1);
+    background-color: var(--color-kunyit);
+  }
+}
+.chip-in {
+  animation: chip-in 450ms var(--ease-out);
+}
+/* The next empty share invites a tap until the visitor tries it. */
+@keyframes invite {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(240 168 28 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(240 168 28 / 0.25);
+  }
+}
+.invite {
+  animation: invite 2400ms var(--ease-in-out) infinite;
+}
+/* When the last share is in, every share turns green in a wave: the funds go out together. */
+.hero-cell {
+  transition:
+    background-color 400ms var(--ease-out),
+    border-color 400ms var(--ease-out),
+    transform 160ms var(--ease-out);
+  transition-delay: var(--d, 0ms), var(--d, 0ms), 0ms;
+}
+
+/* Desktop-only hover touches; touch screens fire hover on tap. */
+@media (hover: hover) and (pointer: fine) {
+  .lift {
+    transition:
+      transform 200ms var(--ease-out),
+      border-color 200ms ease;
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+  }
+  .nudge-down svg {
+    transition: transform 200ms var(--ease-out);
+  }
+  .nudge-down:hover svg {
+    transform: translateY(3px);
+  }
+  .tilt-backdrop {
+    transition: rotate 500ms var(--ease-out);
+  }
+  .hero-figure:hover .tilt-backdrop {
+    rotate: -5deg;
+  }
 }
 
 /* Headings: the type carries the friendliness, heavy and tightly set. */
@@ -116,22 +314,6 @@
     text-wrap: balance;
     letter-spacing: -0.02em;
   }
-}
-
-/* The landing page's one orchestrated moment: the hero's share grid filling, cell by cell. */
-@keyframes hero-fill {
-  from {
-    background-color: #ffffff;
-    transform: scale(0.8);
-  }
-  to {
-    background-color: var(--color-kunyit);
-    transform: scale(1);
-  }
-}
-.hero-fill {
-  animation: hero-fill 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: calc(400ms + var(--i) * 140ms);
 }
 
 /* In the app: your share cell filling in once your contribution is recorded. */
@@ -146,14 +328,34 @@
   }
 }
 .share-fill {
-  animation: share-fill 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: share-fill 600ms var(--ease-out) both;
 }
+/* Reduced motion: no movement, but fades that explain a change stay. */
 @media (prefers-reduced-motion: reduce) {
-  .share-fill,
-  .hero-fill {
+  .share-fill {
     animation: none;
   }
-  .hero-fill {
-    background-color: var(--color-kunyit);
+  .pressable:active {
+    transform: none;
+  }
+  /* <Button> presses with Tailwind's scale-* (the `scale` property, not transform). Matched by
+     element, since Base UI triggers replace data-slot. */
+  button:active,
+  a:active {
+    scale: none;
+  }
+  .settle-in,
+  .pop-in {
+    @starting-style {
+      transform: none;
+    }
+  }
+  [data-reveal="hidden"] .rise,
+  [data-reveal="hidden"] .cell-appear {
+    transform: none;
+  }
+  .chip-in,
+  .invite {
+    animation: none;
   }
 }

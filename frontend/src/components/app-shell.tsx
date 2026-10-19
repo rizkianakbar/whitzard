@@ -60,7 +60,7 @@ function ActiveNavLinks({ placement }: { placement: "top" | "bottom" }) {
 /** The members-only area: sends signed-out visitors to the landing page and non-members to /gabung. */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col pb-16 md:pb-0">
+    <div className="flex min-h-full flex-col pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
       <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
         <div className="mx-auto flex h-17 max-w-290 items-center gap-6 px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -88,7 +88,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Suspense>
       </main>
       <MemberOnly>
-        <nav aria-label="Utama" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-3 border-t bg-card md:hidden">
+        <nav
+          aria-label="Utama"
+          className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom,0px))] grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom,0px)] md:hidden"
+        >
           <Suspense fallback={<NavLinks placement="bottom" />}>
             <ActiveNavLinks placement="bottom" />
           </Suspense>
@@ -142,7 +145,7 @@ function Wallet() {
         <button
           type="button"
           aria-label={`Saldo ${formatWhzd(me.chain.balance)} WHZD. Isi saldo`}
-          className="flex h-11 items-center gap-2 rounded-full border bg-card pr-1.5 pl-4 hover:bg-muted"
+          className="pressable flex h-11 items-center gap-2 rounded-full border bg-card pr-1.5 pl-4 hover:bg-muted"
         >
           <span className="tabular text-sm font-bold whitespace-nowrap">
             {formatWhzd(me.chain.balance)}
@@ -166,11 +169,11 @@ function NotificationBell() {
     <Link
       href="/notifikasi"
       aria-label={unread ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
-      className="relative flex size-11 items-center justify-center rounded-full border bg-card hover:bg-muted"
+      className="pressable relative flex size-11 items-center justify-center rounded-full border bg-card hover:bg-muted"
     >
       <Bell aria-hidden="true" className="size-5" />
       {unread > 0 && (
-        <span className="tabular absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-card bg-kunyit px-1 text-[11px] font-bold text-arang">
+        <span className="tabular pop-in absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-card bg-kunyit px-1 text-[11px] font-bold text-arang">
           {unread > 9 ? "9+" : unread}
         </span>
       )}
@@ -188,7 +191,7 @@ function AccountMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<button type="button" aria-label="Akun" className="flex rounded-full hover:opacity-90" />}
+        render={<button type="button" aria-label="Akun" className="pressable flex rounded-full hover:opacity-90" />}
       >
         <Avatar address={address} profile={profile} className="size-11 text-sm" />
       </DropdownMenuTrigger>

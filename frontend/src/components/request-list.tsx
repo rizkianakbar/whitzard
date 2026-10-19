@@ -39,7 +39,7 @@ export function RequestList() {
             aria-pressed={scope === s.id}
             onClick={() => setScope(s.id)}
             className={cn(
-              "h-11 rounded-full border bg-card px-5 font-semibold text-batu hover:text-arang",
+              "pressable h-11 rounded-full border bg-card px-5 font-semibold text-batu hover:text-arang",
               scope === s.id && "border-pandan bg-pandan text-white hover:text-white",
             )}
           >

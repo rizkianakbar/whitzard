@@ -11,6 +11,7 @@ import { bytesToHex, parseSignature } from "viem";
 import { Avatar, callName } from "@/components/avatar";
 import { ShareGrid, ShareLegend } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
+import { Swap } from "@/components/swap";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -393,7 +394,7 @@ function ContributePanel({
       )}
       <div className="flex flex-col gap-2.5">
         <Button size="lg" className="tabular" disabled={tx.busy || !enough} onClick={() => void contribute()}>
-          {tx.busy ? phaseLabel[tx.phase] : `Bantu ${formatWhzd(r.share)} WHZD`}
+          <Swap>{tx.busy ? phaseLabel[tx.phase] : `Bantu ${formatWhzd(r.share)} WHZD`}</Swap>
         </Button>
         {you?.response !== "declined" && (
           <Button variant="outline" disabled={tx.busy} onClick={() => void decline()}>
@@ -443,7 +444,7 @@ function RequesterPanel({ detail, left }: { detail: Detail; left: string }) {
         Saat waktu habis, semua yang terkumpul diteruskan ke dompetmu secara otomatis, berapa pun jumlahnya.
       </p>
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}>{tx.busy ? phaseLabel[tx.phase] : "Batalkan permintaan"}</Button>} />
+        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}><Swap>{tx.busy ? phaseLabel[tx.phase] : "Batalkan permintaan"}</Swap></Button>} />
         <DialogContent className="gap-5 p-6 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">Batalkan permintaan ini?</DialogTitle>
@@ -485,7 +486,7 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
           })
         }
       >
-        {tx.busy ? phaseLabel[tx.phase] : "Teruskan sekarang"}
+        <Swap>{tx.busy ? phaseLabel[tx.phase] : "Teruskan sekarang"}</Swap>
       </Button>
       <p className="text-[13px] leading-relaxed text-batu">
         Siapa pun boleh meneruskannya. Dananya hanya bisa pergi ke {requesterName}.
@@ -524,7 +525,7 @@ function Cancelled({ detail, requesterName }: { detail: Detail; requesterName: s
           })
         }
       >
-        {tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(contribution.amount)} WHZD`}
+        <Swap>{tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(contribution.amount)} WHZD`}</Swap>
       </Button>
     </>
   );
