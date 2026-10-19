@@ -128,11 +128,11 @@ function Wallet({ me }: { me: Member }) {
             value={st?.received}
             note={st && (st.requests ? `${st.funded} permintaan tersalurkan` : "Belum pernah mengajukan")}
           />
-          {st && BigInt(st.refunded) > 0n && (
+          {/* {st && BigInt(st.refunded) > 0n && (
             <p className="col-span-2 pt-2 text-[13px] text-white/60">
               <span className="tabular">{formatWhzd(st.refunded)} WHZD</span> kembali dari permintaan yang dibatalkan
             </p>
-          )}
+          )} */}
         </dl>
       </div>
 
