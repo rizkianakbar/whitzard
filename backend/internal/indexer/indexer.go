@@ -183,8 +183,8 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 		if err != nil {
 			return err
 		}
-		return tx.Notify(ctx, requester, "contribution_received", "New contribution",
-			fmt.Sprintf("%s contributed %s WHZD to your request #%d.", member, chain.FormatUnits(e.Amount), id), id)
+		return tx.Notify(ctx, requester, "contribution_received", "Iuran baru masuk",
+			fmt.Sprintf("Seorang anggota membantu %s WHZD untuk permintaanmu nomor %d.", chain.FormatUnits(e.Amount), id), id)
 
 	case *bindings.EscrowRequestCancelled:
 		id := e.Id.Uint64()
@@ -193,8 +193,8 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 			return err
 		}
 		for _, m := range contributors {
-			if err := tx.Notify(ctx, m, "request_cancelled", "Request cancelled",
-				fmt.Sprintf("Request #%d was cancelled by the requester. You can claim your contribution back.", id), id); err != nil {
+			if err := tx.Notify(ctx, m, "request_cancelled", "Permintaan dibatalkan",
+				fmt.Sprintf("Permintaan nomor %d dibatalkan oleh peminta. Kamu bisa mengambil iuranmu kembali.", id), id); err != nil {
 				return err
 			}
 		}
@@ -211,16 +211,16 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 			return err
 		}
 		if expired {
-			return tx.Notify(ctx, requester, "request_expired", "Request expired",
-				fmt.Sprintf("Request #%d ended without any contributions.", id), id)
+			return tx.Notify(ctx, requester, "request_expired", "Permintaan berakhir",
+				fmt.Sprintf("Waktu permintaan nomor %d habis tanpa iuran.", id), id)
 		}
-		if err := tx.Notify(ctx, requester, "request_finalized", "Funds received",
-			fmt.Sprintf("Request #%d was finalized: %s WHZD was sent to your wallet.", id, total), id); err != nil {
+		if err := tx.Notify(ctx, requester, "request_finalized", "Dana sudah diterima",
+			fmt.Sprintf("%s WHZD dari permintaan nomor %d sudah masuk ke dompetmu.", total, id), id); err != nil {
 			return err
 		}
 		for _, m := range contributors {
-			if err := tx.Notify(ctx, m, "request_finalized", "Request finalized",
-				fmt.Sprintf("Request #%d you contributed to was finalized: %s WHZD went to the requester.", id, total), id); err != nil {
+			if err := tx.Notify(ctx, m, "request_finalized", "Dana sudah diteruskan",
+				fmt.Sprintf("Permintaan nomor %d yang kamu bantu sudah selesai: %s WHZD sampai ke peminta.", id, total), id); err != nil {
 				return err
 			}
 		}
@@ -265,10 +265,9 @@ func (ix *Indexer) applyOpened(ctx context.Context, tx *store.IndexTx, e *bindin
 	if err := tx.AddSnapshotMembers(ctx, id, members); err != nil {
 		return err
 	}
-	deadline := time.Unix(int64(e.Deadline), 0).UTC().Format(time.RFC1123)
 	for _, m := range members {
-		if err := tx.Notify(ctx, m, "request_opened", "New health-aid request",
-			fmt.Sprintf("Request #%d asks each member for %s WHZD. Deadline: %s.", id, chain.FormatUnits(e.Share), deadline), id); err != nil {
+		if err := tx.Notify(ctx, m, "request_opened", "Ada yang butuh bantuan",
+			fmt.Sprintf("Permintaan nomor %d meminta %s WHZD dari setiap anggota.", id, chain.FormatUnits(e.Share)), id); err != nil {
 			return err
 		}
 	}

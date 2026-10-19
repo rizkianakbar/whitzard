@@ -378,3 +378,24 @@ func (s *Store) MarkRead(ctx context.Context, id int64, member string) error {
 	}
 	return nil
 }
+
+// ResponsesFor returns `member`'s snapshot response for each of `requestIDs` they are in.
+func (s *Store) ResponsesFor(ctx context.Context, member string, requestIDs []int64) (map[int64]string, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT request_id, response FROM snapshot_members WHERE member = $1 AND request_id = ANY($2)`,
+		member, requestIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var response string
+		if err := rows.Scan(&id, &response); err != nil {
+			return nil, err
+		}
+		out[id] = response
+	}
+	return out, rows.Err()
+}

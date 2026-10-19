@@ -330,6 +330,12 @@ func TestRequestFlow(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("bob's requests = %v", list)
 	}
+	if got := list[0].(map[string]any)["yourResponse"]; got != "contributed" {
+		t.Fatalf("yourResponse = %v, want contributed", got)
+	}
+	if all := e.get("/requests", bobToken).json(t)["requests"].([]any); all[0].(map[string]any)["yourResponse"] != nil {
+		t.Fatal("yourResponse is only filled for member=me")
+	}
 	if got := e.get("/requests?member=me", eveToken).json(t)["requests"].([]any); len(got) != 0 {
 		t.Fatalf("eve is in no snapshot, got %v", got)
 	}

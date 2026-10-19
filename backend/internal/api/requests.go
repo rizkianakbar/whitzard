@@ -27,6 +27,8 @@ type requestView struct {
 	// After the deadline a funded request stays "funding" until finalize, with AwaitingFinalize set.
 	Status           string `json:"status"`
 	AwaitingFinalize bool   `json:"awaitingFinalize"`
+	// YourResponse is the signed-in caller's snapshot response, when listing with member=me.
+	YourResponse *string `json:"yourResponse,omitempty"`
 }
 
 func (s *Server) view(r *store.Request) requestView {
@@ -151,12 +153,14 @@ func (s *Server) handleListRequests(w http.ResponseWriter, r *http.Request) {
 		}
 		f.Requester = lower
 	}
+	me := ""
 	if v := q.Get("member"); v != "" {
 		if v == "me" {
-			if v = s.optionalCaller(r); v == "" {
+			if me = s.optionalCaller(r); me == "" {
 				writeError(w, http.StatusUnauthorized, "sign in to filter by member=me")
 				return
 			}
+			v = me
 		}
 		_, lower, ok := parseAddress(v)
 		if !ok {
@@ -183,8 +187,21 @@ func (s *Server) handleListRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]requestView, len(requests))
+	ids := make([]int64, len(requests))
 	for i, req := range requests {
-		out[i] = s.view(req)
+		out[i], ids[i] = s.view(req), req.ID
+	}
+	if me != "" && len(ids) > 0 {
+		responses, err := s.store.ResponsesFor(r.Context(), me, ids)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		for i := range out {
+			if response, ok := responses[out[i].ID]; ok {
+				out[i].YourResponse = &response
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"requests": out})
 }
