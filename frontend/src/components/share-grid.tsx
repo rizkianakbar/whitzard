@@ -53,7 +53,7 @@ export function ShareGrid({ size, contributed, declined, you, justContributed, v
           ? "grid-cols-[repeat(auto-fill,minmax(32px,44px))] gap-2"
           : medium
             ? "grid-cols-[repeat(auto-fill,22px)] gap-1.5"
-            : "grid-cols-[repeat(auto-fill,12px)] gap-[3px]",
+            : "grid-cols-[repeat(auto-fill,12px)] gap-0.75",
         className,
       )}
     >
@@ -64,8 +64,7 @@ export function ShareGrid({ size, contributed, declined, you, justContributed, v
             "box-border aspect-square",
             large ? "rounded-[10px]" : medium ? "rounded-[6px]" : "rounded-[3px]",
             cell.kind === "filled" && "bg-kunyit",
-            cell.kind === "declined" &&
-              "border border-garis bg-[repeating-linear-gradient(135deg,#fff_0_6px,#d9dee7_6px_7px)]",
+            cell.kind === "declined" && "border border-[#9aa8a1] bg-[repeating-linear-gradient(135deg,#fff_0_4px,#8a9891_4px_6px)]",
             cell.kind === "empty" && "border border-garis bg-card",
             cell.you && (large ? "border-[3px] border-pandan" : "border-2 border-pandan"),
             cell.you && cell.kind === "filled" && justContributed && "share-fill",
@@ -90,7 +89,7 @@ export function ShareLegend() {
       <li className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="size-3.5 rounded-[3px] border border-garis bg-[repeating-linear-gradient(135deg,#fff_0_3px,#d9dee7_3px_4px)]"
+          className="size-3.5 rounded-[3px] border border-[#9aa8a1] bg-[repeating-linear-gradient(135deg,#fff_0_2px,#8a9891_2px_3.5px)]"
         />
         Tidak ikut
       </li>
