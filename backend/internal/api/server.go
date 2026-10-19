@@ -107,12 +107,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /members/me/photo", s.authed(s.handleDeletePhoto))
 	mux.HandleFunc("GET /members/me/proof", s.authed(s.handleProof))
 	mux.HandleFunc("GET /members/me/refunds", s.authed(s.handleRefunds))
+	mux.HandleFunc("GET /members/me/stats", s.authed(s.handleMemberStats))
 
 	mux.HandleFunc("POST /requests", s.authed(s.handleCreateDraft))
 	// Request stories are health-related, so only signed-in members may read them.
 	mux.HandleFunc("GET /requests", s.authed(s.handleListRequests))
 	mux.HandleFunc("GET /requests/{id}", s.authed(s.handleGetRequest))
 	mux.HandleFunc("GET /requests/{id}/evidence", s.authed(s.handleEvidence))
+	mux.HandleFunc("GET /requests/{id}/activity", s.authed(s.handleActivity))
 	mux.HandleFunc("POST /requests/{id}/contribute", s.authed(s.handleRespond))
 
 	mux.HandleFunc("GET /notifications", s.authed(s.handleListNotifications))

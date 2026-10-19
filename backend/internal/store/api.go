@@ -454,3 +454,63 @@ func (s *Store) ResponsesFor(ctx context.Context, member string, requestIDs []in
 	}
 	return out, rows.Err()
 }
+
+// ---------------------------------------------------------------- activity and member stats
+
+// Activity is one on-chain member step on a request: a contribution or its refund. Who declined or
+// did not answer is never listed (only counted, see SnapshotCounts), so helping stays a free choice.
+type Activity struct {
+	Type   string    `json:"type"` // contributed | refunded
+	Member string    `json:"member"`
+	Amount string    `json:"amount"`
+	TxHash string    `json:"txHash"`
+	At     time.Time `json:"at"`
+}
+
+// RequestActivity returns the contributions and refunds of a request, oldest first.
+func (s *Store) RequestActivity(ctx context.Context, requestID int64) ([]Activity, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT 'contributed', member, amount::text, tx_hash, contributed_at
+		FROM contributions WHERE request_id = $1
+		UNION ALL
+		SELECT 'refunded', member, amount::text, refund_tx_hash, refunded_at
+		FROM contributions WHERE request_id = $1 AND refunded AND refunded_at IS NOT NULL
+		ORDER BY 5, 1, 2`, requestID)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Activity, error) {
+		var a Activity
+		err := row.Scan(&a.Type, &a.Member, &a.Amount, &a.TxHash, &a.At)
+		return a, err
+	})
+	if out == nil {
+		out = []Activity{}
+	}
+	return out, err
+}
+
+// MemberStats sums up what moved through one member's wallet. Amounts are decimal strings in wei.
+type MemberStats struct {
+	Helped   int    `json:"helped"`   // contributions, refunded ones included
+	Given    string `json:"given"`    // contributed and not refunded
+	Refunded string `json:"refunded"` // contributions returned after a cancel
+	Requests int    `json:"requests"` // requests the member opened
+	Funded   int    `json:"funded"`   // of those, paid out
+	Received string `json:"received"` // paid out to the member
+}
+
+// GetMemberStats returns `member`'s totals.
+func (s *Store) GetMemberStats(ctx context.Context, member string) (*MemberStats, error) {
+	var st MemberStats
+	err := s.Pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM contributions WHERE member = $1),
+		       (SELECT coalesce(sum(amount), 0)::text FROM contributions WHERE member = $1 AND NOT refunded),
+		       (SELECT coalesce(sum(amount), 0)::text FROM contributions WHERE member = $1 AND refunded),
+		       (SELECT count(*) FROM requests WHERE requester = $1),
+		       (SELECT count(*) FROM requests WHERE requester = $1 AND status = 'finalized'),
+		       (SELECT coalesce(sum(collected), 0)::text FROM requests WHERE requester = $1 AND status = 'finalized')`,
+		member).
+		Scan(&st.Helped, &st.Given, &st.Refunded, &st.Requests, &st.Funded, &st.Received)
+	return &st, err
+}

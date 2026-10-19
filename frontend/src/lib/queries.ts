@@ -11,6 +11,8 @@ import { useSession } from "@/lib/session";
 // wallets never shows the previous wallet's cached data.
 export const keys = {
   member: (address: string) => ["member", address.toLowerCase()] as const,
+  // Under the member's key, so anything that refreshes the member refreshes their totals too.
+  memberStats: (address: string) => ["member", address.toLowerCase(), "stats"] as const,
   requests: (scope: string) => ["requests", scope] as const,
   request: (id: number) => ["request", id] as const,
   notifications: ["notifications"] as const,
@@ -54,6 +56,25 @@ export function useRequest(id: number) {
   });
 }
 
+/** Under the request's key, so every refresh of the request refreshes its activity too. */
+export function useActivity(id: number) {
+  const { address, token } = useSession();
+  return useQuery({
+    queryKey: [...keys.request(id), "activity", viewer(address, token)],
+    queryFn: () => api.activity(id, token!),
+    enabled: !!token,
+  });
+}
+
+export function useMemberStats() {
+  const { address, token } = useSession();
+  return useQuery({
+    queryKey: keys.memberStats(address ?? "none"),
+    queryFn: () => api.memberStats(token!),
+    enabled: !!token && !!address,
+  });
+}
+
 export function useNotifications(limit = 50) {
   const { address, token } = useSession();
   return useQuery({
@@ -71,6 +92,24 @@ export function useRefunds() {
 export function useProof() {
   const { address, token } = useSession();
   return useQuery({ queryKey: [...keys.proof, viewer(address, token)], queryFn: () => api.proof(token!), enabled: !!token });
+}
+
+/**
+ * Whether the member can open a request now, and if not, why: their own request is still running,
+ * or (after the first request) they have to help someone else first. undefined while loading.
+ */
+export type Eligibility =
+  | { can: true }
+  | { can: false; reason: "running"; requestId: number }
+  | { can: false; reason: "help-first" };
+
+export function useEligibility(): Eligibility | undefined {
+  const { data: proof } = useProof();
+  const { data: mine } = useRequests("mine");
+  if (!proof || !mine) return undefined;
+  if (proof.canOpenRequest) return { can: true };
+  const running = mine.find((r) => r.status === "open" || r.status === "funding");
+  return running ? { can: false, reason: "running", requestId: running.id } : { can: false, reason: "help-first" };
 }
 
 export function useMember(address: Address | undefined) {

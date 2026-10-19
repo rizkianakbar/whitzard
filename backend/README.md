@@ -62,6 +62,7 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | `GET /stats` | `{members, readyMembers, requests, funded, distributed, contributions}`: community totals for the public landing page |
 | `GET /members/me/proof` 🔒 | `{needed, proofId, canOpenRequest}`: the `proofId` to pass to `openRequest` |
 | `GET /members/me/refunds` 🔒 | `{total, refunds: [{requestId, amount}]}`: claimable with `claimRefund` |
+| `GET /members/me/stats` 🔒 | `{helped, given, refunded, requests, funded, received}`: the caller's own totals for the dashboard |
 
 ### Requests
 
@@ -70,6 +71,7 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | `POST /requests` 🔒 multipart `title`, `description`, `file` | `{draftId, evidenceHash, …}`: then send `Escrow.openRequest(amount, duration, evidenceHash, proofId)` from the wallet |
 | `GET /requests?requester=&member=me&before=&limit=` 🔒 | newest first; with `member=me` each request also has `yourResponse` |
 | `GET /requests/{id}` 🔒 | `{request, responses, you}`: `status` is open / funding / finalized / expired / cancelled, plus `awaitingFinalize` |
+| `GET /requests/{id}/activity` 🔒 | `{activity: [{type, member, amount, txHash, at}]}`: contributions and refunds, oldest first; `type` is contributed / refunded. Who declined or did not answer is only counted, never named |
 | `GET /requests/{id}/evidence` 🔒 | the document, only for the requester and snapshot members; `X-Evidence-Sha256` = on-chain hash |
 | `POST /requests/{id}/contribute` 🔒 `{response: "participate" \| "decline"}` | records the answer; the contribution itself is `Escrow.contributeWithPermit` from the wallet |
 

@@ -234,6 +234,21 @@ func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, body)
 }
 
+// GET /requests/{id}/activity → the request's contributions and refunds with their transactions,
+// oldest first. Declines and non-answers are only counted (GET /requests/{id}), never named.
+func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
+	req, ok := s.loadRequest(w, r)
+	if !ok {
+		return
+	}
+	activity, err := s.store.RequestActivity(r.Context(), req.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"activity": activity})
+}
+
 // GET /requests/{id}/evidence → the document, only for the requester and snapshot members.
 func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
 	req, ok := s.loadRequest(w, r)

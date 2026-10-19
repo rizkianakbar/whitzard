@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -25,7 +25,7 @@ import {
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
 import { readContract, signTypedData, writeContract } from "wagmi/actions";
-import { bytesToHex, parseSignature } from "viem";
+import { type Address, bytesToHex, parseSignature } from "viem";
 
 import { Avatar, callName } from "@/components/avatar";
 import { CountdownPanel, useRemaining } from "@/components/countdown";
@@ -34,6 +34,7 @@ import { ShareGrid, ShareLegend } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
 import { BusyLabel, TxLabel } from "@/components/tx-label";
 import { TopUpDialog } from "@/components/top-up";
+import { AddressLink, TxProof } from "@/components/tx-proof";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,7 +52,7 @@ import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
 import { formatDate, formatWhzd, shortAddress } from "@/lib/format";
-import { keys, useMe, useMember, useRequest } from "@/lib/queries";
+import { keys, useActivity, useMe, useMember, useRequest } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { useTx } from "@/lib/tx";
@@ -282,112 +283,158 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
 
 // ---------------------------------------------------------------- history
 
-function TxLink({ hash, children }: { hash: string; children: React.ReactNode }) {
-  if (!appConfig.explorerUrl) return <span className="text-[13px] text-batu">{children}</span>;
-  return (
-    <a
-      href={`${appConfig.explorerUrl}/tx/${hash}`}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 self-start text-[13px] text-batu underline-offset-4 hover:text-pandan hover:underline"
-    >
-      {children}
-      <ArrowUpRight aria-hidden="true" className="size-3.5" />
-    </a>
-  );
-}
+type Event = {
+  key: string;
+  icon: React.ReactNode;
+  tone: string;
+  /** Who took the step; their name leads the line. */
+  who?: Address;
+  text: React.ReactNode;
+  when: string;
+  tx: string | null;
+};
 
-type Event = { icon: React.ReactNode; tone: string; text: React.ReactNode; when: string; tx: string };
+const stamp = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-/** Every on-chain step of this request (yours included), oldest first, each linked to its transaction. */
+// Past this many steps the middle contributions fold away; the opening and the latest steps stay.
+const FOLD_AFTER = 6;
+const KEEP_LAST = 3;
+
+/**
+ * Every on-chain step of this request, oldest first: opened, each contribution, a cancel and its
+ * refunds, and the payout, each with its transaction so anyone can check it on the explorer. Who
+ * declined or didn't answer is never named, only counted in the share grid.
+ */
 function History({ detail, requesterName }: { detail: Detail; requesterName: string }) {
-  const { request: r, you } = detail;
-  const c = you?.contribution;
+  const { request: r } = detail;
+  const { data } = useActivity(r.id);
+  const [unfolded, setUnfolded] = useState(false);
+
   const events: Event[] = [
     {
-      icon: <FilePlus className="size-4" />,
+      key: "opened",
+      icon: <FilePlus className="size-3.5" />,
       tone: "bg-pandan-soft text-pandan",
+      who: r.requester,
       text: (
         <>
-          Permintaan dibuka untuk <strong className="tabular">{formatWhzd(r.amount)} WHZD</strong>
+          meminta <strong className="tabular">{formatWhzd(r.amount)} WHZD</strong>
         </>
       ),
       when: r.openedAt,
       tx: r.openedTx,
     },
   ];
-  if (c) {
+  for (const a of data?.activity ?? []) {
+    const helped = a.type === "contributed";
     events.push({
-      icon: <HeartHandshake className="size-4" />,
-      tone: "bg-kunyit-soft text-kunyit-ink",
+      key: `${a.type}-${a.member}`,
+      icon: helped ? <HeartHandshake className="size-3.5" /> : <RotateCcw className="size-3.5" />,
+      tone: helped ? "bg-kunyit-soft text-kunyit-ink" : "bg-muted text-batu",
+      who: a.member,
       text: (
         <>
-          Kamu membantu <strong className="tabular">{formatWhzd(c.amount)} WHZD</strong>
+          {helped ? "membantu" : "mengambil kembali"} <strong className="tabular">{formatWhzd(a.amount)} WHZD</strong>
         </>
       ),
-      when: c.contributedAt,
-      tx: c.txHash,
+      when: a.at,
+      tx: a.txHash,
     });
   }
   if (r.cancelledAt && r.cancelledTx) {
-    events.push({ icon: <X className="size-4" />, tone: "bg-bata-soft text-bata-ink", text: `Dibatalkan oleh ${requesterName}`, when: r.cancelledAt, tx: r.cancelledTx });
-  }
-  if (c?.refunded && c.refundedAt && c.refundTxHash) {
     events.push({
-      icon: <RotateCcw className="size-4" />,
-      tone: "bg-muted text-batu",
-      text: (
-        <>
-          Iuranmu <strong className="tabular">{formatWhzd(c.amount)} WHZD</strong> kembali ke dompetmu
-        </>
-      ),
-      when: c.refundedAt,
-      tx: c.refundTxHash,
+      key: "cancelled",
+      icon: <X className="size-3.5" />,
+      tone: "bg-bata-soft text-bata-ink",
+      who: r.requester,
+      text: "membatalkan",
+      when: r.cancelledAt,
+      tx: r.cancelledTx,
     });
   }
-  if (r.finalizedAt && r.finalizedTx) {
-    events.push(
-      r.status === "expired"
-        ? { icon: <Clock className="size-4" />, tone: "bg-muted text-batu", text: "Berakhir tanpa iuran", when: r.finalizedAt, tx: r.finalizedTx }
-        : {
-            icon: <Check className="size-4" strokeWidth={2.5} />,
-            tone: "bg-daun-soft text-daun-ink",
-            text: (
-              <>
-                <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> terkirim ke {requesterName}
-              </>
-            ),
-            when: r.finalizedAt,
-            tx: r.finalizedTx,
-          },
-    );
+  if (r.status === "finalized" && r.finalizedAt && r.finalizedTx) {
+    events.push({
+      key: "finalized",
+      icon: <Check className="size-3.5" strokeWidth={2.5} />,
+      tone: "bg-daun-soft text-daun-ink",
+      text: (
+        <>
+          <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> diteruskan ke {requesterName}
+        </>
+      ),
+      when: r.finalizedAt,
+      tx: r.finalizedTx,
+    });
+  } else if (r.status === "expired") {
+    events.push({
+      key: "expired",
+      icon: <Clock className="size-3.5" />,
+      tone: "bg-muted text-batu",
+      text: "Berakhir tanpa iuran",
+      when: r.finalizedAt ?? r.deadline,
+      tx: r.finalizedTx,
+    });
   }
   events.sort((a, b) => new Date(a.when).getTime() - new Date(b.when).getTime());
+
+  const folded = !unfolded && events.length > FOLD_AFTER ? events.length - 1 - KEEP_LAST : 0;
+  const shown = folded ? [events[0], ...events.slice(-KEEP_LAST)] : events;
 
   return (
     <Panel
       id="history"
       icon={<HistoryIcon className="size-4.5" />}
       title="Riwayat"
-      description={`Setiap langkah adalah transaksi publik di ${chain.name}${appConfig.explorerUrl ? ", bisa dicek di Etherscan" : ""}.`}
+      description={`Tercatat permanen di ${chain.name}${appConfig.explorerUrl ? ". Tekan kodenya untuk memeriksa di Etherscan" : ""}.`}
       className="order-4"
     >
       <ol className="flex flex-col">
-        {events.map((e, i) => (
-          <li key={e.tx + i} className="relative flex gap-3.5 pb-5 last:pb-0">
-            {i < events.length - 1 && <span aria-hidden="true" className="absolute top-9 bottom-1 left-[15px] w-0.5 rounded-full bg-garis" />}
-            <span aria-hidden="true" className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", e.tone)}>
-              {e.icon}
-            </span>
-            <div className="flex min-w-0 flex-col gap-0.5 pt-1">
-              <span className="leading-snug">{e.text}</span>
-              <TxLink hash={e.tx}>{formatDate(e.when)}</TxLink>
-            </div>
-          </li>
+        {shown.map((e, i) => (
+          <Fragment key={e.key}>
+            <li className="relative flex gap-3 pb-4 last:pb-0">
+              {i < shown.length - 1 && <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-[13px] w-0.5 rounded-full bg-garis" />}
+              <span aria-hidden="true" className={cn("flex size-7 shrink-0 items-center justify-center rounded-full", e.tone)}>
+                {e.icon}
+              </span>
+              <div className="flex min-w-0 flex-col gap-0.5 pt-0.5">
+                <span className="text-[15px] leading-snug">
+                  {e.who && <Who address={e.who} />} {e.text}
+                </span>
+                <span className="flex flex-wrap items-center gap-x-2 text-[12px] text-batu">
+                  <time dateTime={e.when} title={formatDate(e.when)}>
+                    {stamp.format(new Date(e.when))}
+                  </time>
+                  {e.tx && <TxProof hash={e.tx} compact />}
+                </span>
+              </div>
+            </li>
+            {i === 0 && folded > 0 && (
+              <li className="relative flex gap-3 pb-4">
+                <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-[13px] w-0.5 rounded-full bg-garis" />
+                <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-garis text-[11px] font-bold text-batu">
+                  +{folded}
+                </span>
+                <button type="button" onClick={() => setUnfolded(true)} className="pressable self-center text-[13px] font-semibold text-pandan">
+                  Tampilkan {folded} langkah lainnya
+                </button>
+              </li>
+            )}
+          </Fragment>
         ))}
       </ol>
+      <p className="border-t pt-4 text-[12px] leading-relaxed text-batu">
+        Dana ditahan kontrak <AddressLink address={escrow.address}>{shortAddress(escrow.address)}</AddressLink>, bukan oleh siapa pun.
+      </p>
     </Panel>
   );
+}
+
+/** A member's name in a history line: "Kamu" for the viewer. */
+function Who({ address }: { address: Address }) {
+  const { address: me } = useSession();
+  const { data: member } = useMember(address);
+  const mine = me?.toLowerCase() === address.toLowerCase();
+  return <strong className="font-semibold">{mine ? "Kamu" : callName(member?.profile, shortAddress(address))}</strong>;
 }
 
 // ---------------------------------------------------------------- actions
@@ -400,10 +447,13 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
 
   if (r.status === "finalized") {
     return (
-      <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah terkirim">
-        <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sampai ke {requesterName}
-        {r.finalizedAt ? ` pada ${formatDate(r.finalizedAt)}` : ""}.
-      </Summary>
+      <>
+        <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah terkirim">
+          <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sampai ke {requesterName}
+          {r.finalizedAt ? ` pada ${formatDate(r.finalizedAt)}` : ""}, langsung dari kontrak tanpa perantara.
+        </Summary>
+        {r.finalizedTx && <TxProof hash={r.finalizedTx} label="Bukti transfer" className="px-3 py-1.5 text-[13px]" />}
+      </>
     );
   }
   if (r.status === "expired") {
@@ -536,6 +586,7 @@ function ContributePanel({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: keys.request(r.id) }),
         queryClient.invalidateQueries({ queryKey: ["requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["member"] }),
       ]);
       toast("Kamu tidak ikut kali ini.");
     } catch (error) {

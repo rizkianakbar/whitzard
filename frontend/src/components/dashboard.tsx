@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, HandHeart, RotateCcw, Send } from "lucide-react";
+import { ArrowRight, Check, Hand, HandHeart, Hourglass, RotateCcw, Send } from "lucide-react";
 import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { toast } from "sonner";
@@ -21,9 +21,8 @@ import { Switch } from "@/components/ui/switch";
 import { api, type Member, type Request } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatWhzd, shortAddress, timeAgo } from "@/lib/format";
-import { keys, useMe, useMember, useNotifications, useProof, useRefunds, useRequests } from "@/lib/queries";
-import { useNow } from "@/lib/now";
+import { formatWhzd, shortAddress } from "@/lib/format";
+import { keys, useEligibility, useMe, useMember, useMemberStats, useRefunds, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
 import { cn } from "@/lib/utils";
@@ -42,7 +41,7 @@ export function Dashboard() {
   const name = me.profile?.nickname ?? me.profile?.displayName?.split(" ")[0];
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-[39px] leading-tight font-extrabold text-pandan">
           {greeting()}
@@ -53,14 +52,11 @@ export function Dashboard() {
         </Link>
       </div>
       <SetupBanner me={me} />
-      <Overview me={me} />
       <RefundNotice />
-      <div className="grid items-start gap-10 lg:grid-cols-[1fr_340px]">
-        <div className="flex min-w-0 flex-col gap-10">
-          <Waiting />
-          <MyRequests />
-        </div>
-        <LatestNotifications />
+      <Wallet me={me} />
+      <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-8">
+        <Waiting />
+        <MyRequests />
       </div>
     </div>
   );
@@ -86,12 +82,14 @@ function SetupBanner({ me }: { me: Member }) {
   );
 }
 
-// ---------------------------------------------------------------- overview
+// ---------------------------------------------------------------- wallet
 
-function Overview({ me }: { me: Member }) {
+/** Balance, what has moved through it, and whether new requests count you in: one card. */
+function Wallet({ me }: { me: Member }) {
   const config = useConfig();
   const ready = useTx();
-  const { data: proof } = useProof();
+  const { data: st } = useMemberStats();
+  const empty = BigInt(me.chain.balance) === 0n;
 
   const toggleReady = (value: boolean) =>
     ready.run({
@@ -102,67 +100,132 @@ function Overview({ me }: { me: Member }) {
     });
 
   return (
-    <section aria-label="Ringkasan" className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
-      <div className="flex flex-col justify-between gap-6 rounded-3xl bg-pandan-deep p-7 text-white md:col-span-2 lg:col-span-1">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm text-white/70">Saldo</span>
-          <span className="tabular text-[49px] leading-none font-extrabold tracking-tight">
-            {formatWhzd(me.chain.balance)} <span className="text-xl font-bold tracking-normal">WHZD</span>
-          </span>
+    <section aria-label="Saldo" className="flex flex-col gap-6 rounded-3xl bg-pandan-deep p-6 text-white sm:p-7">
+      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm text-white/70">Saldo</span>
+            <span className="tabular text-[49px] leading-none font-extrabold tracking-tight">
+              {formatWhzd(me.chain.balance)} <span className="text-xl font-bold tracking-normal">WHZD</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TopUpDialog me={me} trigger={<Button className="bg-white text-pandan-deep hover:bg-pandan-soft">Isi saldo</Button>} />
+            <span className="text-sm text-white/70">Token uji, tidak bernilai uang</span>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TopUpDialog
-            me={me}
-            trigger={<Button className="bg-white text-pandan-deep hover:bg-pandan-soft">Isi saldo</Button>}
+        <dl className="grid min-w-64 grid-cols-2 gap-x-8 gap-y-1 sm:gap-x-12">
+          <Figure label="Kamu berikan" value={st?.given} note={st && `${st.helped} kali membantu`} />
+          <Figure
+            label="Kamu terima"
+            value={st?.received}
+            note={st && (st.requests ? `${st.funded} permintaan tersalurkan` : "Belum pernah mengajukan")}
           />
-          <span className="text-sm text-white/70">Token uji, tidak bernilai uang</span>
-        </div>
+          {st && BigInt(st.refunded) > 0n && (
+            <p className="col-span-2 pt-2 text-[13px] text-white/60">
+              <span className="tabular">{formatWhzd(st.refunded)} WHZD</span> kembali dari permintaan yang dibatalkan
+            </p>
+          )}
+        </dl>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-3xl border bg-card p-7">
-        <div className="flex items-start justify-between gap-4">
-          <span id="ready-label" className="text-lg font-bold">
-            Siap membantu
-          </span>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex items-center gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
           <Switch
             size="lg"
             aria-labelledby="ready-label"
             aria-describedby="ready-help"
             checked={me.chain.ready}
-            disabled={ready.busy || (!me.chain.ready && BigInt(me.chain.balance) === 0n)}
+            disabled={ready.busy || (!me.chain.ready && empty)}
             onCheckedChange={(value) => void toggleReady(value)}
+            className="data-checked:bg-kunyit data-unchecked:bg-white/25"
           />
+          <div className="flex min-w-0 flex-col">
+            <span id="ready-label" className="font-semibold">
+              Siap membantu
+            </span>
+            <span id="ready-help" className="text-[13px] leading-snug text-white/70">
+              {ready.busy
+                ? phaseLabel[ready.phase]
+                : me.chain.ready
+                  ? "Kamu ikut dihitung saat ada permintaan baru."
+                  : empty
+                    ? "Isi saldo dulu sebelum menyalakan."
+                    : "Kamu tidak dihitung di permintaan baru."}
+            </span>
+          </div>
         </div>
-        <p id="ready-help" className="leading-relaxed text-batu">
-          {ready.busy
-            ? phaseLabel[ready.phase]
-            : me.chain.ready
-              ? "Kamu ikut dihitung saat ada permintaan baru, dan diberi tahu berapa bagianmu."
-              : BigInt(me.chain.balance) === 0n
-                ? "Isi saldo dulu sebelum menyalakan."
-                : "Kamu tidak dihitung di permintaan baru. Nyalakan saat kamu siap ikut membantu."}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-3xl border bg-card p-7">
-        <span className="text-lg font-bold">Mengajukan bantuan</span>
-        {proof?.canOpenRequest ? (
-          <>
-            <p className="flex items-center gap-2 font-semibold text-daun-ink">
-              <Check aria-hidden="true" className="size-5" strokeWidth={2.5} />
-              Kamu bisa mengajukan
-            </p>
-            <Link href="/ajukan" className="self-start font-semibold text-pandan underline underline-offset-4">
-              Ajukan bantuan
-            </Link>
-          </>
-        ) : (
-          <p className="leading-relaxed text-batu">
-            Belum bisa. Bantu satu permintaan anggota lain dulu, atau tunggu permintaanmu yang masih berjalan selesai.
-          </p>
-        )}
+        <CanRequest />
       </div>
     </section>
+  );
+}
+
+/** A total on the balance card; a placeholder until (or if) the totals load. */
+function Figure({ label, value, note }: { label: string; value?: string; note?: string | false }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-sm text-white/70">{label}</dt>
+      <dd className="flex flex-col gap-0.5">
+        <span className="tabular text-2xl font-bold">
+          {value === undefined ? "–" : formatWhzd(value)} <span className="text-sm font-semibold text-white/70">WHZD</span>
+        </span>
+        <span className="min-h-[1lh] text-[13px] text-white/60">{note}</span>
+      </dd>
+    </div>
+  );
+}
+
+/** Whether you can open a request right now, and what to do if not. */
+function CanRequest() {
+  const eligibility = useEligibility();
+  const { icon, title, text, href, cta } = !eligibility
+    ? { icon: null, title: "Mengajukan bantuan", text: "Memeriksa…", href: null, cta: null }
+    : eligibility.can
+      ? {
+          icon: <Check className="size-4.5" strokeWidth={2.5} />,
+          title: "Kamu bisa mengajukan bantuan",
+          text: "Saat butuh biaya berobat, ajukan kapan saja.",
+          href: "/ajukan",
+          cta: "Ajukan",
+        }
+      : eligibility.reason === "running"
+        ? {
+            icon: <Hourglass className="size-4.5" />,
+            title: "Permintaanmu masih berjalan",
+            text: "Bisa mengajukan lagi setelah waktunya habis.",
+            href: `/permintaan/${eligibility.requestId}`,
+            cta: "Lihat",
+          }
+        : {
+            icon: <HandHeart className="size-4.5" />,
+            title: "Belum bisa mengajukan",
+            text: "Bantu satu permintaan anggota lain dulu.",
+            href: "/permintaan",
+            cta: "Cari",
+          };
+  return (
+    <div className="flex items-center gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-full",
+          eligibility?.can ? "bg-kunyit text-pandan-deep" : "bg-white/15 text-white",
+        )}
+      >
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="font-semibold">{title}</span>
+        <span className="text-[13px] leading-snug text-white/70">{text}</span>
+      </div>
+      {href && (
+        <Link href={href} className="pressable flex shrink-0 items-center gap-1 text-sm font-semibold text-kunyit">
+          {cta}
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -215,27 +278,40 @@ function SectionTitle({ id, children, action }: { id: string; children: React.Re
   );
 }
 
+// Waiting for your answer first, then the ones you passed on (you can still help), then the ones you
+// already helped, so a running request never drops off the dashboard just because you answered.
+const answerOrder = { pending: 0, participating: 0, declined: 1, contributed: 2 } as const;
+
 function Waiting() {
   const { data, isPending } = useRequests("for-me");
-  const waiting = (data ?? []).filter(
-    (r) =>
-      (r.status === "open" || r.status === "funding") &&
-      !r.awaitingFinalize &&
-      (r.yourResponse === "pending" || r.yourResponse === "participating"),
-  );
+  const live = (data ?? [])
+    .filter((r) => isLive(r) && r.yourResponse)
+    .sort((a, b) => answerOrder[a.yourResponse!] - answerOrder[b.yourResponse!]);
+  const waiting = live.filter((r) => answerOrder[r.yourResponse!] === 0).length;
   return (
     <section aria-labelledby="waiting" className="flex flex-col gap-4">
-      <SectionTitle id="waiting">Butuh bantuanmu</SectionTitle>
+      <SectionTitle
+        id="waiting"
+        action={
+          live.length > 0 && (
+            <span className="text-sm font-semibold text-batu">
+              {waiting ? `${waiting} menunggu jawabanmu` : "Semua sudah kamu jawab"}
+            </span>
+          )
+        }
+      >
+        Permintaan berjalan
+      </SectionTitle>
       {isPending ? (
         <Skeleton className="h-40 w-full rounded-3xl" />
-      ) : waiting.length === 0 ? (
+      ) : live.length === 0 ? (
         <p className="rounded-3xl border border-dashed bg-card p-7 leading-relaxed text-batu">
-          Belum ada yang menunggu jawabanmu. Saat anggota lain butuh bantuan dan siap membantu menyala, permintaannya
-          muncul di sini.
+          Belum ada permintaan yang sedang berjalan untukmu. Saat anggota lain butuh bantuan dan siap membantu menyala,
+          permintaannya muncul di sini.
         </p>
       ) : (
         <ul className="flex flex-col gap-4">
-          {waiting.map((r) => (
+          {live.map((r) => (
             <WaitingCard key={r.id} request={r} />
           ))}
         </ul>
@@ -260,8 +336,14 @@ function Requester({ request: r }: { request: Request }) {
 
 function WaitingCard({ request: r }: { request: Request }) {
   const { token: session } = useSession();
+  const answer = r.yourResponse;
   return (
-    <li className="flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6">
+    <li
+      className={cn(
+        "flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6",
+        answer === "contributed" && "border-kunyit/50",
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Requester request={r} />
         <CountdownPill deadline={r.deadline} />
@@ -273,12 +355,37 @@ function WaitingCard({ request: r }: { request: Request }) {
         {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
       </div>
       <FundingProgress request={r} className="rounded-xl bg-embun p-4" />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
-          Bantu {formatWhzd(r.share)} WHZD
-        </Link>
-        <DeclineButton id={r.id} token={session} />
-      </div>
+      {answer === "contributed" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="flex items-center gap-2.5 rounded-full bg-kunyit-soft py-1.5 pr-3.5 pl-2 text-sm font-semibold text-kunyit-ink">
+            <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-kunyit text-white">
+              <Check className="size-3.5" strokeWidth={3} />
+            </span>
+            <span className="tabular">Kamu sudah membantu {formatWhzd(r.share)} WHZD</span>
+          </span>
+          <Link href={`/permintaan/${r.id}`} className="flex items-center gap-1 text-sm font-semibold text-pandan">
+            Lihat riwayat
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
+      ) : answer === "declined" ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-center gap-2.5 text-sm text-batu">
+            <Hand aria-hidden="true" className="size-4.5 shrink-0" />
+            Kamu tidak ikut kali ini. Masih bisa membantu sampai waktunya habis.
+          </span>
+          <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants({ variant: "outline" }), "tabular w-full sm:w-auto")}>
+            Bantu {formatWhzd(r.share)} WHZD
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
+            Bantu {formatWhzd(r.share)} WHZD
+          </Link>
+          <DeclineButton id={r.id} token={session} />
+        </div>
+      )}
     </li>
   );
 }
@@ -298,9 +405,10 @@ function DeclineButton({ id, token }: { id: number; token: string | null }) {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["requests"] }),
             queryClient.invalidateQueries({ queryKey: keys.request(id) }),
+            queryClient.invalidateQueries({ queryKey: ["member"] }),
           ]);
           toast("Kamu tidak ikut kali ini.", {
-            description: "Permintaannya tetap bisa kamu bantu dari halaman Permintaan sampai waktunya habis.",
+            description: "Permintaannya tetap di sini, dan masih bisa kamu bantu sampai waktunya habis.",
           });
         } catch (error) {
           toast.error(errorMessage(error));
@@ -412,48 +520,5 @@ function LiveRequestCard({ request: r }: { request: Request }) {
         </div>
       </Link>
     </li>
-  );
-}
-
-function LatestNotifications() {
-  const { data } = useNotifications(5);
-  const now = useNow();
-  return (
-    <aside aria-labelledby="notifications" className="flex min-w-0 flex-col gap-4">
-      <SectionTitle
-        id="notifications"
-        action={
-          <Link href="/notifikasi" className="font-semibold text-pandan underline underline-offset-4">
-            Lihat semua
-          </Link>
-        }
-      >
-        Notifikasi
-      </SectionTitle>
-      <div className="rounded-3xl border bg-card p-2">
-        {data && data.length === 0 && <p className="p-4 text-batu">Belum ada notifikasi.</p>}
-        <ul className="flex flex-col">
-          {(data ?? []).map((n) => (
-            <li key={n.id} className="flex gap-3 rounded-2xl p-3">
-              <span
-                aria-label={n.isRead ? undefined : "Belum dibaca"}
-                className={cn("mt-2 size-2 shrink-0 rounded-full", n.isRead ? "bg-transparent" : "bg-kunyit")}
-              />
-              <div className="flex flex-col gap-1">
-                {n.requestId ? (
-                  <Link href={`/permintaan/${n.requestId}`} className="font-semibold hover:underline">
-                    {n.title}
-                  </Link>
-                ) : (
-                  <span className="font-semibold">{n.title}</span>
-                )}
-                <span className="text-sm leading-relaxed text-batu">{n.description}</span>
-                <span className="text-xs text-batu">{timeAgo(n.createdAt, now)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </aside>
   );
 }

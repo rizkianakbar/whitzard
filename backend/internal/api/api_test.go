@@ -439,6 +439,74 @@ func TestRequestFlow(t *testing.T) {
 	expect(t, e.upload(e.login(e.chain.Accounts[5]), "t", "d", pdf), 403)
 }
 
+func TestActivityAndMemberStats(t *testing.T) {
+	e := newEnv(t)
+	aliceToken, bobToken, carolToken, daveToken := e.login(e.alice), e.login(e.bob), e.login(e.carol), e.login(e.dave)
+	lower := func(a *testutil.Account) string { return strings.ToLower(a.Addr.Hex()) }
+
+	// Request 1 (alice): bob contributes after first declining, carol declines, dave never answers.
+	e.chain.Send(e.chain.Escrow.OpenRequest(e.alice.Opts, testutil.Ether(90), 3600, [32]byte{1}, id(0)))
+	e.sync()
+	expect(t, e.post("/requests/1/contribute", bobToken, map[string]string{"response": "decline"}), 200)
+	expect(t, e.post("/requests/1/contribute", carolToken, map[string]string{"response": "decline"}), 200)
+	e.chain.Send(e.chain.Escrow.Contribute(e.bob.Opts, id(1)))
+	// Request 2 (carol): alice contributes, carol cancels, alice claims back.
+	e.chain.Send(e.chain.Escrow.OpenRequest(e.carol.Opts, testutil.Ether(90), 3600, [32]byte{2}, id(0)))
+	e.chain.Send(e.chain.Escrow.Contribute(e.alice.Opts, id(2)))
+	e.chain.Send(e.chain.Escrow.CancelRequest(e.carol.Opts, id(2)))
+	e.chain.Send(e.chain.Escrow.ClaimRefund(e.alice.Opts, id(2)))
+	e.sync()
+
+	steps := func(requestID string) map[string]string {
+		t.Helper()
+		r := e.get("/requests/"+requestID+"/activity", daveToken)
+		expect(t, r, 200)
+		body := r.json(t)
+		got := map[string]string{}
+		for _, a := range body["activity"].([]any) {
+			a := a.(map[string]any)
+			got[a["type"].(string)+" "+a["member"].(string)] = a["txHash"].(string)
+		}
+		return got
+	}
+	// Only bob's contribution: who declined (carol) or did not answer (dave) is never named.
+	got := steps("1")
+	if len(got) != 1 || got["contributed "+lower(e.bob)] == "" {
+		t.Fatalf("request 1 activity = %v", got)
+	}
+	got = steps("2")
+	if len(got) != 2 || got["contributed "+lower(e.alice)] == "" || got["refunded "+lower(e.alice)] == "" {
+		t.Fatalf("request 2 activity = %v", got)
+	}
+	expect(t, e.get("/requests/1/activity", ""), 401)
+	expect(t, e.get("/requests/99/activity", daveToken), 404)
+
+	// Request 1 ends and is paid out.
+	e.chain.Warp(2 * time.Hour)
+	e.chain.Send(e.chain.Escrow.Finalize(e.dave.Opts, id(1)))
+	e.sync()
+
+	stats := func(token string) map[string]any {
+		t.Helper()
+		r := e.get("/members/me/stats", token)
+		expect(t, r, 200)
+		return r.json(t)
+	}
+	share := testutil.Ether(30).String()
+	if st := stats(aliceToken); st["requests"] != float64(1) || st["funded"] != float64(1) || st["received"] != share ||
+		st["helped"] != float64(1) || st["given"] != "0" || st["refunded"] != share {
+		t.Fatalf("alice's stats = %v", st)
+	}
+	if st := stats(bobToken); st["helped"] != float64(1) || st["given"] != share || st["requests"] != float64(0) {
+		t.Fatalf("bob's stats = %v", st)
+	}
+	// carol's request was cancelled: nothing received.
+	if st := stats(carolToken); st["requests"] != float64(1) || st["funded"] != float64(0) || st["received"] != "0" {
+		t.Fatalf("carol's stats = %v", st)
+	}
+	expect(t, e.get("/members/me/stats", ""), 401)
+}
+
 // ---------------------------------------------------------------- proof and refunds
 
 func TestProofAndRefunds(t *testing.T) {

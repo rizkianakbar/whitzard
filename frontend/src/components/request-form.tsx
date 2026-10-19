@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
+import { HandHeart, Hourglass, Upload, UserRound } from "lucide-react";
 import { useConfig, useReadContract } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { parseEther, parseEventLogs } from "viem";
@@ -20,7 +20,7 @@ import { api } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
 import { formatWhzd } from "@/lib/format";
-import { keys, useMe, useProof } from "@/lib/queries";
+import { keys, useEligibility, useMe, useProof } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
 import { useFieldErrors } from "@/lib/use-field-errors";
@@ -40,6 +40,37 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 
 export function RequestForm() {
+  const { data: me } = useMe();
+  const { data: proof } = useProof();
+  const eligibility = useEligibility();
+  if (!me || !proof || !eligibility) return <Skeleton className="h-96 w-full rounded-3xl" />;
+
+  // Nothing to fill in yet: one centred message saying why, and where to go instead.
+  if (!me.chain.registered) {
+    return (
+      <Blocked icon={<UserRound className="size-6" />} title="Daftar dulu sebagai anggota" href="/gabung" cta="Daftar sekarang">
+        Hanya anggota yang bisa mengajukan bantuan. Pendaftaran cukup sekali.
+      </Blocked>
+    );
+  }
+  if (!eligibility.can) {
+    return eligibility.reason === "running" ? (
+      <Blocked
+        icon={<Hourglass className="size-6" />}
+        title="Permintaanmu masih berjalan"
+        href={`/permintaan/${eligibility.requestId}`}
+        cta="Lihat permintaanmu"
+      >
+        Satu anggota hanya bisa punya satu permintaan berjalan. Kamu bisa mengajukan lagi setelah waktunya habis.
+      </Blocked>
+    ) : (
+      <Blocked icon={<HandHeart className="size-6" />} title="Bantu satu anggota dulu" href="/permintaan" cta="Cari permintaan untuk dibantu">
+        Setelah permintaan pertamamu, kamu perlu membantu satu permintaan anggota lain sebelum mengajukan lagi. Begitu
+        iuranmu tercatat, kamu bisa langsung mengajukan.
+      </Blocked>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex max-w-160 flex-col gap-2.5">
@@ -49,42 +80,37 @@ export function RequestForm() {
           masing-masing diminta bagian yang sama.
         </p>
       </div>
-      <Eligible />
+      <Form proofId={BigInt(proof.proofId ?? 0)} meReady={me.chain.ready} />
     </div>
   );
 }
 
-function Eligible() {
-  const { data: me } = useMe();
-  const { data: proof, isPending } = useProof();
-  if (isPending || !me) return <Skeleton className="h-96 w-full rounded-3xl" />;
-  if (!me.chain.registered) {
-    return (
-      <Blocked title="Daftar dulu sebagai anggota">
-        <Link href="/gabung" className="underline underline-offset-4">Daftar di sini</Link>. Hanya perlu sekali.
-      </Blocked>
-    );
-  }
-  if (!proof?.canOpenRequest) {
-    return (
-      <Blocked title="Kamu belum bisa mengajukan">
-        Setelah permintaan pertamamu, kamu perlu membantu satu permintaan anggota lain sebelum mengajukan lagi. Kalau
-        permintaanmu masih berjalan, tunggu sampai waktunya habis.{" "}
-        <Link href="/permintaan" className="underline underline-offset-4">
-          Lihat permintaan yang bisa kamu bantu
-        </Link>
-        .
-      </Blocked>
-    );
-  }
-  return <Form proofId={BigInt(proof.proofId ?? 0)} meReady={me.chain.ready} />;
-}
-
-function Blocked({ title, children }: { title: string; children: React.ReactNode }) {
+function Blocked({
+  icon,
+  title,
+  href,
+  cta,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  href: string;
+  cta: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="flex max-w-xl flex-col gap-3 rounded-3xl border bg-card p-8">
-      <h2 className="text-xl font-bold">{title}</h2>
-      <p className="leading-relaxed text-batu">{children}</p>
+    <section className="mx-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-3xl border bg-card px-6 py-10 text-center sm:mt-8 sm:px-10 sm:py-12">
+      <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
+        {icon}
+      </span>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-semibold text-batu">Ajukan bantuan</span>
+        <h1 className="text-[25px] leading-tight font-extrabold text-balance">{title}</h1>
+      </div>
+      <p className="max-w-[44ch] leading-relaxed text-pretty text-batu">{children}</p>
+      <Link href={href} className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
+        {cta}
+      </Link>
     </section>
   );
 }

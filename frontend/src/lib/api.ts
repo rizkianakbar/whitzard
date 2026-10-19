@@ -102,6 +102,25 @@ export type Stats = {
   contributions: number;
 };
 
+/** The signed-in member's own totals. Amounts are wei strings. */
+export type MemberStats = {
+  helped: number;
+  given: string;
+  refunded: string;
+  requests: number;
+  funded: number;
+  received: string;
+};
+
+/** One on-chain member step on a request. Who declined or did not answer is only counted, never named. */
+export type Activity = {
+  type: "contributed" | "refunded";
+  member: Address;
+  amount: string;
+  txHash: Hex;
+  at: string;
+};
+
 export type Proof = { needed: boolean; proofId: string | null; canOpenRequest: boolean };
 export type Refunds = { total: string; refunds: { requestId: string; amount: string }[] };
 
@@ -161,6 +180,7 @@ export const api = {
   stats: () => call<Stats>("/stats"),
   proof: (token: string) => call<Proof>("/members/me/proof", { token }),
   refunds: (token: string) => call<Refunds>("/members/me/refunds", { token }),
+  memberStats: (token: string) => call<MemberStats>("/members/me/stats", { token }),
 
   requests: (query: { requester?: Address; member?: "me"; limit?: number }, token?: string | null) => {
     const params = new URLSearchParams();
@@ -170,6 +190,8 @@ export const api = {
     return call<{ requests: Request[] }>(`/requests?${params}`, { token });
   },
   request: (id: number, token?: string | null) => call<RequestDetail>(`/requests/${id}`, { token }),
+  activity: (id: number, token: string) =>
+    call<{ activity: Activity[] }>(`/requests/${id}/activity`, { token }),
   createDraft: (token: string, form: FormData) =>
     call<{ draftId: number; evidenceHash: Hex; contentType: string; size: number }>("/requests", {
       method: "POST",

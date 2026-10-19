@@ -325,6 +325,16 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
+// GET /members/me/stats → the caller's own totals: what they gave, got back and received.
+func (s *Server) handleMemberStats(w http.ResponseWriter, r *http.Request) {
+	st, err := s.store.GetMemberStats(r.Context(), caller(r))
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
 // GET /members/me/proof → the proofId to pass to Escrow.openRequest. The first request needs no
 // proof (0). Otherwise the newest contribution the chain accepts is returned, or null if none.
 func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
