@@ -154,6 +154,22 @@ func (s *Server) handleGetMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"address": lower, "profile": profileView(profile, s.optionalCaller(r)), "chain": state})
 }
 
+// GET /members → every registered member's profile (as profileView shows it), ready ones first.
+// Profiles only: the live chain state stays per member (GET /members/{address}).
+func (s *Server) handleListMembers(w http.ResponseWriter, r *http.Request) {
+	members, err := s.store.ListMembers(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	viewer := caller(r)
+	out := make([]any, len(members))
+	for i, m := range members {
+		out[i] = profileView(m, viewer)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"members": out})
+}
+
 // profileView is a member's profile as the viewer may see it: the birth date only for the member
 // themself, the city only for signed-in viewers.
 func profileView(m *store.Member, viewer string) any {

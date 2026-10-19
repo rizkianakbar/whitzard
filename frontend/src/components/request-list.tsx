@@ -8,7 +8,7 @@ import { Avatar, callName } from "@/components/avatar";
 import { CountdownPill } from "@/components/countdown";
 import { FundingProgress } from "@/components/funding";
 import { endedAt, isLive, PastRequestRow } from "@/components/request-row";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, YourAnswer } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Request } from "@/lib/api";
@@ -243,11 +243,12 @@ function RequestCard({ request: r, highlight }: { request: Request; highlight?: 
           href={`/permintaan/${r.id}`}
           className="text-xl leading-snug font-bold text-balance after:absolute after:inset-0 after:rounded-2xl group-hover:underline"
         >
-          {r.title ?? `Permintaan nomor ${r.id}`}
+          {r.title ?? `Permintaan #${r.id}`}
         </Link>
         {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
       </div>
       <FundingProgress request={r} className="mt-auto" />
+      <YourAnswer request={r} className="self-start" />
       <div className="flex items-center justify-between gap-3 border-t pt-4">
         <div className="flex min-w-0 items-center gap-2.5">
           <Avatar address={r.requester} profile={member?.profile} className="size-8 text-xs" />

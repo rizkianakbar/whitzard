@@ -23,6 +23,7 @@ import { formatWhzd } from "@/lib/format";
 import { keys, useEligibility, useMe, useProof } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
+import { callDetail } from "@/lib/wallet-prompt";
 import { useFieldErrors } from "@/lib/use-field-errors";
 import { cn } from "@/lib/utils";
 
@@ -169,6 +170,10 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
 
     let id: bigint | undefined;
     const receipt = await tx.run({
+      prompt: {
+        title: `Ajukan ${formatWhzd(amountWei)} WHZD`,
+        detail: callDetail("Escrow", "openRequest", "Mencatat permintaanmu dan sidik dokumennya. Tidak ada dana yang berpindah sekarang."),
+      },
       send: () =>
         writeContract(config, {
           ...escrow,

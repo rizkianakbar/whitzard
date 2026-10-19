@@ -23,21 +23,21 @@ export function PastRequestRow({ request: r, first, mine }: { request: Request; 
   const outcome =
     r.status === "finalized"
       ? {
-          icon: <Check className="size-4.5" strokeWidth={2.5} />,
-          tone: "bg-daun-soft text-daun-ink",
-          text: (
-            <>
-              <strong className="tabular font-semibold text-arang">{formatWhzd(r.collected)} WHZD</strong>{" "}
-              {mine ? "diterima" : "terkirim"} dari {r.contributors} anggota
-            </>
-          ),
-        }
+        icon: <Check className="size-4.5" strokeWidth={2.5} />,
+        tone: "bg-daun-soft text-daun-ink",
+        text: (
+          <>
+            <strong className="tabular font-semibold text-arang">{formatWhzd(r.collected)} WHZD</strong>{" "}
+            {mine ? "diterima" : "terkirim"} dari {r.contributors} anggota
+          </>
+        ),
+      }
       : r.status === "cancelled"
         ? {
-            icon: <X className="size-4.5" />,
-            tone: "bg-bata-soft text-bata-ink",
-            text: mine ? "Kamu membatalkannya" : "Dibatalkan oleh peminta",
-          }
+          icon: <X className="size-4.5" />,
+          tone: "bg-bata-soft text-bata-ink",
+          text: mine ? "Kamu membatalkannya" : "Dibatalkan oleh peminta",
+        }
         : r.awaitingFinalize
           ? { icon: <Clock className="size-4.5" />, tone: "bg-kunyit-soft text-kunyit-ink", text: "Waktu habis, dana sedang dikirim" }
           : { icon: <Clock className="size-4.5" />, tone: "bg-muted text-batu", text: "Berakhir tanpa iuran" };
@@ -49,7 +49,7 @@ export function PastRequestRow({ request: r, first, mine }: { request: Request; 
           {outcome.icon}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-semibold">{r.title ?? `Permintaan nomor ${r.id}`}</span>
+          <span className="truncate font-semibold">{r.title ?? `Permintaan #${r.id}`}</span>
           <span className="truncate text-sm text-batu">
             {outcome.text} · {shortDate.format(new Date(endedAt(r)))}
           </span>

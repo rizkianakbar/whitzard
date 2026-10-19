@@ -164,6 +164,7 @@ export const api = {
   logout: (token: string) => call<void>("/auth/logout", { method: "POST", token }),
 
   member: (address: Address | "me", token?: string | null) => call<Member>(`/members/${address}`, { token }),
+  members: (token: string) => call<{ members: MemberProfile[] }>("/members", { token }),
   updateMe: (token: string, profile: ProfileInput) =>
     call<MemberProfile>("/members/me", { method: "PUT", token, body: JSON.stringify(profile) }),
   setPhoto: (token: string, file: File) => {

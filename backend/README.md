@@ -54,6 +54,7 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 
 | | |
 | --- | --- |
+| `GET /members` 🔒 | `{members: [profile]}`: every registered member, ready ones first (profiles only; chain state per member) |
 | `GET /members/{address}` (or `/members/me` 🔒) | `{address, profile, chain}`: profile is null before registering; `chain` = registered, ready, hasParticipated, requestCount, balance, faucetClaimed, faucetNextClaimAt (live) |
 | `PUT /members/me` 🔒 `{displayName, nickname, birthDate, city}` | replace the profile (registered members); missing fields are cleared, `birthDate` is `YYYY-MM-DD`. Self-declared, never verified. `birthDate` is returned only to the member themself, `city` only to signed-in viewers |
 | `PUT /members/me/photo` 🔒 multipart `file` | set the profile photo (PNG, JPEG or WebP, `MAX_PHOTO_BYTES`); `profile.photo` is its SHA-256 |

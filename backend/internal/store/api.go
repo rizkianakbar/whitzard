@@ -74,21 +74,43 @@ type Member struct {
 	CreatedAt         time.Time  `json:"createdAt"`
 }
 
-// GetMember returns a registered member, or ErrNotFound.
-func (s *Store) GetMember(ctx context.Context, address string) (*Member, error) {
+const memberColumns = `
+	address, display_name, nickname, birth_date, city, photo_hash, photo_type,
+	ready, registered_at_block, created_at,
+	(SELECT count(*) FROM contributions c WHERE c.member = m.address AND NOT c.refunded),
+	(SELECT count(*) FROM requests r WHERE r.requester = m.address AND r.status <> 'cancelled')`
+
+func scanMember(row pgx.Row) (*Member, error) {
 	var m Member
-	err := s.Pool.QueryRow(ctx, `
-		SELECT address, display_name, nickname, birth_date, city, photo_hash, photo_type,
-		       ready, registered_at_block, created_at,
-		       (SELECT count(*) FROM contributions c WHERE c.member = m.address AND NOT c.refunded),
-		       (SELECT count(*) FROM requests r WHERE r.requester = m.address AND r.status <> 'cancelled')
-		FROM members m WHERE address = $1`, address).
-		Scan(&m.Address, &m.DisplayName, &m.Nickname, &m.BirthDate, &m.City, &m.Photo, &m.PhotoType,
-			&m.Ready, &m.RegisteredAtBlock, &m.CreatedAt, &m.Contributions, &m.Requests)
+	err := row.Scan(&m.Address, &m.DisplayName, &m.Nickname, &m.BirthDate, &m.City, &m.Photo, &m.PhotoType,
+		&m.Ready, &m.RegisteredAtBlock, &m.CreatedAt, &m.Contributions, &m.Requests)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	return &m, err
+}
+
+// GetMember returns a registered member, or ErrNotFound.
+func (s *Store) GetMember(ctx context.Context, address string) (*Member, error) {
+	return scanMember(s.Pool.QueryRow(ctx, `SELECT `+memberColumns+` FROM members m WHERE address = $1`, address))
+}
+
+// ListMembers returns every registered member: ready ones first, then by who joined first.
+func (s *Store) ListMembers(ctx context.Context) ([]*Member, error) {
+	rows, err := s.Pool.Query(ctx, `SELECT `+memberColumns+` FROM members m ORDER BY ready DESC, registered_at_block, address`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Member{}
+	for rows.Next() {
+		m, err := scanMember(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 // Profile is the editable part of a member; nil fields are cleared.

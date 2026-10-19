@@ -15,6 +15,7 @@ import { formatWhzd } from "@/lib/format";
 import { useNow } from "@/lib/now";
 import { keys } from "@/lib/queries";
 import { useTx } from "@/lib/tx";
+import { callDetail } from "@/lib/wallet-prompt";
 import { chain } from "@/lib/wagmi";
 
 const CAP = 1000n * 10n ** 18n;
@@ -34,6 +35,7 @@ export function useFaucet(me: Member) {
 
   const claim = () =>
     tx.run({
+      prompt: { title: "Isi 100 WHZD", detail: callDetail("WhitzardToken", "faucet", "Token uji gratis masuk ke dompetmu; kamu hanya membayar biaya jaringan.") },
       send: () => writeContract(config, { ...token, functionName: "faucet" }),
       synced: async () => (await api.member(me.address)).chain.balance !== me.chain.balance,
       success: "100 WHZD masuk ke saldomu.",

@@ -100,6 +100,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /stats", s.handleStats)
 
+	mux.HandleFunc("GET /members", s.authed(s.handleListMembers))
 	mux.HandleFunc("GET /members/{address}", s.handleGetMember)
 	mux.HandleFunc("GET /members/{address}/photo", s.authed(s.handleGetPhoto))
 	mux.HandleFunc("PUT /members/me", s.authed(s.handleUpdateMe))

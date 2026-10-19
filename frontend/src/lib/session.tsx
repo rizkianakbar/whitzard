@@ -3,9 +3,10 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { useConfig, useConnection } from "wagmi";
 import { disconnect, signMessage } from "wagmi/actions";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 
 import { api, ApiError } from "@/lib/api";
+import { dismissWalletPrompt, showWalletPrompt } from "@/lib/wallet-prompt";
 
 type Stored = { token: string; expiresAt: string };
 
@@ -97,7 +98,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (account: Address | undefined = address) => {
       if (!account) throw new Error("Hubungkan dompet dulu.");
       const { nonce, message } = await api.nonce(account);
-      const signature = await signMessage(config, { account, message });
+      showWalletPrompt("wallet-sign-in", {
+        title: "Masuk ke Whitzard",
+        detail: "Dompet meminta tanda tangan pesan masuk. Gratis: bukan transaksi, tidak ada dana yang berpindah.",
+      });
+      let signature: Hex;
+      try {
+        signature = await signMessage(config, { account, message });
+      } finally {
+        dismissWalletPrompt("wallet-sign-in");
+      }
       const session = await api.verify(account, nonce, signature);
       write(account, { token: session.token, expiresAt: session.expiresAt });
     },

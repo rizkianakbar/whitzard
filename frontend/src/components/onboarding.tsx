@@ -18,6 +18,7 @@ import { registry } from "@/lib/contracts";
 import { formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useMe } from "@/lib/queries";
 import { useTx } from "@/lib/tx";
+import { callDetail } from "@/lib/wallet-prompt";
 import { useChanged } from "@/lib/use-changed";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
@@ -178,6 +179,7 @@ function JoinStep({ me }: { me: Member }) {
         className="w-full sm:w-auto"
         onClick={() =>
           void tx.run({
+            prompt: { title: "Daftar sebagai anggota", detail: callDetail("Registry", "register", "Mencatat dompetmu sebagai anggota. Tidak ada dana yang berpindah.") },
             send: () => writeContract(config, { ...registry, functionName: "register" }),
             synced: async () => (await api.member(me.address)).profile !== null,
             success: "Kamu sudah terdaftar sebagai anggota.",
@@ -315,6 +317,10 @@ function ReadyStep({ me, onLater }: { me: Member; onLater: () => void }) {
           className="w-full sm:w-auto"
           onClick={() =>
             void tx.run({
+              prompt: {
+                title: "Nyalakan siap membantu",
+                detail: callDetail("Registry", "setReady", "Kamu ikut dihitung di permintaan baru. Tidak ada dana yang berpindah."),
+              },
               send: () => writeContract(config, { ...registry, functionName: "setReady", args: [true] }),
               synced: async () => (await api.member(me.address)).chain.ready,
               success: "Kamu siap membantu.",

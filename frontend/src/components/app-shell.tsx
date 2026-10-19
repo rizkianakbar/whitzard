@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, Suspense } from "react";
+import { type ReactNode, Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, LogOut, Plus, UserRound } from "lucide-react";
@@ -8,6 +8,7 @@ import { useConnection, useSwitchChain } from "wagmi";
 
 import { Avatar, callName } from "@/components/avatar";
 import { Logo, TestnetPill } from "@/components/brand";
+import { NotificationItem, useMarkRead } from "@/components/notification-list";
 import { TopUpDialog } from "@/components/top-up";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,8 +20,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatWhzd, shortAddress } from "@/lib/format";
 import { useMe, useNotifications } from "@/lib/queries";
+import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
@@ -131,24 +135,80 @@ function Wallet() {
   );
 }
 
+const BELL_PREVIEW = 6;
+
+/** The bell opens the latest notifications in place; the full list is one link away. */
 function NotificationBell() {
   const { status } = useSession();
-  const { data } = useNotifications(20);
+  const { data, isPending } = useNotifications(20);
+  const markRead = useMarkRead();
+  const now = useNow();
+  const [open, setOpen] = useState(false);
   if (status !== "signed-in") return null;
-  const unread = data?.filter((n) => !n.isRead).length ?? 0;
+  const unreadItems = data?.filter((n) => !n.isRead) ?? [];
+  const unread = unreadItems.length;
+  const latest = data?.slice(0, BELL_PREVIEW) ?? [];
+
   return (
-    <Link
-      href="/notifikasi"
-      aria-label={unread ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
-      className="pressable relative flex size-11 items-center justify-center rounded-full border bg-card hover:bg-muted"
-    >
-      <Bell aria-hidden="true" className="size-5" />
-      {unread > 0 && (
-        <span className="tabular pop-in absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-card bg-kunyit px-1 text-[11px] font-bold text-arang">
-          {unread > 9 ? "9+" : unread}
-        </span>
-      )}
-    </Link>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label={unread ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
+        // No press scale (`pressable`) here: the popup is positioned from the bell's box while it is
+        // still scaled down from the click, then jumps right as the bell springs back.
+        className={cn(
+          "relative flex size-11 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted active:bg-garis",
+          open && "bg-muted",
+        )}
+      >
+        <Bell aria-hidden="true" className="size-5" />
+        {unread > 0 && (
+          <span className="tabular pop-in absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-card bg-kunyit px-1 text-[11px] font-bold text-arang">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="flex w-[min(380px,calc(100vw-32px))] flex-col rounded-2xl">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <PopoverTitle className="text-base font-bold">Notifikasi</PopoverTitle>
+          {unread > 0 && (
+            <button
+              type="button"
+              onClick={() => void markRead(unreadItems)}
+              className="pressable text-[13px] font-semibold text-pandan hover:underline"
+            >
+              Tandai semua dibaca
+            </button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isPending ? (
+            <div className="flex flex-col gap-2 p-4">
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <Skeleton className="h-14 w-full rounded-xl" />
+            </div>
+          ) : latest.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm leading-relaxed text-batu">
+              Belum ada notifikasi. Kamu diberi tahu saat ada yang butuh bantuan, saat iuran masuk, dan saat dana diteruskan.
+            </p>
+          ) : (
+            <ul>
+              {latest.map((n, i) => (
+                <li key={n.id} className={cn(i > 0 && "border-t")}>
+                  <NotificationItem notification={n} now={now} compact onOpen={() => setOpen(false)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <Link
+          href="/notifikasi"
+          onClick={() => setOpen(false)}
+          className="border-t px-4 py-3 text-center text-sm font-semibold text-pandan hover:bg-muted"
+        >
+          Lihat semua notifikasi
+        </Link>
+      </PopoverContent>
+    </Popover>
   );
 }
 

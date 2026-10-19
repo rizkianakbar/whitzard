@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 // wallets never shows the previous wallet's cached data.
 export const keys = {
   member: (address: string) => ["member", address.toLowerCase()] as const,
+  members: ["members"] as const,
   // Under the member's key, so anything that refreshes the member refreshes their totals too.
   memberStats: (address: string) => ["member", address.toLowerCase(), "stats"] as const,
   requests: (scope: string) => ["requests", scope] as const,
@@ -118,6 +119,16 @@ export function useMember(address: Address | undefined) {
     queryKey: keys.member(address ?? "none"),
     queryFn: () => api.member(address!, token),
     enabled: !!address,
+  });
+}
+
+/** Every registered member's profile, ready ones first. */
+export function useMembers() {
+  const { address, token } = useSession();
+  return useQuery({
+    queryKey: [...keys.members, viewer(address, token)],
+    queryFn: async () => (await api.members(token!)).members,
+    enabled: !!token,
   });
 }
 

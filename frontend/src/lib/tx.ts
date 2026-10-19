@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
@@ -8,6 +8,7 @@ import { waitForTransactionReceipt } from "wagmi/actions";
 import type { Hash, TransactionReceipt } from "viem";
 
 import { errorMessage } from "@/lib/errors";
+import { dismissWalletPrompt, showWalletPrompt, type WalletPrompt } from "@/lib/wallet-prompt";
 
 /** wallet → pending (mined?) → syncing (indexed by the backend?) → done. */
 export type TxPhase = "idle" | "wallet" | "pending" | "syncing" | "done";
@@ -31,8 +32,13 @@ export async function until(check: () => Promise<boolean>, timeoutMs = 45_000, i
 }
 
 type RunOptions = {
-  /** Sends the transaction (after any signatures) and returns its hash. */
-  send: () => Promise<Hash>;
+  /** What the wallet is about to ask for, shown in the page while it is open. */
+  prompt: WalletPrompt;
+  /**
+   * Sends the transaction (after any signatures) and returns its hash. A send with several wallet
+   * steps (a signature, then the transaction) calls `step` before each one to update the prompt.
+   */
+  send: (step: (prompt: WalletPrompt) => void) => Promise<Hash>;
   /** Resolves true once the backend reflects the change; polled after the receipt. */
   synced?: (receipt: TransactionReceipt) => Promise<boolean>;
   /** Shown as a toast when everything is done. */
@@ -45,11 +51,18 @@ export function useTx() {
   const config = useConfig();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<TxPhase>("idle");
+  const promptId = `wallet-${useId()}`;
 
-  async function run({ send, synced, success, invalidate = [] }: RunOptions): Promise<TransactionReceipt | null> {
+  async function run({ prompt, send, synced, success, invalidate = [] }: RunOptions): Promise<TransactionReceipt | null> {
     try {
       setPhase("wallet");
-      const hash = await send();
+      showWalletPrompt(promptId, prompt);
+      let hash: Hash;
+      try {
+        hash = await send((next) => showWalletPrompt(promptId, next));
+      } finally {
+        dismissWalletPrompt(promptId);
+      }
       setPhase("pending");
       const receipt = await waitForTransactionReceipt(config, { hash });
       if (receipt.status !== "success") throw new Error("Transaksi gagal di blockchain.");

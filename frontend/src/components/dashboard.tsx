@@ -3,16 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, Hand, HandHeart, Hourglass, RotateCcw, Send } from "lucide-react";
+import { ArrowRight, Check, HandHeart, Hourglass, RotateCcw, Send, Users } from "lucide-react";
 import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { toast } from "sonner";
 
 import { Avatar, callName } from "@/components/avatar";
 import { CountdownPill } from "@/components/countdown";
+import { Carousel } from "@/components/carousel";
 import { FundingProgress } from "@/components/funding";
-import { isLive, PastRequestRow } from "@/components/request-row";
-import { ShareGrid } from "@/components/share-grid";
+import { MemberDirectory } from "@/components/member-directory";
+import { isLive } from "@/components/request-row";
+import { StatusBadge, YourAnswer } from "@/components/status-badge";
 import { BusyLabel, TxLabel } from "@/components/tx-label";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -25,6 +27,7 @@ import { formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useEligibility, useMe, useMember, useMemberStats, useRefunds, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
+import { callDetail } from "@/lib/wallet-prompt";
 import { cn } from "@/lib/utils";
 
 function greeting(): string {
@@ -58,6 +61,7 @@ export function Dashboard() {
         <Waiting />
         <MyRequests />
       </div>
+      <MemberDirectory />
     </div>
   );
 }
@@ -93,10 +97,13 @@ function Wallet({ me }: { me: Member }) {
 
   const toggleReady = (value: boolean) =>
     ready.run({
+      prompt: value
+        ? { title: "Nyalakan siap membantu", detail: callDetail("Registry", "setReady", "Kamu ikut dihitung di permintaan baru. Tidak ada dana yang berpindah.") }
+        : { title: "Matikan siap membantu", detail: callDetail("Registry", "setReady", "Kamu tidak dihitung di permintaan baru. Tidak ada dana yang berpindah.") },
       send: () => writeContract(config, { ...registry, functionName: "setReady", args: [value] }),
       synced: async () => (await api.member(me.address)).chain.ready === value,
       success: value ? "Kamu siap membantu." : "Kamu tidak dihitung di permintaan baru.",
-      invalidate: [keys.member(me.address), keys.proof],
+      invalidate: [keys.member(me.address), keys.proof, keys.members],
     });
 
   return (
@@ -170,7 +177,7 @@ function Figure({ label, value, note }: { label: string; value?: string; note?: 
         <span className="tabular text-2xl font-bold">
           {value === undefined ? "–" : formatWhzd(value)} <span className="text-sm font-semibold text-white/70">WHZD</span>
         </span>
-        <span className="min-h-[1lh] text-[13px] text-white/60">{note}</span>
+        <span className="min-h-lh text-[13px] text-white/60">{note}</span>
       </dd>
     </div>
   );
@@ -183,27 +190,27 @@ function CanRequest() {
     ? { icon: null, title: "Mengajukan bantuan", text: "Memeriksa…", href: null, cta: null }
     : eligibility.can
       ? {
-          icon: <Check className="size-4.5" strokeWidth={2.5} />,
-          title: "Kamu bisa mengajukan bantuan",
-          text: "Saat butuh biaya berobat, ajukan kapan saja.",
-          href: "/ajukan",
-          cta: "Ajukan",
-        }
+        icon: <Check className="size-4.5" strokeWidth={2.5} />,
+        title: "Kamu bisa mengajukan bantuan",
+        text: "Saat butuh biaya berobat, ajukan kapan saja.",
+        href: "/ajukan",
+        cta: "Ajukan",
+      }
       : eligibility.reason === "running"
         ? {
-            icon: <Hourglass className="size-4.5" />,
-            title: "Permintaanmu masih berjalan",
-            text: "Bisa mengajukan lagi setelah waktunya habis.",
-            href: `/permintaan/${eligibility.requestId}`,
-            cta: "Lihat",
-          }
+          icon: <Hourglass className="size-4.5" />,
+          title: "Permintaanmu masih berjalan",
+          text: "Bisa mengajukan lagi setelah waktunya habis.",
+          href: `/permintaan/${eligibility.requestId}`,
+          cta: "Lihat",
+        }
         : {
-            icon: <HandHeart className="size-4.5" />,
-            title: "Belum bisa mengajukan",
-            text: "Bantu satu permintaan anggota lain dulu.",
-            href: "/permintaan",
-            cta: "Cari",
-          };
+          icon: <HandHeart className="size-4.5" />,
+          title: "Belum bisa mengajukan",
+          text: "Bantu satu permintaan anggota lain dulu.",
+          href: "/permintaan",
+          cta: "Cari",
+        };
   return (
     <div className="flex items-center gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
       <span
@@ -241,7 +248,7 @@ function RefundNotice() {
           <RotateCcw aria-hidden="true" className="size-5" />
           <p className="min-w-72 flex-1">
             <Link href={`/permintaan/${refund.requestId}`} className="font-semibold underline underline-offset-4">
-              Permintaan nomor {refund.requestId}
+              Permintaan #{refund.requestId}
             </Link>{" "}
             dibatalkan. Iuranmu <strong className="tabular">{formatWhzd(refund.amount)} WHZD</strong> bisa kamu ambil
             kembali.
@@ -250,6 +257,10 @@ function RefundNotice() {
             disabled={tx.busy}
             onClick={() =>
               void tx.run({
+                prompt: {
+                  title: `Ambil kembali ${formatWhzd(refund.amount)} WHZD`,
+                  detail: callDetail("Escrow", "claimRefund", "Iuranmu dari permintaan yang dibatalkan kembali ke dompetmu."),
+                },
                 send: () =>
                   writeContract(config, { ...escrow, functionName: "claimRefund", args: [BigInt(refund.requestId)] }),
                 success: `${formatWhzd(refund.amount)} WHZD sudah kembali ke saldomu.`,
@@ -267,27 +278,42 @@ function RefundNotice() {
 
 // ---------------------------------------------------------------- lists
 
-function SectionTitle({ id, children, action }: { id: string; children: React.ReactNode; action?: React.ReactNode }) {
+function SectionTitle({
+  id,
+  children,
+  description,
+  action,
+}: {
+  id: string;
+  children: React.ReactNode;
+  description: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <h2 id={id} className="text-[25px] font-extrabold">
-        {children}
-      </h2>
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-col gap-0.5">
+        <h2 id={id} className="text-[25px] leading-tight font-extrabold">
+          {children}
+        </h2>
+        <p className="text-sm text-batu">{description}</p>
+      </div>
       {action}
     </div>
   );
 }
 
 // Waiting for your answer first, then the ones you passed on (you can still help), then the ones you
-// already helped, so a running request never drops off the dashboard just because you answered.
+// already helped, then the ones whose time is up and whose money is on its way. A request stays here
+// until the money has actually arrived, whatever you answered.
 const answerOrder = { pending: 0, participating: 0, declined: 1, contributed: 2 } as const;
+const order = (r: Request) => (r.awaitingFinalize ? 3 : answerOrder[r.yourResponse!]);
 
 function Waiting() {
   const { data, isPending } = useRequests("for-me");
   const live = (data ?? [])
-    .filter((r) => isLive(r) && r.yourResponse)
-    .sort((a, b) => answerOrder[a.yourResponse!] - answerOrder[b.yourResponse!]);
-  const waiting = live.filter((r) => answerOrder[r.yourResponse!] === 0).length;
+    .filter((r) => (isLive(r) || r.awaitingFinalize) && r.yourResponse)
+    .sort((a, b) => order(a) - order(b) || new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+  const waiting = live.filter((r) => order(r) === 0).length;
   return (
     <section aria-labelledby="waiting" className="flex flex-col gap-4">
       <SectionTitle
@@ -299,91 +325,101 @@ function Waiting() {
             </span>
           )
         }
+        description="Permintaan anggota lain yang meminta bagianmu."
       >
-        Permintaan berjalan
+        Membantu anggota lain
       </SectionTitle>
       {isPending ? (
         <Skeleton className="h-40 w-full rounded-3xl" />
       ) : live.length === 0 ? (
-        <p className="rounded-3xl border border-dashed bg-card p-7 leading-relaxed text-batu">
-          Belum ada permintaan yang sedang berjalan untukmu. Saat anggota lain butuh bantuan dan siap membantu menyala,
-          permintaannya muncul di sini.
-        </p>
+        <EmptyState icon={<Users className="size-6" />} title="Belum ada yang meminta bantuanmu">
+          Saat ada anggota yang butuh dan siap membantu menyala, permintaannya muncul di sini.
+        </EmptyState>
       ) : (
-        <ul className="flex flex-col gap-4">
+        <Carousel label="Permintaan anggota lain">
           {live.map((r) => (
-            <WaitingCard key={r.id} request={r} />
+            <RequestCard key={r.id} request={r} className="w-full shrink-0 snap-start" />
           ))}
-        </ul>
+        </Carousel>
       )}
     </section>
   );
 }
 
-function Requester({ request: r }: { request: Request }) {
+function Requester({ request: r, mine }: { request: Request; mine?: boolean }) {
   const { data: member } = useMember(r.requester);
   const profile = member?.profile;
   return (
     <div className="flex items-center gap-3">
       <Avatar address={r.requester} profile={profile} className="size-11 text-sm" />
       <div className="flex flex-col leading-snug">
-        <span className="font-semibold">{callName(profile, shortAddress(r.requester))}</span>
+        <span className="font-semibold">{mine ? "Kamu" : callName(profile, shortAddress(r.requester))}</span>
         {profile?.city && <span className="text-sm text-batu">{profile.city}</span>}
       </div>
     </div>
   );
 }
 
-function WaitingCard({ request: r }: { request: Request }) {
+/**
+ * A running request on the dashboard. The same card for requests you can help with and your own
+ * (`mine`), so both read alike; only the footer differs: your answer, or where your money goes.
+ */
+function RequestCard({ request: r, mine, className }: { request: Request; mine?: boolean; className?: string }) {
   const { token: session } = useSession();
+  const { data: requester } = useMember(r.requester);
   const answer = r.yourResponse;
+  const sending = r.awaitingFinalize;
+  const open = !mine && !sending && (answer === "pending" || answer === "participating");
   return (
     <li
-      className={cn(
-        "flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6",
-        answer === "contributed" && "border-kunyit/50",
-      )}
+      className={cn("flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6", open && "border-kunyit/60", className)}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <Requester request={r} />
-        <CountdownPill deadline={r.deadline} />
+        <Requester request={r} mine={mine} />
+        {sending ? <StatusBadge request={r} /> : <CountdownPill deadline={r.deadline} />}
       </div>
       <div className="flex flex-col gap-1.5">
         <Link href={`/permintaan/${r.id}`} className="text-xl leading-snug font-bold text-balance hover:underline">
-          {r.title ?? `Permintaan nomor ${r.id}`}
+          {r.title ?? `Permintaan #${r.id}`}
         </Link>
-        {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
+        {r.description && <p className="line-clamp-1 leading-relaxed text-batu">{r.description}</p>}
       </div>
       <FundingProgress request={r} className="rounded-xl bg-embun p-4" />
-      {answer === "contributed" ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="flex items-center gap-2.5 rounded-full bg-kunyit-soft py-1.5 pr-3.5 pl-2 text-sm font-semibold text-kunyit-ink">
-            <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-kunyit text-white">
-              <Check className="size-3.5" strokeWidth={3} />
-            </span>
-            <span className="tabular">Kamu sudah membantu {formatWhzd(r.share)} WHZD</span>
+      {mine ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5.5">
+          <span className="flex min-w-0 items-center gap-1.5 text-sm text-batu">
+            <Send aria-hidden="true" className="size-4 shrink-0" />
+            {sending ? "Dana sedang dikirim ke dompetmu." : "Dikirim otomatis ke dompetmu saat waktu habis."}
           </span>
-          <Link href={`/permintaan/${r.id}`} className="flex items-center gap-1 text-sm font-semibold text-pandan">
+          <Link href={`/permintaan/${r.id}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
             Lihat riwayat
             <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </div>
-      ) : answer === "declined" ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-center gap-2.5 text-sm text-batu">
-            <Hand aria-hidden="true" className="size-4.5 shrink-0" />
-            Kamu tidak ikut kali ini. Masih bisa membantu sampai waktunya habis.
-          </span>
-          <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants({ variant: "outline" }), "tabular w-full sm:w-auto")}>
-            Bantu {formatWhzd(r.share)} WHZD
-          </Link>
-        </div>
-      ) : (
+      ) : open ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
             Bantu {formatWhzd(r.share)} WHZD
           </Link>
           <DeclineButton id={r.id} token={session} />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <YourAnswer request={r} />
+            {sending ? (
+              <span className="flex items-center gap-1.5 text-sm text-batu">
+                <Send aria-hidden="true" className="size-4 shrink-0" />
+                Dana sedang dikirim ke {callName(requester?.profile, shortAddress(r.requester))}
+              </span>
+            ) : (
+              answer === "declined" && <span className="text-sm text-batu">Masih bisa membantu sampai waktunya habis.</span>
+            )}
+          </div>
+          {/* <Link href={`/permintaan/${r.id}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
+            {answer === "declined" && !sending ? `Bantu ${formatWhzd(r.share)} WHZD` : "Lihat riwayat"}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link> */}
         </div>
       )}
     </li>
@@ -424,101 +460,71 @@ function DeclineButton({ id, token }: { id: number; token: string | null }) {
 function MyRequests() {
   const { data, isPending } = useRequests("mine");
   // Waiting to be sent still counts as running for the requester: the money hasn't arrived yet.
-  const running = (r: Request) => isLive(r) || r.awaitingFinalize;
-  const live = (data ?? []).filter(running);
-  const past = (data ?? []).filter((r) => !running(r)).slice(0, 3);
-  const any = live.length + past.length > 0;
+  // Finished ones live on the Permintaan page; the dashboard only shows what is still under way.
+  const live = (data ?? []).filter((r) => isLive(r) || r.awaitingFinalize);
+  const finished = (data?.length ?? 0) - live.length;
   return (
     <section aria-labelledby="mine" className="flex flex-col gap-4">
       <SectionTitle
         id="mine"
+        description="Bantuan yang kamu ajukan untuk dirimu."
         action={
-          any && (
-            <Link href="/permintaan" className="font-semibold text-pandan underline underline-offset-4">
-              Semua permintaan
+          finished > 0 && (
+            <Link href="/permintaan" className="text-sm font-semibold text-pandan underline underline-offset-4">
+              Riwayat pengajuan
             </Link>
           )
         }
       >
-        Permintaanmu
+        Bantuan untukmu
       </SectionTitle>
       {isPending ? (
         <Skeleton className="h-48 w-full rounded-2xl" />
-      ) : !any ? (
-        <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed bg-card p-6 sm:flex-row sm:items-center sm:gap-5">
-          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-pandan-soft text-pandan">
-            <HandHeart className="size-6" />
-          </span>
-          <p className="flex-1 leading-relaxed text-batu">
-            <span className="block font-bold text-arang">Belum pernah mengajukan</span>
-            Saat butuh biaya berobat, ajukan di sini. Anggota yang siap membantu langsung diberi tahu.
-          </p>
-          <Link href="/ajukan" className={buttonVariants({ variant: "outline", className: "w-full sm:w-auto" })}>
-            Ajukan bantuan
-          </Link>
-        </div>
+      ) : live.length === 0 ? (
+        <EmptyState
+          icon={<HandHeart className="size-6" />}
+          title={finished > 0 ? "Tidak ada pengajuan yang berjalan" : "Belum pernah mengajukan"}
+          action={
+            <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
+              Ajukan bantuan
+            </Link>
+          }
+        >
+          Saat butuh biaya berobat, ajukan di sini. Anggota yang siap membantu langsung diberi tahu.
+        </EmptyState>
       ) : (
-        <div className="flex flex-col gap-4">
-          {live.length > 0 && (
-            <ul className="flex flex-col gap-4">
-              {live.map((r) => (
-                <LiveRequestCard key={r.id} request={r} />
-              ))}
-            </ul>
-          )}
-          {past.length > 0 && (
-            <ul className="overflow-hidden rounded-2xl border bg-card">
-              {past.map((r, i) => (
-                <PastRequestRow key={r.id} request={r} first={i === 0} mine />
-              ))}
-            </ul>
-          )}
-        </div>
+        <ul className="flex flex-col gap-4">
+          {live.map((r) => (
+            <RequestCard key={r.id} request={r} mine />
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-/** Your request while it collects: everything you'd want to know at a glance, and what happens next. */
-function LiveRequestCard({ request: r }: { request: Request }) {
-  const sending = r.awaitingFinalize;
+/** An empty section: centred and roomy, so it reads as a calm placeholder rather than a cramped row. */
+function EmptyState({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <li>
-      <Link
-        href={`/permintaan/${r.id}`}
-        className="group flex flex-col gap-5 rounded-2xl border bg-card p-5 transition-colors duration-200 hover:border-pandan/40 sm:p-6"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="flex items-center gap-2 text-[13px] font-semibold text-pandan">
-              <span aria-hidden="true" className="relative flex size-2">
-                <span className="absolute inset-0 rounded-full bg-kunyit motion-safe:animate-ping" />
-                <span className="relative size-2 rounded-full bg-kunyit" />
-              </span>
-              {sending ? "Sedang dikirim ke dompetmu" : "Sedang mengumpulkan"}
-            </span>
-            <span className="text-xl leading-snug font-bold text-balance">{r.title ?? `Permintaan nomor ${r.id}`}</span>
-          </div>
-          {!sending && <CountdownPill deadline={r.deadline} />}
-        </div>
-
-        <div className="flex flex-col gap-4 rounded-xl bg-embun p-4">
-          <FundingProgress request={r} />
-          <ShareGrid variant="small" size={r.snapshotSize} contributed={r.contributors} declined={0} />
-        </div>
-
-
-        <div className="flex items-center justify-between gap-3 border-t pt-4 text-sm">
-          <span className="flex min-w-0 items-center gap-2 text-batu">
-            <Send aria-hidden="true" className="size-4 shrink-0" />
-            {sending ? "Tidak perlu melakukan apa pun." : "Dikirim otomatis ke dompetmu saat waktu habis."}
-          </span>
-          <span className="flex shrink-0 items-center gap-1 font-semibold text-pandan">
-            Lihat
-            <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
-          </span>
-        </div>
-      </Link>
-    </li>
+    <div className="flex min-h-91.25 flex-col items-center justify-center gap-4 rounded-2xl border border-dashed bg-card px-6 py-10 text-center">
+      <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
+        {icon}
+      </span>
+      <div className="flex max-w-[36ch] flex-col gap-1.5">
+        <span className="text-lg font-bold">{title}</span>
+        <p className="leading-relaxed text-pretty text-batu">{children}</p>
+      </div>
+      {action && <div className="pt-1">{action}</div>}
+    </div>
   );
 }

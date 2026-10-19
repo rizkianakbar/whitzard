@@ -56,6 +56,7 @@ import { keys, useActivity, useMe, useMember, useRequest } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { useTx } from "@/lib/tx";
+import { callDetail } from "@/lib/wallet-prompt";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
 
@@ -100,7 +101,7 @@ function View({ detail }: { detail: Detail }) {
         </Link>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="max-w-[24ch] text-[32px] leading-[1.1] font-extrabold text-pandan sm:text-[39px]">
-            {r.title ?? `Permintaan nomor ${r.id}`}
+            {r.title ?? `Permintaan #${r.id}`}
           </h1>
           <StatusBadge request={r} />
         </div>
@@ -548,8 +549,13 @@ function ContributePanel({
   const contribute = async () => {
     // Recording the intent is a courtesy for the requester; the chain decides.
     void api.respond(session!, r.id, "participate").catch(() => undefined);
+    const contributeStep = (fn: string) => ({
+      title: `Kirim iuran ${formatWhzd(r.share)} WHZD`,
+      detail: callDetail("Escrow", fn, `Dana ditahan kontrak dan diteruskan ke ${requesterName} saat waktu habis.`),
+    });
     const receipt = await tx.run({
-      send: async () => {
+      prompt: contributeStep("contribute"),
+      send: async (step) => {
         const allowance = await readContract(config, { ...token, functionName: "allowance", args: [address!, escrow.address] });
         if (allowance >= share) return writeContract(config, { ...escrow, functionName: "contribute", args: [id] });
         // One transaction: approve by signature (EIP-2612) inside the contribution.
@@ -558,6 +564,10 @@ function ContributePanel({
           readContract(config, { ...token, functionName: "nonces", args: [address!] }),
         ]);
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+        step({
+          title: `Izinkan ${formatWhzd(r.share)} WHZD untuk iuran (1 dari 2)`,
+          detail: `Dompet meminta tanda tangan "Permit": izin bagi kontrak Escrow memakai ${formatWhzd(r.share)} WHZD. Gratis, belum ada dana yang berpindah.`,
+        });
         const signature = await signTypedData(config, {
           domain: { name, version: "1", chainId: chain.id, verifyingContract: token.address },
           types: permitTypes,
@@ -565,6 +575,7 @@ function ContributePanel({
           message: { owner: address!, spender: escrow.address, value: share, nonce, deadline },
         });
         const { v, r: sigR, s } = parseSignature(signature);
+        step({ ...contributeStep("contributeWithPermit"), title: `Kirim iuran ${formatWhzd(r.share)} WHZD (2 dari 2)` });
         return writeContract(config, {
           ...escrow,
           functionName: "contributeWithPermit",
@@ -660,6 +671,10 @@ function RequesterPanel({ detail }: { detail: Detail }) {
 
   const cancel = () =>
     tx.run({
+      prompt: {
+        title: "Batalkan permintaan",
+        detail: callDetail("Escrow", "cancelRequest", "Tidak ada dana yang diteruskan kepadamu; setiap anggota bisa mengambil iurannya kembali."),
+      },
       send: () => writeContract(config, { ...escrow, functionName: "cancelRequest", args: [BigInt(r.id)] }),
       synced: async () => (await api.request(r.id, session)).request.status === "cancelled",
       success: "Permintaan dibatalkan. Anggota bisa mengambil iurannya kembali.",
@@ -737,6 +752,10 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
       return;
     }
     await tx.run({
+      prompt: {
+        title: empty ? "Tutup permintaan" : `Kirim ${formatWhzd(r.collected)} WHZD ke ${recipient}`,
+        detail: callDetail("Escrow", "finalize", `Kontrak hanya bisa mengirim ke ${requesterName}; kamu hanya membayar biaya jaringan.`),
+      },
       send: () => writeContract(config, { ...escrow, functionName: "finalize", args: [BigInt(r.id)] }),
       synced: async () => (await api.request(r.id, session)).request.status !== r.status,
       success: empty ? "Permintaan ditutup." : `Dana terkirim ke ${recipient}.`,
@@ -822,6 +841,10 @@ function Cancelled({ detail, requesterName }: { detail: Detail; requesterName: s
         disabled={tx.busy}
         onClick={() =>
           void tx.run({
+            prompt: {
+              title: `Ambil kembali ${formatWhzd(contribution.amount)} WHZD`,
+              detail: callDetail("Escrow", "claimRefund", "Iuranmu dari permintaan yang dibatalkan kembali ke dompetmu."),
+            },
             send: () => writeContract(config, { ...escrow, functionName: "claimRefund", args: [BigInt(r.id)] }),
             success: `${formatWhzd(contribution.amount)} WHZD sudah kembali ke dompetmu.`,
             invalidate: [keys.request(r.id), keys.refunds, ["member"]],

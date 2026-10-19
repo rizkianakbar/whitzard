@@ -289,6 +289,22 @@ func TestMembers(t *testing.T) {
 	unknown, _ := json.Marshal(map[string]any{"ready": true})
 	expect(t, e.do("PUT", "/members/me", token, bytes.NewReader(unknown), "application/json"), 400)
 
+	// The member list: signed-in only, ready members first, nobody else's birth date.
+	expect(t, e.get("/members", ""), 401)
+	put(token, map[string]any{"displayName": "Alice", "birthDate": "1990-05-17"})
+	list := e.get("/members", bobToken).json(t)["members"].([]any)
+	if len(list) != 5 {
+		t.Fatalf("members = %v", list)
+	}
+	if last := list[4].(map[string]any); last["address"] != strings.ToLower(e.eve.Addr.Hex()) || last["ready"] != false {
+		t.Fatalf("eve (not ready) should come last: %v", last)
+	}
+	for _, m := range list {
+		if m.(map[string]any)["birthDate"] != nil {
+			t.Fatalf("birth date leaked in the list: %v", m)
+		}
+	}
+
 	// An address that never registered cannot have a profile.
 	strangerAccount := e.chain.Accounts[5]
 	strangerToken := e.login(strangerAccount)
