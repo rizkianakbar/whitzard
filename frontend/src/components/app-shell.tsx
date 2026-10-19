@@ -167,7 +167,7 @@ function NotificationBell() {
           </span>
         )}
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="flex w-[min(380px,calc(100vw-32px))] flex-col rounded-2xl">
+      <PopoverContent align="end" sideOffset={12} className="flex w-[min(380px,calc(100vw-32px))] flex-col rounded-2xl">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <PopoverTitle className="text-base font-bold">Notifikasi</PopoverTitle>
           {unread > 0 && (
@@ -226,7 +226,7 @@ function AccountMenu() {
       >
         <Avatar address={address} profile={profile} className="size-11 text-sm" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-60 rounded-2xl p-1.5">
+      <DropdownMenuContent align="end" className="min-w-60 rounded-2xl p-1.5 mt-2">
         {/* Base UI requires a label to sit inside a group. */}
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex flex-col gap-0.5 px-2.5 py-2">
