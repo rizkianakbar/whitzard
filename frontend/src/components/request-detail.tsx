@@ -266,7 +266,7 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
 
   if (status !== "signed-in") {
     return (
-      <SignedIn reason="Hubungkan dompet untuk membantu permintaan ini.">
+      <SignedIn reason="Masuk untuk membantu permintaan ini.">
         <span />
       </SignedIn>
     );

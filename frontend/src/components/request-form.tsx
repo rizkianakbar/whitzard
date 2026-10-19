@@ -47,7 +47,7 @@ export function RequestForm() {
           masing-masing diminta bagian yang sama.
         </p>
       </div>
-      <SignedIn reason="Hubungkan dompet untuk mengajukan bantuan.">
+      <SignedIn reason="Masuk untuk mengajukan bantuan.">
         <Eligible />
       </SignedIn>
     </div>

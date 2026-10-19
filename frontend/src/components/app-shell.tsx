@@ -4,11 +4,11 @@ import { type ReactNode, Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
-import { useConnection, useDisconnect, useSwitchChain } from "wagmi";
+import { useConnection, useSwitchChain } from "wagmi";
 
 import { Avatar } from "@/components/avatar";
 import { Logo } from "@/components/brand";
-import { ConnectButton } from "@/components/connect-dialog";
+import { SignInButton } from "@/components/sign-in-button";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -110,9 +110,9 @@ function NotificationBell() {
 function AccountMenu() {
   const { address, status, signOut } = useSession();
   const { data: me } = useMe();
-  const { mutate: disconnect } = useDisconnect();
 
-  if (!address) return <ConnectButton />;
+  if (status === "loading") return null;
+  if (status !== "signed-in" || !address) return <SignInButton />;
   const name = me?.profile?.displayName;
 
   return (
@@ -137,8 +137,7 @@ function AccountMenu() {
           <DropdownMenuLabel className="tabular text-batu">{shortAddress(address)}</DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {status === "signed-in" && <DropdownMenuItem onClick={() => void signOut()}>Keluar</DropdownMenuItem>}
-        <DropdownMenuItem onClick={() => disconnect()}>Putuskan dompet</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void signOut()}>Keluar</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

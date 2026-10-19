@@ -28,7 +28,7 @@ const CAP = 1000n * 10n ** 18n;
 
 export function Dashboard() {
   return (
-    <SignedIn reason="Hubungkan dompet untuk melihat siapa yang sedang butuh bantuan, dan untuk ikut membantu.">
+    <SignedIn reason="Masuk untuk melihat siapa yang sedang butuh bantuan, dan untuk ikut membantu.">
       <SignedInDashboard />
     </SignedIn>
   );

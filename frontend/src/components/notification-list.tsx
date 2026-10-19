@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 export function NotificationList() {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <SignedIn reason="Hubungkan dompet untuk melihat kabar tentang permintaan dan iuranmu.">
+      <SignedIn reason="Masuk untuk melihat kabar tentang permintaan dan iuranmu.">
         <List />
       </SignedIn>
     </div>

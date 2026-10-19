@@ -2,7 +2,7 @@
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
 import { useConnection, useConfig } from "wagmi";
-import { signMessage } from "wagmi/actions";
+import { disconnect, signMessage } from "wagmi/actions";
 import type { Address } from "viem";
 
 import { api, ApiError } from "@/lib/api";
@@ -16,7 +16,9 @@ type Session = {
   token: string | null;
   /** "loading" until the stored session (if any) has been read in the browser. */
   status: "disconnected" | "loading" | "signed-out" | "signed-in";
-  signIn: () => Promise<void>;
+  /** Signs in the connected wallet, or `account` when it was connected a moment ago and React hasn't caught up. */
+  signIn: (account?: Address) => Promise<void>;
+  /** Ends the backend session and disconnects the wallet. */
   signOut: () => Promise<void>;
 };
 
@@ -74,20 +76,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ? "signed-in"
         : "signed-out";
 
-  const signIn = useCallback(async () => {
-    if (!address) throw new Error("Hubungkan dompet dulu.");
-    const { nonce, message } = await api.nonce(address);
-    const signature = await signMessage(config, { message });
-    const session = await api.verify(address, nonce, signature);
-    write(address, { token: session.token, expiresAt: session.expiresAt });
-  }, [address, config]);
+  const signIn = useCallback(
+    async (account: Address | undefined = address) => {
+      if (!account) throw new Error("Hubungkan dompet dulu.");
+      const { nonce, message } = await api.nonce(account);
+      const signature = await signMessage(config, { account, message });
+      const session = await api.verify(account, nonce, signature);
+      write(account, { token: session.token, expiresAt: session.expiresAt });
+    },
+    [address, config],
+  );
 
   const signOut = useCallback(async () => {
-    if (!address) return;
-    const current = read(address);
-    write(address, null);
+    const current = address ? read(address) : null;
+    if (address) write(address, null);
+    await disconnect(config);
     if (current) await api.logout(current.token).catch(() => undefined);
-  }, [address]);
+  }, [address, config]);
 
   return (
     <SessionContext.Provider value={{ address, token: token ?? null, status, signIn, signOut }}>

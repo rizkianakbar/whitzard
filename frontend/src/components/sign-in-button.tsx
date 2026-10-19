@@ -1,39 +1,78 @@
 "use client";
 
+import { useState } from "react";
 import { Wallet } from "lucide-react";
-import { useConnect, useConnectors } from "wagmi";
+import { useConnect, useConnectors, useDisconnect } from "wagmi";
 import { toast } from "sonner";
+import type { Address } from "viem";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { errorMessage } from "@/lib/errors";
+import { useSession } from "@/lib/session";
 import { devAccounts } from "@/lib/wagmi";
 
-/** Lists the wallets the browser announces (EIP-6963), plus local test accounts in dev. */
-export function ConnectButton({ label = "Hubungkan dompet", size }: { label?: string; size?: "default" | "lg" }) {
+/**
+ * One step to sign in: connects a wallet if none is connected (the browser's EIP-6963 wallets, plus
+ * local test accounts in dev), then asks it to sign the SIWE message. A refused signature disconnects
+ * again, so the member is never left connected but signed out.
+ */
+export function SignInButton({ size }: { size?: "default" | "lg" }) {
   const connectors = useConnectors();
   const { mutateAsync: connect, isPending } = useConnect();
+  const { mutate: disconnect } = useDisconnect();
+  const { address, signIn } = useSession();
+  const [open, setOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
 
   const announced = connectors.filter((c) => c.type === "injected" && c.id !== "injected");
   const browser = announced.length ? announced : connectors.filter((c) => c.id === "injected");
   const mocks = connectors.filter((c) => c.type === "mock");
 
-  const choose = async (connector: (typeof connectors)[number]) => {
+  const sign = async (account?: Address) => {
+    setSigning(true);
     try {
-      await connect({ connector });
+      await signIn(account);
     } catch (error) {
+      disconnect();
       toast.error(errorMessage(error));
+    } finally {
+      setSigning(false);
     }
   };
 
+  const choose = async (connector: (typeof connectors)[number]) => {
+    let account: Address;
+    try {
+      [account] = (await connect({ connector })).accounts;
+    } catch (error) {
+      toast.error(errorMessage(error));
+      return;
+    }
+    setOpen(false);
+    await sign(account);
+  };
+
+  const label = signing ? "Tanda tangani di dompetmu" : "Masuk";
+
+  // Already connected (wagmi reconnected on load, or the wallet switched accounts): only the signature is missing.
+  if (address) {
+    return (
+      <Button size={size} disabled={signing} onClick={() => sign()}>
+        {label}
+      </Button>
+    );
+  }
+
   return (
-    <Dialog>
-      <DialogTrigger render={<Button size={size}>{label}</Button>} />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size={size} disabled={signing}>{label}</Button>} />
       <DialogContent className="gap-5 p-6 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Hubungkan dompet</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Masuk dengan dompet</DialogTitle>
           <DialogDescription className="text-batu">
-            Dompet menyimpan tokenmu dan menandatangani setiap iuran. Whitzard tidak pernah memegang kuncimu.
+            Pilih dompetmu, lalu tanda tangani pesan masuk. Gratis, dan tidak mengirim transaksi apa pun. Whitzard
+            tidak pernah memegang kuncimu.
           </DialogDescription>
         </DialogHeader>
         <ul className="flex flex-col gap-2">
