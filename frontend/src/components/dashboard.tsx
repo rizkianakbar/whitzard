@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Avatar, callName } from "@/components/avatar";
 import { ShareGrid } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
+import { Swap } from "@/components/swap";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,7 +191,7 @@ function RefundNotice() {
               })
             }
           >
-            {tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(refund.amount)} WHZD`}
+            <Swap>{tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(refund.amount)} WHZD`}</Swap>
           </Button>
         </div>
       ))}

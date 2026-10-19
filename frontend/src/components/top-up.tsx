@@ -6,6 +6,7 @@ import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { sepolia } from "wagmi/chains";
 
+import { Swap } from "@/components/swap";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { api, type Member } from "@/lib/api";
@@ -17,7 +18,7 @@ import { phaseLabel, useTx } from "@/lib/tx";
 import { chain } from "@/lib/wagmi";
 
 const CAP = 1000n * 10n ** 18n;
-const SEPOLIA_FAUCET = "https://cloud.google.com/application/web3/faucet/ethereum/sepolia";
+export const SEPOLIA_FAUCET = "https://cloud.google.com/application/web3/faucet/ethereum/sepolia";
 
 /** The faucet, presented as topping up: real money is never involved. */
 export function useFaucet(me: Member) {
@@ -87,7 +88,7 @@ export function TopUpDialog({ me, trigger }: { me: Member; trigger: ReactElement
               if (await claim()) setOpen(false);
             }}
           >
-            {tx.busy ? phaseLabel[tx.phase] : "Ambil 100 WHZD gratis"}
+            <Swap>{tx.busy ? phaseLabel[tx.phase] : "Ambil 100 WHZD gratis"}</Swap>
           </Button>
         ) : (
           <p className="rounded-2xl bg-muted p-4 text-sm text-batu">{wait}</p>
