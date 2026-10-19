@@ -6,7 +6,7 @@ import { useConnect, useConnectors, useDisconnect } from "wagmi";
 import { toast } from "sonner";
 import type { Address } from "viem";
 
-import { Swap } from "@/components/swap";
+import { BusyLabel } from "@/components/tx-label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { errorMessage } from "@/lib/errors";
@@ -54,20 +54,24 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
     await sign(account);
   };
 
-  const label = signing ? "Tanda tangani di dompetmu" : idle;
+  const label = (
+    <BusyLabel busy={signing ? "Setujui di dompetmu" : null} wallet>
+      {idle}
+    </BusyLabel>
+  );
 
   // Already connected (wagmi reconnected on load, or the wallet switched accounts): only the signature is missing.
   if (address) {
     return (
       <Button size={size} disabled={signing} onClick={() => sign()}>
-        <Swap>{label}</Swap>
+        {label}
       </Button>
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={size} disabled={signing}><Swap>{label}</Swap></Button>} />
+      <DialogTrigger render={<Button size={size} disabled={signing}>{label}</Button>} />
       <DialogContent className="gap-5 rounded-3xl p-6 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Masuk dengan dompet</DialogTitle>

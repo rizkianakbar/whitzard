@@ -10,13 +10,14 @@ import { sepolia } from "wagmi/chains";
 
 import { ProfileForm } from "@/components/profile-form";
 import { Swap } from "@/components/swap";
+import { TxLabel } from "@/components/tx-label";
 import { SEPOLIA_FAUCET, TestnetNotice, useFaucet } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { api, type Member } from "@/lib/api";
 import { registry } from "@/lib/contracts";
 import { formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useMe } from "@/lib/queries";
-import { phaseLabel, useTx } from "@/lib/tx";
+import { useTx } from "@/lib/tx";
 import { useChanged } from "@/lib/use-changed";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
@@ -184,7 +185,7 @@ function JoinStep({ me }: { me: Member }) {
           })
         }
       >
-        <Swap>{tx.busy ? phaseLabel[tx.phase] : "Daftar sekarang"}</Swap>
+        <TxLabel tx={tx}>Daftar sekarang</TxLabel>
       </Button>
       <TxNote />
     </>
@@ -285,7 +286,7 @@ function BalanceStep({ me }: { me: Member }) {
       </div>
       {canClaim ? (
         <Button size="lg" disabled={tx.busy} className="w-full sm:w-auto" onClick={() => void claim()}>
-          <Swap>{tx.busy ? phaseLabel[tx.phase] : "Ambil 100 WHZD gratis"}</Swap>
+          <TxLabel tx={tx}>Ambil 100 WHZD gratis</TxLabel>
         </Button>
       ) : (
         <p className="rounded-2xl bg-muted p-4 text-batu">{wait}</p>
@@ -321,7 +322,7 @@ function ReadyStep({ me, onLater }: { me: Member; onLater: () => void }) {
             })
           }
         >
-          <Swap>{tx.busy ? phaseLabel[tx.phase] : "Nyalakan"}</Swap>
+          <TxLabel tx={tx}>Nyalakan</TxLabel>
         </Button>
         <Button size="lg" variant="ghost" disabled={tx.busy} onClick={onLater}>
           Nanti saja

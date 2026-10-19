@@ -12,7 +12,7 @@ import { Avatar, callName } from "@/components/avatar";
 import { CountdownPill } from "@/components/countdown";
 import { FundingProgress, percentCollected } from "@/components/funding";
 import { StatusBadge } from "@/components/status-badge";
-import { Swap } from "@/components/swap";
+import { BusyLabel, TxLabel } from "@/components/tx-label";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -193,7 +193,7 @@ function RefundNotice() {
               })
             }
           >
-            <Swap>{tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(refund.amount)} WHZD`}</Swap>
+            <TxLabel tx={tx}>{`Ambil kembali ${formatWhzd(refund.amount)} WHZD`}</TxLabel>
           </Button>
         </div>
       ))}
@@ -312,7 +312,7 @@ function DeclineButton({ id, token }: { id: number; token: string | null }) {
         }
       }}
     >
-      <Swap>{busy ? "Menyimpan" : "Tidak kali ini"}</Swap>
+      <BusyLabel busy={busy ? "Menyimpan" : null}>Tidak kali ini</BusyLabel>
     </Button>
   );
 }

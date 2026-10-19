@@ -10,7 +10,7 @@ import { parseEther, parseEventLogs } from "viem";
 import { toast } from "sonner";
 
 import { ShareGrid } from "@/components/share-grid";
-import { Swap } from "@/components/swap";
+import { BusyLabel } from "@/components/tx-label";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -237,7 +237,9 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
 
         <div className="flex flex-wrap items-center gap-4 border-t pt-6">
           <Button type="submit" size="lg" disabled={busy}>
-            <Swap>{status ?? "Ajukan permintaan"}</Swap>
+            <BusyLabel busy={status} wallet={!uploading && tx.phase === "wallet"}>
+              Ajukan permintaan
+            </BusyLabel>
           </Button>
           <span className="min-w-64 flex-1 text-[13px] leading-relaxed text-batu">
             Dokumen diunggah dulu, lalu kamu menandatangani satu transaksi di dompet. Setelah dikirim, jumlah dan bukti

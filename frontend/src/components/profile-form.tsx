@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Avatar } from "@/components/avatar";
-import { Swap } from "@/components/swap";
+import { BusyLabel } from "@/components/tx-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,7 +143,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
       </p>
 
       <Button type="submit" size="lg" disabled={saving} className="self-start">
-        <Swap>{saving ? "Menyimpan" : submitLabel}</Swap>
+        <BusyLabel busy={saving ? "Menyimpan" : null}>{submitLabel}</BusyLabel>
       </Button>
     </form>
   );

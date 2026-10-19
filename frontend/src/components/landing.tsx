@@ -14,6 +14,8 @@ import { useSession } from "@/lib/session";
 import { useReveal } from "@/lib/use-reveal";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
+import { Button } from "./ui/button";
+import { BusyLabel } from "./tx-label";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 const delay = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
@@ -30,6 +32,7 @@ export function Landing() {
   return (
     <div className="flex min-h-full flex-col">
       <Header />
+
       <main className="flex-1">
         <Hero />
         <HowItWorks />

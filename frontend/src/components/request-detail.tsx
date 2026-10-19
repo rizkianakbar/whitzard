@@ -14,7 +14,7 @@ import { CountdownPanel, useRemaining } from "@/components/countdown";
 import { FundingProgress } from "@/components/funding";
 import { ShareGrid, ShareLegend } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
-import { Swap } from "@/components/swap";
+import { BusyLabel, TxLabel } from "@/components/tx-label";
 import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -36,7 +36,7 @@ import { formatDate, formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useMe, useMember, useRequest } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
-import { phaseLabel, useTx } from "@/lib/tx";
+import { useTx } from "@/lib/tx";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
 
@@ -456,11 +456,11 @@ function ContributePanel({
           disabled={tx.busy || declining || !enough}
           onClick={() => void contribute()}
         >
-          <Swap>{tx.busy ? phaseLabel[tx.phase] : `Bantu ${formatWhzd(r.share)} WHZD`}</Swap>
+          <TxLabel tx={tx}>{`Bantu ${formatWhzd(r.share)} WHZD`}</TxLabel>
         </Button>
         {!declined && (
           <Button variant="ghost" disabled={tx.busy || declining} onClick={() => void decline()}>
-            <Swap>{declining ? "Menyimpan" : "Tidak kali ini"}</Swap>
+            <BusyLabel busy={declining ? "Menyimpan" : null}>Tidak kali ini</BusyLabel>
           </Button>
         )}
       </div>
@@ -503,7 +503,7 @@ function RequesterPanel({ detail }: { detail: Detail }) {
         Saat waktu habis, semua yang terkumpul diteruskan ke dompetmu secara otomatis, berapa pun jumlahnya.
       </p>
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}><Swap>{tx.busy ? phaseLabel[tx.phase] : "Batalkan permintaan"}</Swap></Button>} />
+        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}><TxLabel tx={tx}>Batalkan permintaan</TxLabel></Button>} />
         <DialogContent className="gap-5 p-6 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">Batalkan permintaan ini?</DialogTitle>
@@ -616,7 +616,7 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
             hanya bisa sampai ke {requesterName}, dan tidak mungkin terkirim dua kali.
           </p>
           <Button variant="outline" disabled={tx.busy} onClick={() => void forward()}>
-            <Swap>{tx.busy ? phaseLabel[tx.phase] : "Kirim sekarang"}</Swap>
+            <TxLabel tx={tx}>Kirim sekarang</TxLabel>
           </Button>
         </div>
       )}
@@ -654,7 +654,7 @@ function Cancelled({ detail, requesterName }: { detail: Detail; requesterName: s
           })
         }
       >
-        <Swap>{tx.busy ? phaseLabel[tx.phase] : `Ambil kembali ${formatWhzd(contribution.amount)} WHZD`}</Swap>
+        <TxLabel tx={tx}>{`Ambil kembali ${formatWhzd(contribution.amount)} WHZD`}</TxLabel>
       </Button>
     </>
   );

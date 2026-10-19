@@ -6,7 +6,7 @@ import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { sepolia } from "wagmi/chains";
 
-import { Swap } from "@/components/swap";
+import { TxLabel } from "@/components/tx-label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { api, type Member } from "@/lib/api";
@@ -14,7 +14,7 @@ import { token } from "@/lib/contracts";
 import { formatWhzd } from "@/lib/format";
 import { useNow } from "@/lib/now";
 import { keys } from "@/lib/queries";
-import { phaseLabel, useTx } from "@/lib/tx";
+import { useTx } from "@/lib/tx";
 import { chain } from "@/lib/wagmi";
 
 const CAP = 1000n * 10n ** 18n;
@@ -88,7 +88,7 @@ export function TopUpDialog({ me, trigger }: { me: Member; trigger: ReactElement
               if (await claim()) setOpen(false);
             }}
           >
-            <Swap>{tx.busy ? phaseLabel[tx.phase] : "Ambil 100 WHZD gratis"}</Swap>
+            <TxLabel tx={tx}>Ambil 100 WHZD gratis</TxLabel>
           </Button>
         ) : (
           <p className="rounded-2xl bg-muted p-4 text-sm text-batu">{wait}</p>

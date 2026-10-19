@@ -12,12 +12,13 @@ import { errorMessage } from "@/lib/errors";
 /** wallet → pending (mined?) → syncing (indexed by the backend?) → done. */
 export type TxPhase = "idle" | "wallet" | "pending" | "syncing" | "done";
 
+/** Short enough for a button. Says what is happening for the member, not the chain mechanics. */
 export const phaseLabel: Record<TxPhase, string> = {
   idle: "",
-  wallet: "Konfirmasi di dompetmu",
-  pending: "Menunggu dicatat di blockchain",
-  syncing: "Memperbarui tampilan",
-  done: "Tercatat",
+  wallet: "Setujui di dompetmu",
+  pending: "Sedang diproses",
+  syncing: "Hampir selesai",
+  done: "Selesai",
 };
 
 /** Polls `check` until it returns true (e.g. the backend has indexed a transaction). */
