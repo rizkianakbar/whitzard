@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { SignedIn } from "@/components/gate";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type Notification } from "@/lib/api";
@@ -16,16 +15,6 @@ import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 export function NotificationList() {
-  return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <SignedIn reason="Masuk untuk melihat kabar tentang permintaan dan iuranmu.">
-        <List />
-      </SignedIn>
-    </div>
-  );
-}
-
-function List() {
   const { token } = useSession();
   const queryClient = useQueryClient();
   const { data, isPending } = useNotifications(100);
@@ -42,9 +31,9 @@ function List() {
   };
 
   return (
-    <>
+    <div className="flex max-w-3xl flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-[31px] font-semibold tracking-tight">Kabar</h1>
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Notifikasi</h1>
         {unread.length > 0 && (
           <Button variant="outline" onClick={() => void markRead(unread)}>
             Tandai semua sudah dibaca
@@ -52,14 +41,14 @@ function List() {
         )}
       </div>
       {isPending ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
       ) : !data?.length ? (
-        <p className="rounded-xl border border-dashed bg-card p-8 leading-relaxed text-batu">
-          Belum ada kabar. Kamu akan diberi tahu saat ada anggota yang butuh bantuan, saat iuran masuk, dan saat dana
+        <p className="rounded-3xl border border-dashed bg-card p-8 leading-relaxed text-batu">
+          Belum ada notifikasi. Kamu akan diberi tahu saat ada anggota yang butuh bantuan, saat iuran masuk, dan saat dana
           diteruskan.
         </p>
       ) : (
-        <ul className="rounded-xl border bg-card">
+        <ul className="overflow-hidden rounded-3xl border bg-card">
           {data.map((n, i) => (
             <li key={n.id} className={cn("flex gap-4 p-5", i > 0 && "border-t")}>
               <span
@@ -85,6 +74,6 @@ function List() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   );
 }

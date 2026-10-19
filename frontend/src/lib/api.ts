@@ -54,9 +54,17 @@ export type RequestDetail = {
   };
 };
 
+/** Self-declared and never verified. */
 export type MemberProfile = {
   address: Address;
   displayName: string | null;
+  nickname: string | null;
+  /** YYYY-MM-DD; only present on your own profile. */
+  birthDate?: string | null;
+  /** Only shown to signed-in viewers. */
+  city: string | null;
+  /** SHA-256 of the photo (also a cache key), or null. */
+  photo: string | null;
   ready: boolean;
   registeredAtBlock: number;
   contributions: number;
@@ -76,6 +84,22 @@ export type Member = {
     faucetClaimed: string;
     faucetNextClaimAt: string;
   };
+};
+
+export type ProfileInput = {
+  displayName: string | null;
+  nickname: string | null;
+  birthDate: string | null;
+  city: string | null;
+};
+
+export type Stats = {
+  members: number;
+  readyMembers: number;
+  requests: number;
+  funded: number;
+  distributed: string;
+  contributions: number;
 };
 
 export type Proof = { needed: boolean; proofId: string | null; canOpenRequest: boolean };
@@ -121,8 +145,20 @@ export const api = {
   logout: (token: string) => call<void>("/auth/logout", { method: "POST", token }),
 
   member: (address: Address | "me", token?: string | null) => call<Member>(`/members/${address}`, { token }),
-  updateMe: (token: string, displayName: string | null) =>
-    call<MemberProfile>("/members/me", { method: "PUT", token, body: JSON.stringify({ displayName }) }),
+  updateMe: (token: string, profile: ProfileInput) =>
+    call<MemberProfile>("/members/me", { method: "PUT", token, body: JSON.stringify(profile) }),
+  setPhoto: (token: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return call<MemberProfile>("/members/me/photo", { method: "PUT", token, body: form });
+  },
+  deletePhoto: (token: string) => call<MemberProfile>("/members/me/photo", { method: "DELETE", token }),
+  photo: async (token: string, address: Address) => {
+    const res = await fetch(`${appConfig.apiUrl}/members/${address}/photo`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new ApiError(res.status, "Foto tidak bisa dimuat");
+    return res.blob();
+  },
+  stats: () => call<Stats>("/stats"),
   proof: (token: string) => call<Proof>("/members/me/proof", { token }),
   refunds: (token: string) => call<Refunds>("/members/me/refunds", { token }),
 

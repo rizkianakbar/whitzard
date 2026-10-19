@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { Address } from "viem";
 
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -15,6 +16,7 @@ export const keys = {
   notifications: ["notifications"] as const,
   refunds: ["refunds"] as const,
   proof: ["proof"] as const,
+  stats: ["stats"] as const,
 };
 
 export function useMe() {
@@ -37,7 +39,7 @@ export function useRequests(scope: "all" | "mine" | "for-me") {
           token,
         )
       ).requests,
-    enabled: scope === "all" || !!token,
+    enabled: !!token,
   });
 }
 
@@ -45,7 +47,11 @@ const viewer = (address: string | undefined, token: string | null) => (token && 
 
 export function useRequest(id: number) {
   const { address, token } = useSession();
-  return useQuery({ queryKey: [...keys.request(id), viewer(address, token)], queryFn: () => api.request(id, token) });
+  return useQuery({
+    queryKey: [...keys.request(id), viewer(address, token)],
+    queryFn: () => api.request(id, token),
+    enabled: !!token,
+  });
 }
 
 export function useNotifications(limit = 50) {
@@ -65,4 +71,33 @@ export function useRefunds() {
 export function useProof() {
   const { address, token } = useSession();
   return useQuery({ queryKey: [...keys.proof, viewer(address, token)], queryFn: () => api.proof(token!), enabled: !!token });
+}
+
+export function useMember(address: Address | undefined) {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: keys.member(address ?? "none"),
+    queryFn: () => api.member(address!, token),
+    enabled: !!address,
+  });
+}
+
+export function useStats() {
+  return useQuery({ queryKey: keys.stats, queryFn: api.stats });
+}
+
+/**
+ * An object URL for a member's photo (photos need a session, so <img src> can't fetch them
+ * directly). Keyed by the photo's hash, so each version is fetched once per page load.
+ */
+export function usePhotoUrl(address: Address | undefined, photo: string | null | undefined) {
+  const { token } = useSession();
+  const { data: url } = useQuery({
+    queryKey: ["photo", address?.toLowerCase(), photo],
+    queryFn: async () => URL.createObjectURL(await api.photo(token!, address!)),
+    enabled: !!token && !!address && !!photo,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  return photo ? (url ?? null) : null;
 }

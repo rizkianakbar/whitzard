@@ -2,7 +2,7 @@ import type { Request } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const styles = {
-  open: ["Terbuka", "bg-nila-soft text-nila"],
+  open: ["Terbuka", "bg-pandan-soft text-pandan"],
   funding: ["Mengumpulkan", "bg-kunyit-soft text-kunyit-ink"],
   awaiting: ["Menunggu diteruskan", "bg-kunyit-soft text-kunyit-ink"],
   finalized: ["Diteruskan", "bg-daun-soft text-daun-ink"],

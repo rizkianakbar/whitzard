@@ -17,7 +17,7 @@ import { devAccounts } from "@/lib/wagmi";
  * local test accounts in dev), then asks it to sign the SIWE message. A refused signature disconnects
  * again, so the member is never left connected but signed out.
  */
-export function SignInButton({ size }: { size?: "default" | "lg" }) {
+export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default" | "lg"; label?: string }) {
   const connectors = useConnectors();
   const { mutateAsync: connect, isPending } = useConnect();
   const { mutate: disconnect } = useDisconnect();
@@ -53,7 +53,7 @@ export function SignInButton({ size }: { size?: "default" | "lg" }) {
     await sign(account);
   };
 
-  const label = signing ? "Tanda tangani di dompetmu" : "Masuk";
+  const label = signing ? "Tanda tangani di dompetmu" : idle;
 
   // Already connected (wagmi reconnected on load, or the wallet switched accounts): only the signature is missing.
   if (address) {
@@ -67,9 +67,9 @@ export function SignInButton({ size }: { size?: "default" | "lg" }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size={size} disabled={signing}>{label}</Button>} />
-      <DialogContent className="gap-5 p-6 sm:max-w-md">
+      <DialogContent className="gap-5 rounded-3xl p-6 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Masuk dengan dompet</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Masuk dengan dompet</DialogTitle>
           <DialogDescription className="text-batu">
             Pilih dompetmu, lalu tanda tangani pesan masuk. Gratis, dan tidak mengirim transaksi apa pun. Whitzard
             tidak pernah memegang kuncimu.
@@ -78,7 +78,7 @@ export function SignInButton({ size }: { size?: "default" | "lg" }) {
         <ul className="flex flex-col gap-2">
           {browser.map((connector) => (
             <li key={connector.uid}>
-              <Button variant="outline" className="h-14 w-full justify-start gap-3 px-4" disabled={isPending} onClick={() => choose(connector)}>
+              <Button variant="outline" className="h-14 w-full justify-start gap-3 rounded-2xl px-4" disabled={isPending} onClick={() => choose(connector)}>
                 {connector.icon ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={connector.icon} alt="" className="size-7 rounded-md" />

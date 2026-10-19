@@ -22,7 +22,8 @@ export function Providers({ children }: { children: ReactNode }) {
         <SessionProvider>
           <LiveNotifications />
           {children}
-          <Toaster theme="light" position="top-center" />
+          {/* Below the sticky header, so toasts never cover the navigation. */}
+          <Toaster theme="light" position="top-center" offset={84} mobileOffset={{ top: 80 }} />
         </SessionProvider>
       </QueryClientProvider>
     </WagmiProvider>

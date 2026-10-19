@@ -1,0 +1,350 @@
+"use client";
+
+import { type CSSProperties, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
+
+import { Logo, TestnetPill } from "@/components/brand";
+import { SignInButton } from "@/components/sign-in-button";
+import { appConfig } from "@/lib/config";
+import { formatWhzd } from "@/lib/format";
+import { useStats } from "@/lib/queries";
+import { useSession } from "@/lib/session";
+import { cn } from "@/lib/utils";
+import { chain } from "@/lib/wagmi";
+
+/** The public page: what Whitzard is, how it works, live totals. Signed-in members go straight to the app. */
+export function Landing() {
+  const router = useRouter();
+  const { status } = useSession();
+  useEffect(() => {
+    if (status === "signed-in") router.replace("/beranda");
+  }, [status, router]);
+
+  return (
+    <div className="flex min-h-full flex-col">
+      <header className="mx-auto flex h-19 w-full max-w-290 items-center gap-8 px-4 sm:px-6">
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          <TestnetPill />
+        </div>
+        <nav aria-label="Halaman ini" className="hidden flex-1 gap-7 font-semibold text-batu md:flex">
+          <a href="#cara-kerja" className="hover:text-arang">Cara kerja</a>
+          <a href="#transparan" className="hover:text-arang">Transparansi</a>
+          <a href="#tanya-jawab" className="hover:text-arang">Tanya jawab</a>
+        </nav>
+        <div className="ml-auto">
+          <SignInButton />
+        </div>
+      </header>
+      <main className="flex-1">
+        <Hero />
+        <HowItWorks />
+        <Transparency />
+        <Trial />
+        <Faq />
+      </main>
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-290 flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-batu sm:px-6">
+          <Logo />
+          <p className="max-w-xl">
+            Prototipe untuk skripsi Ilmu Komputer, Universitas Bina Nusantara: escrow otomatis untuk penyaluran bantuan
+            kesehatan antaranggota.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- hero
+
+const HERO_CELLS = 12;
+const HERO_FILLED = 9;
+
+function Hero() {
+  return (
+    <section className="mx-auto grid max-w-290 items-center gap-12 px-4 pt-10 pb-20 sm:px-6 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:pb-28">
+      <div className="flex flex-col gap-7">
+        <h1 className="max-w-[13ch] text-[44px] leading-[1.02] font-extrabold tracking-[-0.035em] text-pandan sm:text-[61px]">
+          Biaya berobat terasa ringan kalau ditanggung bersama.
+        </h1>
+        <p className="max-w-[52ch] text-lg leading-relaxed text-batu">
+          Saat ada anggota yang sakit, setiap anggota lain menyumbang bagian yang sama. Iurannya disimpan di smart
+          contract dan diteruskan otomatis saat waktunya habis. Tidak ada admin dan tidak ada voting.
+        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <SignInButton size="lg" label="Masuk dengan dompet" />
+          <a href="#cara-kerja" className="inline-flex h-13 items-center gap-1.5 rounded-full px-5 font-semibold text-pandan hover:bg-pandan-soft">
+            Lihat cara kerjanya
+            <ChevronDown aria-hidden="true" className="size-4" />
+          </a>
+        </div>
+      </div>
+
+      {/* An illustration of one request being funded, not real data. */}
+      <figure className="relative mx-auto w-full max-w-115">
+        <div aria-hidden="true" className="absolute -inset-4 -z-10 -rotate-3 rounded-[36px] bg-pandan-soft" />
+        <div className="flex flex-col gap-6 rounded-2xl border bg-card p-6 shadow-[0_24px_48px_-24px_rgb(15_61_49/0.25)] sm:p-8">
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-full bg-kunyit-soft text-lg font-bold text-kunyit-ink">
+              S
+            </span>
+            <div className="flex flex-col">
+              <span className="font-bold">Sari, Bandung</span>
+              <span className="text-sm text-batu">Rawat inap demam berdarah</span>
+            </div>
+          </div>
+          <div role="img" aria-label={`Contoh: ${HERO_FILLED} dari ${HERO_CELLS} anggota sudah membantu`} className="grid grid-cols-6 gap-2.5">
+            {Array.from({ length: HERO_CELLS }, (_, i) => (
+              <span
+                key={i}
+                style={{ "--i": i } as CSSProperties}
+                className={cn("aspect-square rounded-xl border border-garis", i < HERO_FILLED && "hero-fill border-transparent")}
+              />
+            ))}
+          </div>
+          <div className="flex items-end justify-between gap-4 border-t pt-5">
+            <div className="flex flex-col">
+              <span className="tabular text-3xl font-extrabold tracking-tight">180 WHZD</span>
+              <span className="text-sm text-batu">terkumpul dari 240 WHZD</span>
+            </div>
+            <div className="flex flex-col items-end text-right">
+              <span className="tabular text-lg font-bold">20 WHZD</span>
+              <span className="text-sm text-batu">per anggota</span>
+            </div>
+          </div>
+        </div>
+        <figcaption className="mt-6 text-center text-sm text-batu">Contoh. Satu kotak adalah satu anggota, semuanya bernilai sama.</figcaption>
+      </figure>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- how it works
+
+/** A tiny share grid in a given state, so each step shows what happens to the shares. */
+function MiniGrid({ filled, total = 8, sent = false }: { filled: number; total?: number; sent?: boolean }) {
+  return (
+    <span aria-hidden="true" className="grid w-26 grid-cols-4 gap-1.5">
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            "aspect-square rounded-[5px]",
+            sent ? "bg-pandan" : i < filled ? "bg-kunyit" : "border border-garis bg-card",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+const steps = [
+  {
+    title: "Ajukan",
+    body: "Anggota yang butuh biaya berobat menulis ceritanya, jumlah yang dibutuhkan, dan melampirkan tagihan.",
+    grid: <MiniGrid filled={0} total={1} />,
+  },
+  {
+    title: "Dibagi rata",
+    body: "Jumlahnya dibagi rata ke semua anggota yang sedang siap membantu. Setiap orang diminta bagian yang sama.",
+    grid: <MiniGrid filled={0} />,
+  },
+  {
+    title: "Disimpan di escrow",
+    body: "Iuran masuk ke smart contract, bukan ke rekening siapa pun. Tidak ada yang bisa memindahkannya ke tempat lain.",
+    grid: <MiniGrid filled={5} />,
+  },
+  {
+    title: "Diteruskan otomatis",
+    body: "Saat waktunya habis, semua yang terkumpul dikirim ke peminta. Kalau dibatalkan, iuran kembali ke pemberinya.",
+    grid: <MiniGrid filled={8} sent />,
+  },
+];
+
+function HowItWorks() {
+  return (
+    <section id="cara-kerja" className="scroll-mt-6 border-y bg-card">
+      <div className="mx-auto flex max-w-290 flex-col gap-12 px-4 py-20 sm:px-6">
+        <div className="flex max-w-2xl flex-col gap-3">
+          <h2 className="text-[39px] leading-tight font-extrabold text-pandan">Cara kerja</h2>
+          <p className="text-lg leading-relaxed text-batu">
+            Empat langkah, dan setelah permintaan dibuat tidak ada orang yang perlu menyetujui apa pun.
+          </p>
+        </div>
+        <ol className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+          {steps.map((step, i) => (
+            <li key={step.title} className="flex flex-col gap-4">
+              <div className="flex h-14 items-end">{step.grid}</div>
+              <div className="flex items-center gap-3">
+                <span className="tabular flex size-8 items-center justify-center rounded-full bg-pandan text-sm font-bold text-white">
+                  {i + 1}
+                </span>
+                <h3 className="text-xl font-bold">{step.title}</h3>
+              </div>
+              <p className="leading-relaxed text-batu">{step.body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- transparency
+
+function Transparency() {
+  const { data: stats } = useStats();
+  const figures = [
+    { value: stats?.members, label: "anggota terdaftar" },
+    { value: stats?.readyMembers, label: "sedang siap membantu" },
+    { value: stats?.funded, label: "permintaan sudah tersalurkan" },
+    { value: stats ? formatWhzd(stats.distributed) : undefined, label: "WHZD diteruskan ke peminta" },
+  ];
+  const contracts = [
+    { name: "Escrow", address: appConfig.escrow, note: "menyimpan dan meneruskan iuran" },
+    { name: "Registry", address: appConfig.registry, note: "daftar anggota dan status siap membantu" },
+    { name: "Token WHZD", address: appConfig.token, note: "token uji untuk iuran" },
+  ];
+
+  return (
+    <section id="transparan" className="scroll-mt-6 bg-pandan-deep text-white">
+      <div className="mx-auto flex max-w-290 flex-col gap-14 px-4 py-20 sm:px-6">
+        <div className="grid gap-10 lg:grid-cols-2">
+          <h2 className="max-w-[16ch] text-[39px] leading-tight font-extrabold">Tidak ada orang yang memegang uangnya.</h2>
+          <ul className="flex flex-col gap-5 text-lg leading-relaxed text-white/80">
+            <li>
+              <strong className="text-white">Tanpa admin.</strong> Aturannya ditulis di smart contract dan berjalan
+              sendiri. Tidak ada yang bisa menahan atau mengalihkan dana.
+            </li>
+            <li>
+              <strong className="text-white">Tercatat untuk semua.</strong> Setiap iuran dan pencairan adalah transaksi
+              publik di {chain.name} yang bisa dicek siapa saja.
+            </li>
+            <li>
+              <strong className="text-white">Uang kembali kalau batal.</strong> Kalau peminta membatalkan, setiap anggota
+              bisa mengambil kembali iurannya.
+            </li>
+          </ul>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl bg-white/15 lg:grid-cols-4">
+          {figures.map((f) => (
+            <div key={f.label} className="flex flex-col-reverse gap-1 bg-pandan-deep p-6">
+              <dt className="text-sm text-white/70">{f.label}</dt>
+              <dd className="tabular text-[39px] leading-none font-extrabold tracking-tight">{f.value ?? "–"}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="flex flex-col gap-4">
+          <h3 className="text-xl font-bold">Periksa sendiri</h3>
+          <ul className="grid gap-3 md:grid-cols-3">
+            {contracts.map((c) => (
+              <li key={c.name} className="flex flex-col gap-1 rounded-2xl border border-white/15 p-5">
+                <span className="font-bold">{c.name}</span>
+                <span className="text-sm text-white/70">{c.note}</span>
+                {appConfig.explorerUrl ? (
+                  <a
+                    href={`${appConfig.explorerUrl}/address/${c.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tabular mt-2 self-start text-sm font-semibold text-kunyit underline underline-offset-4"
+                  >
+                    {c.address.slice(0, 10)}…{c.address.slice(-6)} di Etherscan
+                  </a>
+                ) : (
+                  <span className="tabular mt-2 text-sm text-white/70">{c.address.slice(0, 10)}…{c.address.slice(-6)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- trial
+
+function Trial() {
+  return (
+    <section className="mx-auto grid max-w-290 gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.2fr]">
+      <div className="flex flex-col gap-3">
+        <TestnetPill className="self-start" />
+        <h2 className="text-[39px] leading-tight font-extrabold text-pandan">Masih uji coba, jadi gratis dicoba.</h2>
+      </div>
+      <div className="flex flex-col gap-5 text-lg leading-relaxed text-batu">
+        <p>
+          Whitzard berjalan di {chain.name}, jaringan uji Ethereum. Token WHZD yang dipakai untuk iuran tidak bernilai
+          uang. Setelah bergabung, kamu bisa mengambil 100 WHZD gratis setiap hari dari menu isi saldo.
+        </p>
+        <ul className="flex flex-col gap-3 text-base">
+          <li className="flex gap-3">
+            <Dot />
+            Dompet yang mendukung {chain.name}, misalnya MetaMask.
+          </li>
+          <li className="flex gap-3">
+            <Dot />
+            Sedikit ETH {chain.name} untuk biaya jaringan. Ini juga gratis dari faucet.
+          </li>
+          <li className="flex gap-3">
+            <Dot />
+            Lima menit untuk bergabung: daftar, isi profil, ambil saldo, lalu nyalakan siap membantu.
+          </li>
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function Dot() {
+  return <span aria-hidden="true" className="mt-2.5 size-2 shrink-0 rounded-[3px] bg-kunyit" />;
+}
+
+// ---------------------------------------------------------------- FAQ
+
+const faq = [
+  {
+    q: "Apakah saya perlu membayar?",
+    a: "Tidak. Selama uji coba, semua iuran memakai token WHZD yang tidak bernilai uang, dan biaya jaringan dibayar dengan ETH uji yang gratis.",
+  },
+  {
+    q: "Siapa yang memutuskan dana dicairkan?",
+    a: "Tidak ada. Saat waktu pengumpulan habis, smart contract meneruskan semua yang terkumpul ke peminta, berapa pun jumlahnya. Tidak ada persetujuan atau voting.",
+  },
+  {
+    q: "Siapa yang bisa melihat cerita dan tagihanku?",
+    a: "Cerita permintaan hanya terlihat oleh anggota yang sudah masuk. Dokumen tagihan hanya bisa dibuka olehmu dan anggota yang diminta membantu, dan diperiksa dengan sidiknya di blockchain supaya tidak bisa diubah diam-diam.",
+  },
+  {
+    q: "Kenapa saya harus membantu dulu sebelum mengajukan lagi?",
+    a: "Permintaan pertama boleh langsung. Setelah itu, kamu perlu membantu satu permintaan anggota lain sebelum mengajukan lagi, supaya semua orang ikut menanggung.",
+  },
+  {
+    q: "Bagaimana kalau dananya tidak terkumpul penuh?",
+    a: "Yang terkumpul tetap diteruskan. Kalau tidak ada iuran sama sekali, permintaan berakhir tanpa pencairan.",
+  },
+];
+
+function Faq() {
+  return (
+    <section id="tanya-jawab" className="scroll-mt-6 border-t bg-card">
+      <div className="mx-auto grid max-w-290 gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr]">
+        <h2 className="text-[39px] leading-tight font-extrabold text-pandan">Tanya jawab</h2>
+        <div className="flex flex-col">
+          {faq.map((item) => (
+            <details key={item.q} className="group border-b py-5 first:pt-0">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-batu transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 max-w-[64ch] leading-relaxed text-batu">{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

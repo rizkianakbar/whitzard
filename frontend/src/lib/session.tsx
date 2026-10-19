@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
-import { useConnection, useConfig } from "wagmi";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { useConfig, useConnection } from "wagmi";
 import { disconnect, signMessage } from "wagmi/actions";
 import type { Address } from "viem";
 
@@ -14,7 +14,7 @@ type Session = {
   address: Address | undefined;
   /** The backend session token for that wallet, if signed in. */
   token: string | null;
-  /** "loading" until the stored session (if any) has been read in the browser. */
+  /** "loading" until the wallet has reconnected and the stored session (if any) has been read in the browser. */
   status: "disconnected" | "loading" | "signed-out" | "signed-in";
   /** Signs in the connected wallet, or `account` when it was connected a moment ago and React hasn't caught up. */
   signIn: (account?: Address) => Promise<void>;
@@ -54,6 +54,21 @@ function write(address: string, value: Stored | null) {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
   const { address } = useConnection();
+  // After a page load wagmi reconnects the stored wallet, from its provider's effect (which runs
+  // after this one, so the subscription sees it). Until that finishes, "no address" doesn't mean
+  // signed out, so pages must not redirect yet.
+  const [reconnected, setReconnected] = useState(false);
+  useEffect(
+    () =>
+      config.subscribe(
+        (state) => state.status,
+        (status) => {
+          if (status !== "reconnecting" && status !== "connecting") setReconnected(true);
+        },
+      ),
+    [config],
+  );
+  const settling = !reconnected && !address;
   const token = useSyncExternalStore(
     subscribe,
     () => (address ? (read(address)?.token ?? null) : null),
@@ -68,9 +83,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, [address, token]);
 
-  const status: Session["status"] = !address
-    ? "disconnected"
-    : token === undefined
+  const status: Session["status"] = settling
+    ? "loading"
+    : !address
+      ? "disconnected"
+      : token === undefined
       ? "loading"
       : token
         ? "signed-in"

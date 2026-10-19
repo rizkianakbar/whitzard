@@ -9,7 +9,7 @@ type Props = {
   you?: SnapshotResponse | null;
   /** Animate the viewer's cell filling in (once, right after their contribution). */
   justContributed?: boolean;
-  variant?: "large" | "small";
+  variant?: "large" | "medium" | "small";
   className?: string;
 };
 
@@ -37,6 +37,7 @@ export function shareCells(size: number, contributed: number, declined: number, 
 export function ShareGrid({ size, contributed, declined, you, justContributed, variant = "large", className }: Props) {
   const cells = shareCells(size, contributed, declined, you);
   const large = variant === "large";
+  const medium = variant === "medium";
   const label =
     `${contributed} dari ${size} anggota sudah membantu` +
     (declined ? `, ${declined} tidak ikut` : "") +
@@ -48,7 +49,11 @@ export function ShareGrid({ size, contributed, declined, you, justContributed, v
       aria-label={label}
       className={cn(
         "grid",
-        large ? "grid-cols-[repeat(auto-fill,minmax(32px,44px))] gap-2" : "grid-cols-[repeat(auto-fill,12px)] gap-[3px]",
+        large
+          ? "grid-cols-[repeat(auto-fill,minmax(32px,44px))] gap-2"
+          : medium
+            ? "grid-cols-[repeat(auto-fill,22px)] gap-1.5"
+            : "grid-cols-[repeat(auto-fill,12px)] gap-[3px]",
         className,
       )}
     >
@@ -57,12 +62,12 @@ export function ShareGrid({ size, contributed, declined, you, justContributed, v
           key={i}
           className={cn(
             "box-border aspect-square",
-            large ? "rounded-lg" : "rounded-[3px]",
+            large ? "rounded-[10px]" : medium ? "rounded-[6px]" : "rounded-[3px]",
             cell.kind === "filled" && "bg-kunyit",
             cell.kind === "declined" &&
               "border border-garis bg-[repeating-linear-gradient(135deg,#fff_0_6px,#d9dee7_6px_7px)]",
             cell.kind === "empty" && "border border-garis bg-card",
-            cell.you && (large ? "border-[3px] border-nila" : "border-2 border-nila"),
+            cell.you && (large ? "border-[3px] border-pandan" : "border-2 border-pandan"),
             cell.you && cell.kind === "filled" && justContributed && "share-fill",
           )}
         />
@@ -79,7 +84,7 @@ export function ShareLegend() {
         Sudah membantu
       </li>
       <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="size-3.5 rounded-[3px] border-2 border-nila" />
+        <span aria-hidden="true" className="size-3.5 rounded-[3px] border-2 border-pandan" />
         Kamu
       </li>
       <li className="flex items-center gap-2">

@@ -9,7 +9,6 @@ import { writeContract } from "wagmi/actions";
 import { parseEther, parseEventLogs } from "viem";
 import { toast } from "sonner";
 
-import { SignedIn } from "@/components/gate";
 import { ShareGrid } from "@/components/share-grid";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,15 +40,13 @@ export function RequestForm() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex max-w-160 flex-col gap-2.5">
-        <h1 className="text-[31px] font-semibold tracking-tight">Ajukan bantuan</h1>
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Ajukan bantuan</h1>
         <p className="leading-relaxed text-batu">
           Ceritakan kebutuhanmu dan lampirkan tagihan. Anggota yang sedang siap membantu akan diberi tahu, dan
           masing-masing diminta bagian yang sama.
         </p>
       </div>
-      <SignedIn reason="Masuk untuk mengajukan bantuan.">
-        <Eligible />
-      </SignedIn>
+      <Eligible />
     </div>
   );
 }
@@ -58,11 +55,11 @@ function Eligible() {
   const { data: me } = useMe();
   const { data: proof, isPending } = useProof();
   console.log("proof", proof);
-  if (isPending || !me) return <Skeleton className="h-96 w-full rounded-xl" />;
+  if (isPending || !me) return <Skeleton className="h-96 w-full rounded-3xl" />;
   if (!me.chain.registered) {
     return (
       <Blocked title="Daftar dulu sebagai anggota">
-        Kamu bisa mendaftar di <Link href="/" className="underline underline-offset-4">beranda</Link>. Hanya perlu sekali.
+        <Link href="/gabung" className="underline underline-offset-4">Daftar di sini</Link>. Hanya perlu sekali.
       </Blocked>
     );
   }
@@ -83,8 +80,8 @@ function Eligible() {
 
 function Blocked({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex max-w-xl flex-col gap-3 rounded-xl border bg-card p-8">
-      <h2 className="text-xl font-semibold">{title}</h2>
+    <section className="flex max-w-xl flex-col gap-3 rounded-3xl border bg-card p-8">
+      <h2 className="text-xl font-bold">{title}</h2>
       <p className="leading-relaxed text-batu">{children}</p>
     </section>
   );
@@ -166,7 +163,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
       <form
         noValidate
         onSubmit={submit}
-        className="flex min-w-0 flex-[999_1_560px] flex-col gap-7 rounded-xl border bg-card p-6 sm:p-8"
+        className="flex min-w-0 flex-[999_1_560px] flex-col gap-7 rounded-3xl border bg-card p-6 sm:p-8"
       >
         <Field id="title" label="Judul" error={errors.title}>
           <Input id="title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} aria-invalid={!!errors.title} />
@@ -178,7 +175,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
 
         <div className="flex flex-wrap gap-6">
           <Field id="amount" label="Jumlah yang dibutuhkan" error={errors.amount} className="flex-[1_1_220px]">
-            <div className="flex h-12 items-center gap-2 rounded-lg border bg-card px-3.5 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-ring">
+            <div className="flex h-12 items-center gap-2 rounded-xl border bg-card px-3.5 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-ring">
               <input
                 id="amount"
                 inputMode="decimal"
@@ -198,14 +195,14 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
                 <label
                   key={d.seconds}
                   className={cn(
-                    "flex h-12 cursor-pointer items-center gap-2 rounded-lg border px-4 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
-                    duration === d.seconds && "border-2 border-nila bg-nila-soft font-semibold",
+                    "flex h-12 cursor-pointer items-center gap-2 rounded-full border px-4 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
+                    duration === d.seconds && "border-2 border-pandan bg-pandan-soft font-semibold",
                   )}
                 >
                   <input
                     type="radio"
                     name="duration"
-                    className="accent-nila"
+                    className="accent-pandan"
                     checked={duration === d.seconds}
                     onChange={() => setDuration(d.seconds)}
                   />
@@ -219,9 +216,9 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         <Field id="file" label="Dokumen bukti" error={errors.file}>
           <label
             htmlFor="file"
-            className="flex cursor-pointer flex-wrap items-center gap-4 rounded-[10px] border border-dashed border-[#a9b1c2] bg-kapur p-6 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
+            className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl border border-dashed border-[#a7b8af] bg-embun p-6 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
           >
-            <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-[10px] border bg-card">
+            <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-2xl border bg-card">
               <Upload className="size-5" />
             </span>
             <span className="flex min-w-60 flex-1 flex-col gap-1">
@@ -246,8 +243,8 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
       </form>
 
       <aside aria-label="Pratinjau bagian" className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-        <h2 className="text-xl font-semibold">Yang akan diminta ke anggota</h2>
-        <div className="flex flex-col gap-4.5 rounded-xl border bg-card p-6">
+        <h2 className="text-xl font-bold">Yang akan diminta ke anggota</h2>
+        <div className="flex flex-col gap-4.5 rounded-3xl border bg-card p-6">
           {members !== undefined && members > 0 && (
             <ShareGrid size={Math.min(members, 48)} contributed={0} declined={0} className="grid-cols-[repeat(auto-fill,minmax(24px,1fr))]" />
           )}

@@ -10,7 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatWhzd, timeLeft } from "@/lib/format";
 import { useRequests } from "@/lib/queries";
 import { useNow } from "@/lib/now";
-import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const scopes = [
@@ -20,42 +19,38 @@ const scopes = [
 ] as const;
 
 export function RequestList() {
-  const { status } = useSession();
   const [scope, setScope] = useState<(typeof scopes)[number]["id"]>("all");
   const { data, isPending } = useRequests(scope);
   const now = useNow();
-  const available = status === "signed-in" ? scopes : scopes.slice(0, 1);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-[31px] font-semibold tracking-tight">Permintaan</h1>
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Permintaan</h1>
         <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
           Ajukan bantuan
         </Link>
       </div>
-      {available.length > 1 && (
-        <div role="group" aria-label="Tampilkan" className="flex gap-2">
-          {available.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              aria-pressed={scope === s.id}
-              onClick={() => setScope(s.id)}
-              className={cn(
-                "h-11 rounded-lg border bg-card px-4 font-medium",
-                scope === s.id && "border-2 border-nila bg-nila-soft font-semibold",
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div role="group" aria-label="Tampilkan" className="flex gap-2">
+        {scopes.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={scope === s.id}
+            onClick={() => setScope(s.id)}
+            className={cn(
+              "h-11 rounded-full border bg-card px-5 font-semibold text-batu hover:text-arang",
+              scope === s.id && "border-pandan bg-pandan text-white hover:text-white",
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
       {isPending ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
       ) : !data?.length ? (
-        <p className="rounded-xl border border-dashed bg-card p-8 leading-relaxed text-batu">
+        <p className="rounded-3xl border border-dashed bg-card p-8 leading-relaxed text-batu">
           {scope === "mine"
             ? "Kamu belum pernah mengajukan bantuan."
             : scope === "for-me"
@@ -63,7 +58,7 @@ export function RequestList() {
               : "Belum ada permintaan."}
         </p>
       ) : (
-        <ul className="rounded-xl border bg-card">
+        <ul className="overflow-hidden rounded-3xl border bg-card">
           {data.map((r, i) => {
             const left = timeLeft(r.deadline, now);
             const live = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize && left;
@@ -74,10 +69,10 @@ export function RequestList() {
                     <StatusBadge request={r} />
                     <span className="text-[13px] text-batu">Nomor {r.id}</span>
                   </div>
-                  <Link href={`/permintaan/${r.id}`} className="text-xl font-semibold hover:underline">
+                  <Link href={`/permintaan/${r.id}`} className="text-xl font-bold hover:underline">
                     {r.title ?? `Permintaan nomor ${r.id}`}
                   </Link>
-                  <ShareGrid variant="small" size={r.snapshotSize} contributed={r.contributors} declined={0} you={r.yourResponse} />
+                  <ShareGrid variant="medium" size={r.snapshotSize} contributed={r.contributors} declined={0} you={r.yourResponse} />
                 </div>
                 <div className="flex flex-col items-start gap-1 sm:items-end">
                   <span className="tabular font-semibold">

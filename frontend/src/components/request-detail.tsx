@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { Check, Clock, FileText, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
 import { readContract, signTypedData, writeContract } from "wagmi/actions";
 import { bytesToHex, parseSignature } from "viem";
 
-import { Avatar } from "@/components/avatar";
-import { SignedIn } from "@/components/gate";
+import { Avatar, callName } from "@/components/avatar";
 import { ShareGrid, ShareLegend } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
+import { TopUpDialog } from "@/components/top-up";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,7 +29,7 @@ import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
 import { formatDate, formatWhzd, shortAddress, timeLeft } from "@/lib/format";
-import { keys, useMe, useRequest } from "@/lib/queries";
+import { keys, useMe, useMember, useRequest } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
@@ -41,7 +40,7 @@ export function RequestDetail({ id }: { id: number }) {
   if (isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
   if (error) {
     return (
-      <div className="flex max-w-xl flex-col gap-3 rounded-xl border bg-card p-8">
+      <div className="flex max-w-xl flex-col gap-3 rounded-3xl border bg-card p-8">
         <h1 className="text-xl font-semibold">Permintaan tidak ditemukan</h1>
         <p className="text-batu">
           {error instanceof ApiError && error.status === 404
@@ -59,39 +58,40 @@ export function RequestDetail({ id }: { id: number }) {
 
 function View({ detail }: { detail: Detail }) {
   const { request: r, responses, you } = detail;
-  const { data: requester } = useQuery({ queryKey: keys.member(r.requester), queryFn: () => api.member(r.requester) });
+  const { data: requester } = useMember(r.requester);
   const [justContributed, setJustContributed] = useState(false);
-  const name = requester?.profile?.displayName ?? shortAddress(r.requester);
+  const name = callName(requester?.profile, shortAddress(r.requester));
 
   return (
     <div className="flex flex-wrap items-start gap-10">
       <article className="flex min-w-0 flex-[999_1_560px] flex-col gap-8">
         <div className="flex flex-col gap-3.5">
-          <Link href="/permintaan" className="self-start text-[13px] font-semibold text-batu hover:text-nila">
+          <Link href="/permintaan" className="self-start text-sm font-semibold text-batu hover:text-pandan">
             Semua permintaan
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <StatusBadge request={r} />
             <span className="text-[13px] text-batu">Permintaan nomor {r.id}</span>
           </div>
-          <h1 className="max-w-160 text-[39px] leading-[1.15] font-semibold tracking-tight">
+          <h1 className="max-w-160 text-[39px] leading-[1.1] font-extrabold text-pandan">
             {r.title ?? `Permintaan nomor ${r.id}`}
           </h1>
           <div className="flex items-center gap-3">
-            <Avatar name={requester?.profile?.displayName} className="size-10" />
+            <Avatar address={r.requester} profile={requester?.profile} className="size-12" />
             <span className="leading-snug">
-              {name}
+              <span className="font-semibold">{name}</span>
+              {requester?.profile?.city && <span className="text-batu">, {requester.profile.city}</span>}
               <br />
-              <span className="text-[13px] text-batu">Diajukan {formatDate(r.openedAt)}</span>
+              <span className="text-sm text-batu">Diajukan {formatDate(r.openedAt)}</span>
             </span>
           </div>
         </div>
 
         {r.description && <p className="max-w-160 leading-[1.7] whitespace-pre-line">{r.description}</p>}
 
-        <section aria-labelledby="grid" className="flex flex-col gap-5 rounded-xl border bg-card p-7">
+        <section aria-labelledby="grid" className="flex flex-col gap-5 rounded-3xl border bg-card p-7">
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-            <h2 id="grid" className="text-xl font-semibold">
+            <h2 id="grid" className="text-xl font-bold">
               {r.contributors} dari {r.snapshotSize} anggota sudah membantu
             </h2>
             <span className="tabular">
@@ -116,7 +116,7 @@ function View({ detail }: { detail: Detail }) {
         <History detail={detail} />
       </article>
 
-      <aside aria-label="Tindakan" className="flex min-w-0 flex-[1_1_320px] flex-col gap-5 rounded-xl border bg-card p-7">
+      <aside aria-label="Tindakan" className="flex min-w-0 flex-[1_1_320px] flex-col gap-5 rounded-3xl border bg-card p-7 lg:sticky lg:top-24">
         <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
       </aside>
     </div>
@@ -151,11 +151,11 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
 
   return (
     <section aria-labelledby="evidence" className="flex flex-col gap-3.5">
-      <h2 id="evidence" className="text-xl font-semibold">
+      <h2 id="evidence" className="text-xl font-bold">
         Bukti
       </h2>
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-5">
-        <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-[10px] bg-nila-soft">
+      <div className="flex flex-wrap items-center gap-4 rounded-3xl border bg-card p-5">
+        <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
           <FileText className="size-5.5" />
         </span>
         <div className="flex min-w-60 flex-1 flex-col gap-1" aria-live="polite">
@@ -223,7 +223,7 @@ function History({ detail }: { detail: Detail }) {
   }
   return (
     <section aria-labelledby="history" className="flex flex-col">
-      <h2 id="history" className="mb-2 text-xl font-semibold">
+      <h2 id="history" className="mb-2 text-xl font-bold">
         Riwayat
       </h2>
       <ul>
@@ -246,7 +246,6 @@ function History({ detail }: { detail: Detail }) {
 
 function Actions({ detail, requesterName, onContributed }: { detail: Detail; requesterName: string; onContributed: () => void }) {
   const { request: r, you } = detail;
-  const { status } = useSession();
   const left = timeLeft(r.deadline, useNow());
   const open = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize && left !== null;
 
@@ -264,13 +263,6 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
   if (r.status === "cancelled") return <Cancelled detail={detail} requesterName={requesterName} />;
   if (r.awaitingFinalize || left === null) return <AwaitingFinalize detail={detail} requesterName={requesterName} />;
 
-  if (status !== "signed-in") {
-    return (
-      <SignedIn reason="Masuk untuk membantu permintaan ini.">
-        <span />
-      </SignedIn>
-    );
-  }
   if (you?.isRequester) return <RequesterPanel detail={detail} left={left} />;
   if (!you?.inSnapshot) {
     return (
@@ -293,7 +285,7 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
 function Summary({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-xl font-bold">{title}</h2>
       <p className="leading-relaxed text-batu">{children}</p>
     </div>
   );
@@ -409,10 +401,11 @@ function ContributePanel({
           </Button>
         )}
       </div>
-      {!enough && (
-        <p className="text-[13px] text-bata-ink">
-          Saldomu {me ? formatWhzd(me.chain.balance) : "0"} WHZD, kurang dari bagianmu. Ambil token uji di beranda.
-        </p>
+      {!enough && me && (
+        <div className="flex flex-col gap-2 rounded-2xl bg-bata-soft p-4 text-sm text-bata-ink">
+          <p>Saldomu {formatWhzd(me.chain.balance)} WHZD, kurang dari bagianmu.</p>
+          <TopUpDialog me={me} trigger={<button type="button" className="self-start font-semibold underline underline-offset-4">Isi saldo</button>} />
+        </div>
       )}
       <p className="text-[13px] leading-relaxed text-batu">
         Dana disimpan di kontrak dan diteruskan ke {requesterName} saat waktu habis, berapa pun yang terkumpul. Kalau
