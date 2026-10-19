@@ -3,7 +3,25 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Check, Clock, FileText, Hand, HeartHandshake, Hourglass, LoaderCircle, TriangleAlert, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  BookOpen,
+  Check,
+  Clock,
+  FilePlus,
+  FileText,
+  Hand,
+  HeartHandshake,
+  History as HistoryIcon,
+  Hourglass,
+  LoaderCircle,
+  RotateCcw,
+  ShieldCheck,
+  TriangleAlert,
+  UserRound,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
 import { readContract, signTypedData, writeContract } from "wagmi/actions";
@@ -70,7 +88,7 @@ function View({ detail }: { detail: Detail }) {
   const name = callName(requester?.profile, shortAddress(r.requester));
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
         <Link
           href="/permintaan"
@@ -97,14 +115,17 @@ function View({ detail }: { detail: Detail }) {
         </div>
       </header>
 
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <article className="flex min-w-0 flex-col gap-10">
-          <section aria-labelledby="grid" className="flex flex-col gap-6 rounded-2xl border bg-card p-6 sm:p-8">
+      {/* Phones read top to bottom: what's collected, then what you can do, then the details, then the
+          history. On wide screens the request sits on the left and its status on the right; both columns
+          dissolve (display: contents) on phones so their cards can take part in that single order. */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <section aria-labelledby="grid" className="order-1 flex flex-col gap-6 rounded-2xl border bg-card p-6 sm:p-7">
             <h2 id="grid" className="sr-only">
               Dana terkumpul
             </h2>
             <FundingProgress request={r} size="lg" />
-            <div className="flex flex-col gap-4 border-t pt-6">
+            <div className="flex flex-col gap-4 rounded-xl bg-embun p-4 sm:p-5">
               <ShareGrid
                 size={r.snapshotSize}
                 contributed={responses.contributed}
@@ -113,34 +134,68 @@ function View({ detail }: { detail: Detail }) {
                 justContributed={justContributed}
               />
               <ShareLegend />
-              <p className="text-[13px] leading-relaxed text-batu">
-                Setiap kotak satu anggota, semuanya bernilai sama: {formatWhzd(r.share)} WHZD. Anggota dihitung saat
-                permintaan dibuat, yaitu {r.snapshotSize} orang yang sedang siap membantu, tidak termasuk {name}.
-              </p>
             </div>
+            <p className="text-[13px] leading-relaxed text-batu">
+              Setiap kotak satu anggota, semuanya bernilai sama: {formatWhzd(r.share)} WHZD. Anggota dihitung saat
+              permintaan dibuat, yaitu {r.snapshotSize} orang yang sedang siap membantu, tidak termasuk {name}.
+            </p>
           </section>
 
           {r.description && (
-            <section aria-labelledby="story" className="flex flex-col gap-3">
-              <h2 id="story" className="text-xl font-bold">
-                Cerita {name}
-              </h2>
-              <p className="max-w-[68ch] text-[17px] leading-[1.75] whitespace-pre-line">{r.description}</p>
-            </section>
+            <Panel id="story" icon={<BookOpen className="size-4.5" />} title={`Cerita ${name}`} className="order-3">
+              <p className="max-w-[65ch] text-[17px] leading-[1.75] whitespace-pre-line">{r.description}</p>
+            </Panel>
           )}
 
           <Evidence detail={detail} requesterName={name} />
-          <History detail={detail} />
-        </article>
+        </div>
 
-        <aside
-          aria-label="Tindakan"
-          className="flex min-w-0 flex-col gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(23_48_42/0.04),0_12px_32px_-12px_rgb(23_48_42/0.12)] lg:sticky lg:top-24"
-        >
-          <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
-        </aside>
+        {/* Right column: where the request stands. Actions first, then what has happened so far. */}
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <aside
+            aria-label="Tindakan"
+            className="order-2 flex min-w-0 flex-col gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(23_48_42/0.04),0_12px_32px_-12px_rgb(23_48_42/0.12)]"
+          >
+            <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
+          </aside>
+          <History detail={detail} requesterName={name} />
+        </div>
       </div>
     </div>
+  );
+}
+
+/** One card style for every section of the page: same border, padding and header. */
+function Panel({
+  id,
+  icon,
+  title,
+  description,
+  className,
+  children,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  description?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className={cn("order-3 flex flex-col gap-5 rounded-2xl border bg-card p-6 sm:p-7", className)}>
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-pandan-soft text-pandan">
+          {icon}
+        </span>
+        <div className="flex min-w-0 flex-col gap-0.5 pt-1.5">
+          <h2 id={id} className="text-lg leading-tight font-bold">
+            {title}
+          </h2>
+          {description && <p className="text-sm leading-relaxed text-batu">{description}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -171,49 +226,57 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
   };
 
   return (
-    <section aria-labelledby="evidence" className="flex flex-col gap-3.5">
-      <h2 id="evidence" className="text-xl font-bold">
-        Bukti
-      </h2>
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-5">
-        <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
-          <FileText className="size-5.5" />
+    <Panel
+      id="evidence"
+      icon={<FileText className="size-4.5" />}
+      title="Bukti"
+      description={
+        allowed
+          ? `Hanya ${requesterName} dan anggota yang diminta membantu yang bisa membukanya.`
+          : `Hanya untuk ${requesterName} dan anggota yang diminta membantu.`
+      }
+    >
+      <div className="flex flex-wrap items-center gap-4 rounded-xl bg-embun p-4">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors duration-300",
+            check === "match" ? "bg-daun-soft text-daun-ink" : check === "mismatch" ? "bg-bata-soft text-bata-ink" : "bg-card text-batu",
+          )}
+        >
+          {check === "match" ? (
+            <ShieldCheck className="size-5" />
+          ) : check === "mismatch" ? (
+            <TriangleAlert className="size-5" />
+          ) : (
+            <FileText className="size-5" />
+          )}
         </span>
-        <div className="flex min-w-60 flex-1 flex-col gap-1" aria-live="polite">
-          <span className="font-semibold">{r.hasEvidence ? "Dokumen bukti" : "Dokumen tidak tersedia"}</span>
-          {check === "match" && (
-            <span className="flex items-center gap-1.5 text-[13px] text-daun-ink">
-              <Check aria-hidden="true" className="size-4" strokeWidth={2.5} />
-              Cocok dengan sidik yang tercatat di blockchain
-            </span>
-          )}
-          {check === "mismatch" && (
-            <span className="flex items-center gap-1.5 text-[13px] text-bata-ink">
-              <TriangleAlert aria-hidden="true" className="size-4" />
-              Tidak cocok dengan sidik di blockchain: dokumen ini sudah diubah
-            </span>
-          )}
+        <div className="flex min-w-48 flex-1 flex-col gap-0.5" aria-live="polite">
+          <span className="font-semibold">{r.hasEvidence ? "Tagihan atau surat dokter" : "Dokumen tidak tersedia"}</span>
+          {check === "match" && <span className="text-[13px] text-daun-ink">Asli: cocok dengan sidik di blockchain</span>}
+          {check === "mismatch" && <span className="text-[13px] text-bata-ink">Tidak cocok dengan sidik di blockchain: dokumen ini sudah diubah</span>}
           {(check === "idle" || check === "loading") && (
-            <span className="tabular text-[13px] text-batu">Sidik di blockchain: {shortAddress(r.evidenceHash)}</span>
+            <span className="tabular text-[13px] text-batu">Sidik di blockchain {shortAddress(r.evidenceHash)}</span>
           )}
         </div>
         {r.hasEvidence && allowed && !url && (
-          <Button variant="outline" disabled={check === "loading"} onClick={() => void fetchAndCheck()}>
-            {check === "loading" ? "Memeriksa" : "Periksa dokumen"}
+          <Button variant="outline" disabled={check === "loading"} className="w-full bg-card sm:w-auto" onClick={() => void fetchAndCheck()}>
+            <BusyLabel busy={check === "loading" ? "Memeriksa" : null}>Periksa dokumen</BusyLabel>
           </Button>
         )}
         {url && (
-          <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
+          <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", className: "w-full bg-card sm:w-auto" })}>
             Lihat dokumen
+            <ArrowUpRight data-icon="inline-end" aria-hidden="true" />
           </a>
         )}
       </div>
-      <p className="text-[13px] text-batu">
-        {allowed
-          ? `Hanya ${requesterName} dan anggota yang diminta membantu yang bisa membuka dokumen ini. Dokumen diperiksa dengan sidiknya di blockchain sebelum dibuka.`
-          : `Dokumen ini hanya untuk ${requesterName} dan anggota yang diminta membantu.`}
+      <p className="text-[13px] leading-relaxed text-batu">
+        Sidik (SHA-256) dokumen dicatat di blockchain saat permintaan dibuat. Sebelum dibuka, dokumen diperiksa dengan
+        sidik itu, jadi kamu tahu dokumennya tidak diganti.
       </p>
-    </section>
+    </Panel>
   );
 }
 
@@ -222,48 +285,108 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
 function TxLink({ hash, children }: { hash: string; children: React.ReactNode }) {
   if (!appConfig.explorerUrl) return <span className="text-[13px] text-batu">{children}</span>;
   return (
-    <a href={`${appConfig.explorerUrl}/tx/${hash}`} target="_blank" rel="noreferrer" className="text-[13px] text-batu underline underline-offset-4">
+    <a
+      href={`${appConfig.explorerUrl}/tx/${hash}`}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 self-start text-[13px] text-batu underline-offset-4 hover:text-pandan hover:underline"
+    >
       {children}
+      <ArrowUpRight aria-hidden="true" className="size-3.5" />
     </a>
   );
 }
 
-function History({ detail }: { detail: Detail }) {
-  const r = detail.request;
-  const rows: { text: React.ReactNode; when: string; tx: string }[] = [
-    { text: <>Permintaan dibuka untuk <strong className="tabular">{formatWhzd(r.amount)} WHZD</strong></>, when: r.openedAt, tx: r.openedTx },
+type Event = { icon: React.ReactNode; tone: string; text: React.ReactNode; when: string; tx: string };
+
+/** Every on-chain step of this request (yours included), oldest first, each linked to its transaction. */
+function History({ detail, requesterName }: { detail: Detail; requesterName: string }) {
+  const { request: r, you } = detail;
+  const c = you?.contribution;
+  const events: Event[] = [
+    {
+      icon: <FilePlus className="size-4" />,
+      tone: "bg-pandan-soft text-pandan",
+      text: (
+        <>
+          Permintaan dibuka untuk <strong className="tabular">{formatWhzd(r.amount)} WHZD</strong>
+        </>
+      ),
+      when: r.openedAt,
+      tx: r.openedTx,
+    },
   ];
-  if (r.cancelledAt && r.cancelledTx) rows.unshift({ text: "Permintaan dibatalkan oleh peminta", when: r.cancelledAt, tx: r.cancelledTx });
-  if (r.finalizedAt && r.finalizedTx) {
-    rows.unshift({
-      text:
-        r.status === "expired" ? "Berakhir tanpa iuran" : <>Dana <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> diteruskan ke peminta</>,
-      when: r.finalizedAt,
-      tx: r.finalizedTx,
+  if (c) {
+    events.push({
+      icon: <HeartHandshake className="size-4" />,
+      tone: "bg-kunyit-soft text-kunyit-ink",
+      text: (
+        <>
+          Kamu membantu <strong className="tabular">{formatWhzd(c.amount)} WHZD</strong>
+        </>
+      ),
+      when: c.contributedAt,
+      tx: c.txHash,
     });
   }
+  if (r.cancelledAt && r.cancelledTx) {
+    events.push({ icon: <X className="size-4" />, tone: "bg-bata-soft text-bata-ink", text: `Dibatalkan oleh ${requesterName}`, when: r.cancelledAt, tx: r.cancelledTx });
+  }
+  if (c?.refunded && c.refundedAt && c.refundTxHash) {
+    events.push({
+      icon: <RotateCcw className="size-4" />,
+      tone: "bg-muted text-batu",
+      text: (
+        <>
+          Iuranmu <strong className="tabular">{formatWhzd(c.amount)} WHZD</strong> kembali ke dompetmu
+        </>
+      ),
+      when: c.refundedAt,
+      tx: c.refundTxHash,
+    });
+  }
+  if (r.finalizedAt && r.finalizedTx) {
+    events.push(
+      r.status === "expired"
+        ? { icon: <Clock className="size-4" />, tone: "bg-muted text-batu", text: "Berakhir tanpa iuran", when: r.finalizedAt, tx: r.finalizedTx }
+        : {
+            icon: <Check className="size-4" strokeWidth={2.5} />,
+            tone: "bg-daun-soft text-daun-ink",
+            text: (
+              <>
+                <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> terkirim ke {requesterName}
+              </>
+            ),
+            when: r.finalizedAt,
+            tx: r.finalizedTx,
+          },
+    );
+  }
+  events.sort((a, b) => new Date(a.when).getTime() - new Date(b.when).getTime());
+
   return (
-    <section aria-labelledby="history" className="flex flex-col gap-4">
-      <h2 id="history" className="text-xl font-bold">
-        Riwayat
-      </h2>
+    <Panel
+      id="history"
+      icon={<HistoryIcon className="size-4.5" />}
+      title="Riwayat"
+      description={`Setiap langkah adalah transaksi publik di ${chain.name}${appConfig.explorerUrl ? ", bisa dicek di Etherscan" : ""}.`}
+      className="order-4"
+    >
       <ol className="flex flex-col">
-        {rows.map((row, i) => (
-          <li key={row.tx} className="relative flex gap-4 pb-6 last:pb-0">
-            {i < rows.length - 1 && <span aria-hidden="true" className="absolute top-4 bottom-0 left-[5px] w-0.5 bg-garis" />}
-            <span aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0 rounded-full", i === 0 ? "bg-pandan" : "border-2 border-garis bg-card")} />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span>{row.text}</span>
-              <TxLink hash={row.tx}>{formatDate(row.when)}</TxLink>
+        {events.map((e, i) => (
+          <li key={e.tx + i} className="relative flex gap-3.5 pb-5 last:pb-0">
+            {i < events.length - 1 && <span aria-hidden="true" className="absolute top-9 bottom-1 left-[15px] w-0.5 rounded-full bg-garis" />}
+            <span aria-hidden="true" className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", e.tone)}>
+              {e.icon}
+            </span>
+            <div className="flex min-w-0 flex-col gap-0.5 pt-1">
+              <span className="leading-snug">{e.text}</span>
+              <TxLink hash={e.tx}>{formatDate(e.when)}</TxLink>
             </div>
           </li>
         ))}
       </ol>
-      <p className="text-[13px] text-batu">
-        Setiap baris adalah transaksi publik di {chain.name}
-        {appConfig.explorerUrl ? ". Ketuk waktunya untuk melihatnya di Etherscan." : "."}
-      </p>
-    </section>
+    </Panel>
   );
 }
 
