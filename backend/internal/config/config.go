@@ -36,6 +36,8 @@ type Config struct {
 	SIWEURI        string
 	CORSOrigins    []string
 	EvidenceDir    string
+	PhotoDir       string
+	MaxPhotoBytes  int64
 	MaxUploadBytes int64
 	SessionTTL     time.Duration
 
@@ -73,6 +75,8 @@ func Load() (*Config, error) {
 	}
 	c.EvidenceDir = get("EVIDENCE_DIR", "./data/evidence")
 	c.MaxUploadBytes = int64(uintVar("MAX_UPLOAD_BYTES", 10<<20, &errs))
+	c.PhotoDir = get("PHOTO_DIR", "./data/photos")
+	c.MaxPhotoBytes = int64(uintVar("MAX_PHOTO_BYTES", 2<<20, &errs))
 	c.SessionTTL = duration("SESSION_TTL", "168h", &errs)
 
 	if v := os.Getenv("KEEPER_PRIVATE_KEY"); v != "" {

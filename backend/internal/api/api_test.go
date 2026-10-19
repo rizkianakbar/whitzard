@@ -69,6 +69,11 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	photos, err := evidence.NewDisk(t.TempDir(), 64<<10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	photos.Types = api.PhotoTypes
 	contracts, err := api.NewContracts(e.chain.Client, e.chain.TokenAddr, e.chain.RegistryAddr, e.chain.EscrowAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +87,7 @@ func newEnv(t *testing.T) *env {
 		SIWE:           auth.Params{Domain: "localhost:3000", URI: "http://localhost:3000", ChainID: 1337},
 		MaxUploadBytes: 1 << 20,
 		CORSOrigins:    []string{"http://localhost:3000"},
-	}, e.st, disk, contracts, hub, quiet)
+	}, e.st, disk, photos, contracts, hub, quiet)
 	e.srv = httptest.NewServer(server.Handler())
 	t.Cleanup(e.srv.Close)
 	e.sync()
@@ -249,6 +254,36 @@ func TestMembers(t *testing.T) {
 	if r.json(t)["displayName"] != "Alice" {
 		t.Fatalf("displayName = %s", r.body)
 	}
+	put := func(token string, v any) response {
+		b, _ := json.Marshal(v)
+		return e.do("PUT", "/members/me", token, bytes.NewReader(b), "application/json")
+	}
+	full := put(token, map[string]any{"displayName": "Alice Liddell", "nickname": "Al", "birthDate": "1990-05-17", "city": " Bandung "})
+	expect(t, full, 200)
+	if p := full.json(t); p["nickname"] != "Al" || p["birthDate"] != "1990-05-17" || p["city"] != "Bandung" {
+		t.Fatalf("profile = %s", full.body)
+	}
+	expect(t, put(token, map[string]any{"birthDate": "17-05-1990"}), 400)
+	expect(t, put(token, map[string]any{"birthDate": "2999-01-01"}), 400)
+	expect(t, put(token, map[string]any{"nickname": strings.Repeat("x", 31)}), 400)
+
+	// The birth date is only for alice; the city only for signed-in viewers.
+	bobToken := e.login(e.bob)
+	if p := e.get("/members/me", token).json(t)["profile"].(map[string]any); p["birthDate"] != "1990-05-17" {
+		t.Fatalf("own profile = %v", p)
+	}
+	if p := e.get("/members/"+e.alice.Addr.Hex(), bobToken).json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != "Bandung" {
+		t.Fatalf("bob's view = %v", p)
+	}
+	if p := e.get("/members/"+e.alice.Addr.Hex(), "").json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != nil || p["nickname"] != "Al" {
+		t.Fatalf("anonymous view = %v", p)
+	}
+
+	// Replacing the profile clears what is left out.
+	if p := put(token, map[string]any{"displayName": "Alice"}).json(t); p["nickname"] != nil || p["city"] != nil || p["birthDate"] != nil {
+		t.Fatalf("after replace = %v", p)
+	}
+
 	long, _ := json.Marshal(map[string]any{"displayName": strings.Repeat("x", 51)})
 	expect(t, e.do("PUT", "/members/me", token, bytes.NewReader(long), "application/json"), 400)
 	unknown, _ := json.Marshal(map[string]any{"ready": true})
@@ -258,6 +293,62 @@ func TestMembers(t *testing.T) {
 	strangerAccount := e.chain.Accounts[5]
 	strangerToken := e.login(strangerAccount)
 	expect(t, e.do("PUT", "/members/me", strangerToken, bytes.NewReader(b), "application/json"), 409)
+}
+
+func (e *env) uploadPhoto(token string, file []byte) response {
+	e.t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	fw, _ := w.CreateFormFile("file", "me.png")
+	_, _ = fw.Write(file)
+	_ = w.Close()
+	return e.do("PUT", "/members/me/photo", token, &buf, w.FormDataContentType())
+}
+
+func TestPhoto(t *testing.T) {
+	e := newEnv(t)
+	aliceToken, bobToken := e.login(e.alice), e.login(e.bob)
+	png := append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 100)...)
+	path := "/members/" + e.alice.Addr.Hex() + "/photo"
+
+	expect(t, e.get(path, bobToken), 404)
+	set := e.uploadPhoto(aliceToken, png)
+	expect(t, set, 200)
+	sum := sha256.Sum256(png)
+	if set.json(t)["photo"] != "0x"+hex.EncodeToString(sum[:]) {
+		t.Fatalf("photo = %s", set.body)
+	}
+
+	got := e.get(path, bobToken)
+	expect(t, got, 200)
+	if !bytes.Equal(got.body, png) || got.header.Get("Content-Type") != "image/png" {
+		t.Fatalf("photo served as %q", got.header.Get("Content-Type"))
+	}
+	expect(t, e.get(path, ""), 401) // members only
+
+	expect(t, e.uploadPhoto(aliceToken, pdf), 415)
+	expect(t, e.uploadPhoto(aliceToken, append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 64<<10)...)), 413)
+	expect(t, e.uploadPhoto(e.login(e.chain.Accounts[5]), png), 409) // never registered
+
+	del := e.do("DELETE", "/members/me/photo", aliceToken, nil, "")
+	expect(t, del, 200)
+	if del.json(t)["photo"] != nil {
+		t.Fatalf("after delete = %s", del.body)
+	}
+	expect(t, e.get(path, bobToken), 404)
+}
+
+func TestStats(t *testing.T) {
+	e := newEnv(t)
+	e.chain.Send(e.chain.Escrow.OpenRequest(e.alice.Opts, testutil.Ether(90), 3600, [32]byte{1}, id(0)))
+	e.sync()
+	st := e.get("/stats", "")
+	expect(t, st, 200)
+	got := st.json(t)
+	if got["members"] != float64(5) || got["readyMembers"] != float64(4) || got["requests"] != float64(1) ||
+		got["funded"] != float64(0) || got["distributed"] != "0" {
+		t.Fatalf("stats = %s", st.body)
+	}
 }
 
 // ---------------------------------------------------------------- requests, evidence, responses
@@ -293,8 +384,11 @@ func TestRequestFlow(t *testing.T) {
 	if you := body["you"].(map[string]any); you["inSnapshot"] != true || you["response"] != "pending" {
 		t.Fatalf("bob's view = %v", you)
 	}
-	expect(t, e.get("/requests/99", ""), 404)
-	expect(t, e.get("/requests/abc", ""), 400)
+	expect(t, e.get("/requests/99", bobToken), 404)
+	expect(t, e.get("/requests/abc", bobToken), 400)
+	// Request stories are health-related: members only.
+	expect(t, e.get("/requests/1", ""), 401)
+	expect(t, e.get("/requests", ""), 401)
 
 	// Evidence: requester and snapshot members only.
 	doc := e.get("/requests/1/evidence", bobToken)

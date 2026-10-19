@@ -50,6 +50,7 @@ type Saved struct {
 type Disk struct {
 	Dir      string
 	MaxBytes int64
+	Types    map[string]bool // accepted content types; nil means AllowedTypes
 }
 
 // NewDisk creates the directory if needed.
@@ -82,7 +83,11 @@ func (d *Disk) Save(r io.Reader) (Saved, error) {
 		return Saved{}, ErrEmpty
 	}
 	contentType := http.DetectContentType(head)
-	if !AllowedTypes[contentType] {
+	types := d.Types
+	if types == nil {
+		types = AllowedTypes
+	}
+	if !types[contentType] {
 		tmp.Close()
 		return Saved{}, ErrType
 	}

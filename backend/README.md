@@ -55,7 +55,11 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | | |
 | --- | --- |
 | `GET /members/{address}` (or `/members/me` 🔒) | `{address, profile, chain}`: profile is null before registering; `chain` = registered, ready, hasParticipated, requestCount, balance, faucetClaimed, faucetNextClaimAt (live) |
-| `PUT /members/me` 🔒 `{displayName}` | edit the profile (registered members) |
+| `PUT /members/me` 🔒 `{displayName, nickname, birthDate, city}` | replace the profile (registered members); missing fields are cleared, `birthDate` is `YYYY-MM-DD`. Self-declared, never verified. `birthDate` is returned only to the member themself, `city` only to signed-in viewers |
+| `PUT /members/me/photo` 🔒 multipart `file` | set the profile photo (PNG, JPEG or WebP, `MAX_PHOTO_BYTES`); `profile.photo` is its SHA-256 |
+| `DELETE /members/me/photo` 🔒 | remove the profile photo |
+| `GET /members/{address}/photo` 🔒 | the photo, for signed-in viewers |
+| `GET /stats` | `{members, readyMembers, requests, funded, distributed, contributions}`: community totals for the public landing page |
 | `GET /members/me/proof` 🔒 | `{needed, proofId, canOpenRequest}`: the `proofId` to pass to `openRequest` |
 | `GET /members/me/refunds` 🔒 | `{total, refunds: [{requestId, amount}]}`: claimable with `claimRefund` |
 
@@ -64,8 +68,8 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | | |
 | --- | --- |
 | `POST /requests` 🔒 multipart `title`, `description`, `file` | `{draftId, evidenceHash, …}`: then send `Escrow.openRequest(amount, duration, evidenceHash, proofId)` from the wallet |
-| `GET /requests?requester=&member=me&before=&limit=` | newest first; with `member=me` each request also has `yourResponse` |
-| `GET /requests/{id}` | `{request, responses, you?}`: `status` is open / funding / finalized / expired / cancelled, plus `awaitingFinalize` |
+| `GET /requests?requester=&member=me&before=&limit=` 🔒 | newest first; with `member=me` each request also has `yourResponse` |
+| `GET /requests/{id}` 🔒 | `{request, responses, you}`: `status` is open / funding / finalized / expired / cancelled, plus `awaitingFinalize` |
 | `GET /requests/{id}/evidence` 🔒 | the document, only for the requester and snapshot members; `X-Evidence-Sha256` = on-chain hash |
 | `POST /requests/{id}/contribute` 🔒 `{response: "participate" \| "decline"}` | records the answer; the contribution itself is `Escrow.contributeWithPermit` from the wallet |
 

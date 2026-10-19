@@ -60,7 +60,7 @@ echo "== backend on http://127.0.0.1:8080 (logs: backend/data/dev/backend.log)"
   RPC_URL=http://127.0.0.1:8545 CHAIN_ID=31337 START_BLOCK=0 CONFIRMATIONS=0 POLL_INTERVAL=500ms \
   TOKEN_ADDRESS=$TOKEN REGISTRY_ADDRESS=$REGISTRY ESCROW_ADDRESS=$ESCROW \
   HTTP_ADDR=127.0.0.1:8080 CORS_ORIGINS=http://localhost:3000 SIWE_DOMAIN=localhost:3000 SIWE_URI=http://localhost:3000 \
-  EVIDENCE_DIR="$DATA/evidence" KEEPER_POLL_INTERVAL=3s \
+  EVIDENCE_DIR="$DATA/evidence" PHOTO_DIR="$DATA/photos" KEEPER_POLL_INTERVAL=3s \
   KEEPER_PRIVATE_KEY=0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 \
   go run ./cmd/whitzard all >"$DATA/backend.log" 2>&1) & PIDS+=($!)
 wait_for http://127.0.0.1:8080/health "the backend" || { tail -20 "$DATA/backend.log"; exit 1; }

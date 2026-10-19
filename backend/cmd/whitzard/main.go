@@ -23,6 +23,7 @@ import (
 
 	"github.com/rizkianakbar/whitzard/backend/internal/api"
 	"github.com/rizkianakbar/whitzard/backend/internal/auth"
+	"github.com/rizkianakbar/whitzard/backend/internal/chain"
 	"github.com/rizkianakbar/whitzard/backend/internal/config"
 	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
 	"github.com/rizkianakbar/whitzard/backend/internal/indexer"
@@ -73,8 +74,8 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 		return fmt.Errorf("dial RPC: %w", err)
 	}
 	defer client.Close()
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
+	var chainID *big.Int
+	if err := chain.Retry(ctx, log, "chain id", func() (err error) { chainID, err = client.ChainID(ctx); return }); err != nil {
 		return fmt.Errorf("read chain id: %w", err)
 	}
 	if chainID.Int64() != cfg.ChainID {
@@ -108,15 +109,19 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 
 func indexerTask(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger) func(context.Context) error {
 	return func(ctx context.Context) error {
-		ix, err := indexer.New(ctx, indexer.Config{
-			Name:          cfg.IndexerName,
-			Registry:      cfg.RegistryAddress,
-			Escrow:        cfg.EscrowAddress,
-			StartBlock:    cfg.StartBlock,
-			Confirmations: cfg.Confirmations,
-			BatchSize:     cfg.BatchSize,
-			PollInterval:  cfg.PollInterval,
-		}, client, st, log.With("component", "indexer"))
+		var ix *indexer.Indexer
+		err := chain.Retry(ctx, log, "indexer setup", func() (err error) {
+			ix, err = indexer.New(ctx, indexer.Config{
+				Name:          cfg.IndexerName,
+				Registry:      cfg.RegistryAddress,
+				Escrow:        cfg.EscrowAddress,
+				StartBlock:    cfg.StartBlock,
+				Confirmations: cfg.Confirmations,
+				BatchSize:     cfg.BatchSize,
+				PollInterval:  cfg.PollInterval,
+			}, client, st, log.With("component", "indexer"))
+			return
+		})
 		if err != nil {
 			return err
 		}
@@ -133,8 +138,8 @@ func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, c
 		if err != nil {
 			return err
 		}
-		balance, err := client.BalanceAt(ctx, k.Address(), nil)
-		if err != nil {
+		var balance *big.Int
+		if err := chain.Retry(ctx, log, "keeper balance", func() (err error) { balance, err = client.BalanceAt(ctx, k.Address(), nil); return }); err != nil {
 			return err
 		}
 		log.Info("keeper started", "wallet", k.Address().Hex(), "balanceWei", balance)
@@ -152,6 +157,11 @@ func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log
 		if err != nil {
 			return err
 		}
+		photos, err := evidence.NewDisk(cfg.PhotoDir, cfg.MaxPhotoBytes)
+		if err != nil {
+			return err
+		}
+		photos.Types = api.PhotoTypes
 		contracts, err := api.NewContracts(client, cfg.TokenAddress, cfg.RegistryAddress, cfg.EscrowAddress)
 		if err != nil {
 			return err
@@ -161,7 +171,7 @@ func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log
 			SessionTTL:     cfg.SessionTTL,
 			MaxUploadBytes: cfg.MaxUploadBytes,
 			CORSOrigins:    cfg.CORSOrigins,
-		}, st, ev, contracts, hub, log.With("component", "api"))
+		}, st, ev, photos, contracts, hub, log.With("component", "api"))
 
 		httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
 		go func() {

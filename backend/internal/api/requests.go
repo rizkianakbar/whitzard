@@ -156,10 +156,7 @@ func (s *Server) handleListRequests(w http.ResponseWriter, r *http.Request) {
 	me := ""
 	if v := q.Get("member"); v != "" {
 		if v == "me" {
-			if me = s.optionalCaller(r); me == "" {
-				writeError(w, http.StatusUnauthorized, "sign in to filter by member=me")
-				return
-			}
+			me = caller(r)
 			v = me
 		}
 		_, lower, ok := parseAddress(v)
@@ -206,8 +203,7 @@ func (s *Server) handleListRequests(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"requests": out})
 }
 
-// GET /requests/{id} → the request, its snapshot response counts and, when signed in, the
-// caller's own position.
+// GET /requests/{id} → the request, its snapshot response counts and the caller's own position.
 func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	req, ok := s.loadRequest(w, r)
 	if !ok {
@@ -220,22 +216,21 @@ func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	body := map[string]any{"request": s.view(req), "responses": counts}
 
-	if me := s.optionalCaller(r); me != "" {
-		you := map[string]any{"isRequester": me == req.Requester, "inSnapshot": false, "response": nil, "contribution": nil}
-		if response, err := s.store.SnapshotResponse(r.Context(), req.ID, me); err == nil {
-			you["inSnapshot"], you["response"] = true, response
-		} else if !errors.Is(err, store.ErrNotFound) {
-			s.internalError(w, r, err)
-			return
-		}
-		if c, err := s.store.GetContribution(r.Context(), req.ID, me); err == nil {
-			you["contribution"] = c
-		} else if !errors.Is(err, store.ErrNotFound) {
-			s.internalError(w, r, err)
-			return
-		}
-		body["you"] = you
+	me := caller(r)
+	you := map[string]any{"isRequester": me == req.Requester, "inSnapshot": false, "response": nil, "contribution": nil}
+	if response, err := s.store.SnapshotResponse(r.Context(), req.ID, me); err == nil {
+		you["inSnapshot"], you["response"] = true, response
+	} else if !errors.Is(err, store.ErrNotFound) {
+		s.internalError(w, r, err)
+		return
 	}
+	if c, err := s.store.GetContribution(r.Context(), req.ID, me); err == nil {
+		you["contribution"] = c
+	} else if !errors.Is(err, store.ErrNotFound) {
+		s.internalError(w, r, err)
+		return
+	}
+	body["you"] = you
 	writeJSON(w, http.StatusOK, body)
 }
 

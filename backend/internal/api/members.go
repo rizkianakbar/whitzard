@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/rizkianakbar/whitzard/backend/internal/auth"
+	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
 	"github.com/rizkianakbar/whitzard/backend/internal/store"
 )
 
@@ -149,30 +151,75 @@ func (s *Server) handleGetMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"address": lower, "profile": profile, "chain": state})
+	writeJSON(w, http.StatusOK, map[string]any{"address": lower, "profile": profileView(profile, s.optionalCaller(r)), "chain": state})
 }
 
-// PUT /members/me {displayName}: profile edit, for registered members.
+// profileView is a member's profile as the viewer may see it: the birth date only for the member
+// themself, the city only for signed-in viewers.
+func profileView(m *store.Member, viewer string) any {
+	if m == nil {
+		return nil
+	}
+	v := struct {
+		store.Member
+		BirthDate *string `json:"birthDate,omitempty"`
+	}{Member: *m}
+	if viewer == "" {
+		v.City = nil
+	}
+	if viewer == m.Address && m.BirthDate != nil {
+		d := m.BirthDate.Format(time.DateOnly)
+		v.BirthDate = &d
+	}
+	return v
+}
+
+// PUT /members/me {displayName, nickname, birthDate, city}: replaces the profile (missing or empty
+// fields are cleared), for registered members. Nothing here is verified.
 func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DisplayName *string `json:"displayName"`
+		Nickname    *string `json:"nickname"`
+		BirthDate   *string `json:"birthDate"` // YYYY-MM-DD
+		City        *string `json:"city"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return
 	}
-	if body.DisplayName != nil {
-		name := strings.TrimSpace(*body.DisplayName)
-		if utf8.RuneCountInString(name) > 50 {
-			writeError(w, http.StatusBadRequest, "displayName is at most 50 characters")
+	var p store.Profile
+	for _, f := range []struct {
+		name string
+		in   *string
+		max  int
+		out  **string
+	}{
+		{"displayName", body.DisplayName, 50, &p.DisplayName},
+		{"nickname", body.Nickname, 30, &p.Nickname},
+		{"city", body.City, 60, &p.City},
+	} {
+		if f.in == nil {
+			continue
+		}
+		v := strings.TrimSpace(*f.in)
+		if utf8.RuneCountInString(v) > f.max {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("%s is at most %d characters", f.name, f.max))
 			return
 		}
-		if name == "" {
-			body.DisplayName = nil
-		} else {
-			body.DisplayName = &name
+		if v != "" {
+			*f.out = &v
 		}
 	}
-	err := s.store.SetDisplayName(r.Context(), caller(r), body.DisplayName)
+	if body.BirthDate != nil && *body.BirthDate != "" {
+		d, err := time.Parse(time.DateOnly, *body.BirthDate)
+		today := s.now().UTC().Truncate(24 * time.Hour)
+		if err != nil || d.After(today) || d.Before(today.AddDate(-120, 0, 0)) {
+			writeError(w, http.StatusBadRequest, "birthDate must be a past date as YYYY-MM-DD")
+			return
+		}
+		p.BirthDate = &d
+	}
+
+	err := s.store.SetProfile(r.Context(), caller(r), p)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusConflict, "register on-chain first (Registry.register)")
 		return
@@ -181,12 +228,101 @@ func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	s.writeOwnProfile(w, r)
+}
+
+// PUT /members/me/photo multipart `file` (PNG, JPEG or WebP): sets the profile photo.
+func (s *Server) handleSetPhoto(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, s.photos.MaxBytes+64<<10)
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "expected multipart/form-data with a file")
+		return
+	}
+	defer file.Close()
+	saved, err := s.photos.Save(file)
+	switch {
+	case errors.Is(err, evidence.ErrTooLarge):
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("photo is larger than %d bytes", s.photos.MaxBytes))
+		return
+	case errors.Is(err, evidence.ErrType), errors.Is(err, evidence.ErrEmpty):
+		writeError(w, http.StatusUnsupportedMediaType, "photo must be a PNG, JPEG or WebP image")
+		return
+	case err != nil:
+		s.internalError(w, r, err)
+		return
+	}
+	s.setPhoto(w, r, &saved.Hash, &saved.ContentType)
+}
+
+// DELETE /members/me/photo: removes the profile photo.
+func (s *Server) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
+	s.setPhoto(w, r, nil, nil)
+}
+
+func (s *Server) setPhoto(w http.ResponseWriter, r *http.Request, hash, contentType *string) {
+	err := s.store.SetPhoto(r.Context(), caller(r), hash, contentType)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, "register on-chain first (Registry.register)")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	s.writeOwnProfile(w, r)
+}
+
+func (s *Server) writeOwnProfile(w http.ResponseWriter, r *http.Request) {
 	profile, err := s.store.GetMember(r.Context(), caller(r))
 	if err != nil {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, profile)
+	writeJSON(w, http.StatusOK, profileView(profile, caller(r)))
+}
+
+// GET /members/{address}/photo → the profile photo, for signed-in viewers.
+func (s *Server) handleGetPhoto(w http.ResponseWriter, r *http.Request) {
+	_, lower, ok := parseAddress(r.PathValue("address"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "not an Ethereum address")
+		return
+	}
+	m, err := s.store.GetMember(r.Context(), lower)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.internalError(w, r, err)
+		return
+	}
+	if m == nil || m.Photo == nil {
+		writeError(w, http.StatusNotFound, "no photo")
+		return
+	}
+	f, err := s.photos.Open(*m.Photo)
+	if errors.Is(err, evidence.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "photo missing from storage")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	defer f.Close()
+	h := w.Header()
+	h.Set("Content-Type", *m.PhotoType)
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Cache-Control", "private, max-age=86400")
+	http.ServeContent(w, r, "", time.Time{}, f)
+}
+
+// GET /stats → community totals for the public landing page (no personal or health data).
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	st, err := s.store.GetStats(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
 }
 
 // GET /members/me/proof → the proofId to pass to Escrow.openRequest. The first request needs no

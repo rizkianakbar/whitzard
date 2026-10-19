@@ -33,6 +33,9 @@ type Config struct {
 	CORSOrigins    []string      // e.g. ["http://localhost:3000"]
 }
 
+// PhotoTypes are the accepted profile photo types.
+var PhotoTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true}
+
 // Contracts are read-only views of the deployed contracts.
 type Contracts struct {
 	Token    *bindings.WhitzardTokenCaller
@@ -62,14 +65,16 @@ type Server struct {
 	cfg      Config
 	store    *store.Store
 	evidence *evidence.Disk
+	photos   *evidence.Disk
 	chain    Contracts
 	hub      *Hub
 	log      *slog.Logger
 	now      func() time.Time
 }
 
-// New builds the server. Run hub.Run separately for live notifications.
-func New(cfg Config, st *store.Store, ev *evidence.Disk, contracts Contracts, hub *Hub, log *slog.Logger) *Server {
+// New builds the server; photos should accept images only (PhotoTypes). Run hub.Run separately
+// for live notifications.
+func New(cfg Config, st *store.Store, ev, photos *evidence.Disk, contracts Contracts, hub *Hub, log *slog.Logger) *Server {
 	if cfg.NonceTTL == 0 {
 		cfg.NonceTTL = 10 * time.Minute
 	}
@@ -79,7 +84,7 @@ func New(cfg Config, st *store.Store, ev *evidence.Disk, contracts Contracts, hu
 	if cfg.MaxUploadBytes == 0 {
 		cfg.MaxUploadBytes = 10 << 20
 	}
-	return &Server{cfg: cfg, store: st, evidence: ev, chain: contracts, hub: hub, log: log, now: time.Now}
+	return &Server{cfg: cfg, store: st, evidence: ev, photos: photos, chain: contracts, hub: hub, log: log, now: time.Now}
 }
 
 // Handler returns the routed handler with CORS.
@@ -93,14 +98,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /auth/verify", s.handleVerify)
 	mux.HandleFunc("POST /auth/logout", s.authed(s.handleLogout))
 
+	mux.HandleFunc("GET /stats", s.handleStats)
+
 	mux.HandleFunc("GET /members/{address}", s.handleGetMember)
+	mux.HandleFunc("GET /members/{address}/photo", s.authed(s.handleGetPhoto))
 	mux.HandleFunc("PUT /members/me", s.authed(s.handleUpdateMe))
+	mux.HandleFunc("PUT /members/me/photo", s.authed(s.handleSetPhoto))
+	mux.HandleFunc("DELETE /members/me/photo", s.authed(s.handleDeletePhoto))
 	mux.HandleFunc("GET /members/me/proof", s.authed(s.handleProof))
 	mux.HandleFunc("GET /members/me/refunds", s.authed(s.handleRefunds))
 
 	mux.HandleFunc("POST /requests", s.authed(s.handleCreateDraft))
-	mux.HandleFunc("GET /requests", s.handleListRequests)
-	mux.HandleFunc("GET /requests/{id}", s.handleGetRequest)
+	// Request stories are health-related, so only signed-in members may read them.
+	mux.HandleFunc("GET /requests", s.authed(s.handleListRequests))
+	mux.HandleFunc("GET /requests/{id}", s.authed(s.handleGetRequest))
 	mux.HandleFunc("GET /requests/{id}/evidence", s.authed(s.handleEvidence))
 	mux.HandleFunc("POST /requests/{id}/contribute", s.authed(s.handleRespond))
 
@@ -165,7 +176,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
 			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			h.Set("Access-Control-Expose-Headers", "Content-Disposition, X-Evidence-Sha256")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)

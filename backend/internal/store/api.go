@@ -57,35 +57,53 @@ func (s *Store) DeleteSession(ctx context.Context, tokenHash string) error {
 
 // ---------------------------------------------------------------- members
 
-// Member is the off-chain profile plus mirrored status.
+// Member is the off-chain profile plus mirrored status. Everything in the profile is
+// self-declared and never verified.
 type Member struct {
-	Address           string    `json:"address"`
-	DisplayName       *string   `json:"displayName"`
-	Ready             bool      `json:"ready"`
-	RegisteredAtBlock int64     `json:"registeredAtBlock"`
-	Contributions     int       `json:"contributions"`
-	Requests          int       `json:"requests"`
-	CreatedAt         time.Time `json:"createdAt"`
+	Address           string     `json:"address"`
+	DisplayName       *string    `json:"displayName"`
+	Nickname          *string    `json:"nickname"`
+	BirthDate         *time.Time `json:"-"` // only for the member themself; see Profile.BirthDate
+	City              *string    `json:"city"`
+	Photo             *string    `json:"photo"` // SHA-256 of the photo, also a cache key; null if none
+	PhotoType         *string    `json:"-"`
+	Ready             bool       `json:"ready"`
+	RegisteredAtBlock int64      `json:"registeredAtBlock"`
+	Contributions     int        `json:"contributions"`
+	Requests          int        `json:"requests"`
+	CreatedAt         time.Time  `json:"createdAt"`
 }
 
 // GetMember returns a registered member, or ErrNotFound.
 func (s *Store) GetMember(ctx context.Context, address string) (*Member, error) {
 	var m Member
 	err := s.Pool.QueryRow(ctx, `
-		SELECT address, display_name, ready, registered_at_block, created_at,
+		SELECT address, display_name, nickname, birth_date, city, photo_hash, photo_type,
+		       ready, registered_at_block, created_at,
 		       (SELECT count(*) FROM contributions c WHERE c.member = m.address AND NOT c.refunded),
 		       (SELECT count(*) FROM requests r WHERE r.requester = m.address AND r.status <> 'cancelled')
 		FROM members m WHERE address = $1`, address).
-		Scan(&m.Address, &m.DisplayName, &m.Ready, &m.RegisteredAtBlock, &m.CreatedAt, &m.Contributions, &m.Requests)
+		Scan(&m.Address, &m.DisplayName, &m.Nickname, &m.BirthDate, &m.City, &m.Photo, &m.PhotoType,
+			&m.Ready, &m.RegisteredAtBlock, &m.CreatedAt, &m.Contributions, &m.Requests)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	return &m, err
 }
 
-// SetDisplayName updates a registered member's profile; ErrNotFound if not registered.
-func (s *Store) SetDisplayName(ctx context.Context, address string, name *string) error {
-	tag, err := s.Pool.Exec(ctx, `UPDATE members SET display_name = $2, updated_at = now() WHERE address = $1`, address, name)
+// Profile is the editable part of a member; nil fields are cleared.
+type Profile struct {
+	DisplayName *string
+	Nickname    *string
+	BirthDate   *time.Time
+	City        *string
+}
+
+// SetProfile replaces a registered member's profile (not the photo); ErrNotFound if not registered.
+func (s *Store) SetProfile(ctx context.Context, address string, p Profile) error {
+	tag, err := s.Pool.Exec(ctx, `
+		UPDATE members SET display_name = $2, nickname = $3, birth_date = $4, city = $5, updated_at = now()
+		WHERE address = $1`, address, p.DisplayName, p.Nickname, p.BirthDate, p.City)
 	if err != nil {
 		return err
 	}
@@ -93,6 +111,43 @@ func (s *Store) SetDisplayName(ctx context.Context, address string, name *string
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SetPhoto sets (or, with a nil hash, removes) a registered member's photo; ErrNotFound if not registered.
+func (s *Store) SetPhoto(ctx context.Context, address string, hash, contentType *string) error {
+	tag, err := s.Pool.Exec(ctx, `UPDATE members SET photo_hash = $2, photo_type = $3, updated_at = now() WHERE address = $1`,
+		address, hash, contentType)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// Stats are community-wide totals, safe to show to anyone (no personal or health data).
+type Stats struct {
+	Members       int    `json:"members"`
+	ReadyMembers  int    `json:"readyMembers"`
+	Requests      int    `json:"requests"`
+	Funded        int    `json:"funded"`      // finalized requests
+	Distributed   string `json:"distributed"` // wei paid out to requesters
+	Contributions int    `json:"contributions"`
+}
+
+// GetStats returns the community totals.
+func (s *Store) GetStats(ctx context.Context) (*Stats, error) {
+	var st Stats
+	err := s.Pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM members),
+		       (SELECT count(*) FROM members WHERE ready),
+		       (SELECT count(*) FROM requests),
+		       (SELECT count(*) FROM requests WHERE status = 'finalized'),
+		       (SELECT coalesce(sum(collected), 0)::text FROM requests WHERE status = 'finalized'),
+		       (SELECT count(*) FROM contributions WHERE NOT refunded)`).
+		Scan(&st.Members, &st.ReadyMembers, &st.Requests, &st.Funded, &st.Distributed, &st.Contributions)
+	return &st, err
 }
 
 // ---------------------------------------------------------------- requests
