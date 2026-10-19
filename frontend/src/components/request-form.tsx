@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { appConfig } from "@/lib/config";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
 import { formatWhzd } from "@/lib/format";
@@ -27,8 +26,10 @@ import { phaseLabel, useTx } from "@/lib/tx";
 import { cn } from "@/lib/utils";
 
 const DAY = 24 * 60 * 60;
-const durations = [
-  ...(appConfig.devAccounts ? [{ seconds: 5 * 60, label: "5 menit" }] : []),
+// The short ones are for demos and testing (the contract's minimum is 5 minutes).
+const durations: { seconds: number; label: string; demo?: boolean }[] = [
+  { seconds: 5 * 60, label: "5 menit", demo: true },
+  { seconds: 10 * 60, label: "10 menit", demo: true },
   { seconds: DAY, label: "1 hari" },
   { seconds: 3 * DAY, label: "3 hari" },
   { seconds: 7 * DAY, label: "7 hari" },
@@ -55,7 +56,6 @@ export function RequestForm() {
 function Eligible() {
   const { data: me } = useMe();
   const { data: proof, isPending } = useProof();
-  console.log("proof", proof);
   if (isPending || !me) return <Skeleton className="h-96 w-full rounded-3xl" />;
   if (!me.chain.registered) {
     return (
@@ -208,6 +208,9 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
                     onChange={() => setDuration(d.seconds)}
                   />
                   {d.label}
+                  {d.demo && (
+                    <span className="rounded-full bg-kunyit-soft px-2 py-0.5 text-[11px] font-semibold text-kunyit-ink">Demo</span>
+                  )}
                 </label>
               ))}
             </div>

@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, Clock, RotateCcw } from "lucide-react";
+import { ArrowRight, Check, RotateCcw } from "lucide-react";
 import { useConfig } from "wagmi";
 import { writeContract } from "wagmi/actions";
 import { toast } from "sonner";
 
 import { Avatar, callName } from "@/components/avatar";
-import { ShareGrid } from "@/components/share-grid";
+import { CountdownPill } from "@/components/countdown";
+import { FundingProgress, percentCollected } from "@/components/funding";
 import { StatusBadge } from "@/components/status-badge";
 import { Swap } from "@/components/swap";
 import { TopUpDialog } from "@/components/top-up";
@@ -18,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { api, type Member, type Request } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatWhzd, shortAddress, timeAgo, timeLeft } from "@/lib/format";
+import { formatWhzd, shortAddress, timeAgo } from "@/lib/format";
 import { keys, useMe, useMember, useNotifications, useProof, useRefunds, useRequests } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
@@ -201,6 +203,11 @@ function RefundNotice() {
 
 // ---------------------------------------------------------------- lists
 
+/** Still collecting: open or funding, and not yet past its deadline. */
+function isLive(r: Request) {
+  return (r.status === "open" || r.status === "funding") && !r.awaitingFinalize;
+}
+
 function SectionTitle({ id, children, action }: { id: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
@@ -257,30 +264,24 @@ function Requester({ request: r }: { request: Request }) {
 
 function WaitingCard({ request: r }: { request: Request }) {
   const { token: session } = useSession();
-  const left = timeLeft(r.deadline, useNow());
   return (
-    <li className="flex flex-col gap-5 rounded-3xl border bg-card p-6">
+    <li className="flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Requester request={r} />
-        {left && (
-          <span className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm font-semibold text-batu">
-            <Clock aria-hidden="true" className="size-4" />
-            {left} lagi
-          </span>
-        )}
+        <CountdownPill deadline={r.deadline} />
       </div>
-      <Link href={`/permintaan/${r.id}`} className="text-xl font-bold hover:underline">
-        {r.title ?? `Permintaan nomor ${r.id}`}
-      </Link>
-      <ShareGrid variant="medium" size={r.snapshotSize} contributed={r.contributors} declined={0} you={r.yourResponse} />
-      <div className="flex flex-wrap items-center gap-3 border-t pt-5">
-        <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular")}>
+      <div className="flex flex-col gap-1.5">
+        <Link href={`/permintaan/${r.id}`} className="text-xl leading-snug font-bold text-balance hover:underline">
+          {r.title ?? `Permintaan nomor ${r.id}`}
+        </Link>
+        {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
+      </div>
+      <FundingProgress request={r} className="rounded-xl bg-embun p-4" />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
           Bantu {formatWhzd(r.share)} WHZD
         </Link>
         <DeclineButton id={r.id} token={session} />
-        <span className="tabular ml-auto text-sm text-batu">
-          {formatWhzd(r.collected)} dari {formatWhzd(r.amount)} WHZD
-        </span>
       </div>
     </li>
   );
@@ -288,20 +289,30 @@ function WaitingCard({ request: r }: { request: Request }) {
 
 function DeclineButton({ id, token }: { id: number; token: string | null }) {
   const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
   return (
     <Button
       variant="ghost"
+      disabled={busy}
+      className="w-full sm:w-auto"
       onClick={async () => {
+        setBusy(true);
         try {
           await api.respond(token!, id, "decline");
-          await queryClient.invalidateQueries({ queryKey: ["requests"] });
-          toast("Kamu tidak ikut membantu permintaan ini.");
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["requests"] }),
+            queryClient.invalidateQueries({ queryKey: keys.request(id) }),
+          ]);
+          toast("Kamu tidak ikut kali ini.", {
+            description: "Permintaannya tetap bisa kamu bantu dari halaman Permintaan sampai waktunya habis.",
+          });
         } catch (error) {
           toast.error(errorMessage(error));
+          setBusy(false);
         }
       }}
     >
-      Tidak kali ini
+      <Swap>{busy ? "Menyimpan" : "Tidak kali ini"}</Swap>
     </Button>
   );
 }
@@ -339,14 +350,22 @@ function MyRequests() {
         <ul className="flex flex-col overflow-hidden rounded-3xl border bg-card">
           {mine.map((r, i) => (
             <li key={r.id} className={cn(i > 0 && "border-t")}>
-              <Link href={`/permintaan/${r.id}`} className="flex flex-wrap items-center gap-4 p-5 hover:bg-muted/60">
-                <div className="flex min-w-60 flex-1 flex-col gap-1">
-                  <span className="font-bold">{r.title ?? `Permintaan nomor ${r.id}`}</span>
-                  <span className="tabular text-sm text-batu">
-                    {formatWhzd(r.collected)} dari {formatWhzd(r.amount)} WHZD terkumpul
+              <Link href={`/permintaan/${r.id}`} className="flex flex-col gap-3 p-5 transition-colors hover:bg-muted/60">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="min-w-0 font-bold">{r.title ?? `Permintaan nomor ${r.id}`}</span>
+                  <div className="flex items-center gap-2">
+                    {isLive(r) && <CountdownPill deadline={r.deadline} className="py-1 text-[13px]" />}
+                    <StatusBadge request={r} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full origin-left rounded-full bg-kunyit" style={{ scale: `${percentCollected(r) / 100} 1` }} />
+                  </div>
+                  <span className="tabular shrink-0 text-sm text-batu">
+                    <strong className="font-semibold text-arang">{formatWhzd(r.collected)}</strong> dari {formatWhzd(r.amount)} WHZD
                   </span>
                 </div>
-                <StatusBadge request={r} />
               </Link>
             </li>
           ))}

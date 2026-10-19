@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Check, Clock, FileText, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, Clock, FileText, Hand, HeartHandshake, Hourglass, TriangleAlert, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useConfig } from "wagmi";
 import { readContract, signTypedData, writeContract } from "wagmi/actions";
 import { bytesToHex, parseSignature } from "viem";
 
 import { Avatar, callName } from "@/components/avatar";
+import { CountdownPanel, useRemaining } from "@/components/countdown";
+import { FundingProgress } from "@/components/funding";
 import { ShareGrid, ShareLegend } from "@/components/share-grid";
 import { StatusBadge } from "@/components/status-badge";
 import { Swap } from "@/components/swap";
@@ -29,11 +32,11 @@ import { api, ApiError, type RequestDetail as Detail } from "@/lib/api";
 import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatDate, formatWhzd, shortAddress, timeLeft } from "@/lib/format";
+import { formatDate, formatWhzd, shortAddress } from "@/lib/format";
 import { keys, useMe, useMember, useRequest } from "@/lib/queries";
-import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { phaseLabel, useTx } from "@/lib/tx";
+import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
 
 export function RequestDetail({ id }: { id: number }) {
@@ -57,6 +60,8 @@ export function RequestDetail({ id }: { id: number }) {
   return <View detail={data} />;
 }
 
+const shortDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" });
+
 function View({ detail }: { detail: Detail }) {
   const { request: r, responses, you } = detail;
   const { data: requester } = useMember(r.requester);
@@ -64,62 +69,76 @@ function View({ detail }: { detail: Detail }) {
   const name = callName(requester?.profile, shortAddress(r.requester));
 
   return (
-    <div className="flex flex-wrap items-start gap-10">
-      <article className="flex min-w-0 flex-[999_1_560px] flex-col gap-8">
-        <div className="flex flex-col gap-3.5">
-          <Link href="/permintaan" className="self-start text-sm font-semibold text-batu hover:text-pandan">
-            Semua permintaan
-          </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusBadge request={r} />
-            <span className="text-[13px] text-batu">Permintaan nomor {r.id}</span>
-          </div>
-          <h1 className="max-w-160 text-[39px] leading-[1.1] font-extrabold text-pandan">
+    <div className="flex flex-col gap-7">
+      <header className="flex flex-col gap-3">
+        <Link
+          href="/permintaan"
+          className="pressable -ml-1.5 flex items-center gap-1 self-start rounded-full px-1.5 py-1 text-sm font-semibold text-batu hover:text-pandan"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Permintaan
+        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="max-w-[24ch] text-[32px] leading-[1.1] font-extrabold text-pandan sm:text-[39px]">
             {r.title ?? `Permintaan nomor ${r.id}`}
           </h1>
-          <div className="flex items-center gap-3">
-            <Avatar address={r.requester} profile={requester?.profile} className="size-12" />
-            <span className="leading-snug">
-              <span className="font-semibold">{name}</span>
-              {requester?.profile?.city && <span className="text-batu">, {requester.profile.city}</span>}
-              <br />
-              <span className="text-sm text-batu">Diajukan {formatDate(r.openedAt)}</span>
-            </span>
-          </div>
+          <StatusBadge request={r} />
         </div>
+        <div className="flex min-w-0 items-center gap-2.5 text-sm text-batu">
+          <Avatar address={r.requester} profile={requester?.profile} className="size-7 text-[11px]" />
+          <span className="min-w-0 truncate">
+            <span className="font-semibold text-arang">{name}</span>
+            {requester?.profile?.city && <> · {requester.profile.city}</>} ·{" "}
+            <time dateTime={r.openedAt} title={formatDate(r.openedAt)}>
+              {shortDate.format(new Date(r.openedAt))}
+            </time>
+          </span>
+        </div>
+      </header>
 
-        {r.description && <p className="max-w-160 leading-[1.7] whitespace-pre-line">{r.description}</p>}
-
-        <section aria-labelledby="grid" className="flex flex-col gap-5 rounded-3xl border bg-card p-7">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-            <h2 id="grid" className="text-xl font-bold">
-              {r.contributors} dari {r.snapshotSize} anggota sudah membantu
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <article className="flex min-w-0 flex-col gap-10">
+          <section aria-labelledby="grid" className="flex flex-col gap-6 rounded-2xl border bg-card p-6 sm:p-8">
+            <h2 id="grid" className="sr-only">
+              Dana terkumpul
             </h2>
-            <span className="tabular">
-              <strong className="font-bold">{formatWhzd(r.collected)}</strong> dari {formatWhzd(r.amount)} WHZD
-            </span>
-          </div>
-          <ShareGrid
-            size={r.snapshotSize}
-            contributed={responses.contributed}
-            declined={responses.declined}
-            you={you?.inSnapshot ? you.response : null}
-            justContributed={justContributed}
-          />
-          <ShareLegend />
-          <p className="text-[13px] leading-relaxed text-batu">
-            Anggota dihitung saat permintaan dibuat: {r.snapshotSize} orang yang sedang siap membantu, tidak termasuk{" "}
-            {name}. Setiap orang diminta bagian yang sama.
-          </p>
-        </section>
+            <FundingProgress request={r} size="lg" />
+            <div className="flex flex-col gap-4 border-t pt-6">
+              <ShareGrid
+                size={r.snapshotSize}
+                contributed={responses.contributed}
+                declined={responses.declined}
+                you={you?.inSnapshot ? you.response : null}
+                justContributed={justContributed}
+              />
+              <ShareLegend />
+              <p className="text-[13px] leading-relaxed text-batu">
+                Setiap kotak satu anggota, semuanya bernilai sama: {formatWhzd(r.share)} WHZD. Anggota dihitung saat
+                permintaan dibuat, yaitu {r.snapshotSize} orang yang sedang siap membantu, tidak termasuk {name}.
+              </p>
+            </div>
+          </section>
 
-        <Evidence detail={detail} requesterName={name} />
-        <History detail={detail} />
-      </article>
+          {r.description && (
+            <section aria-labelledby="story" className="flex flex-col gap-3">
+              <h2 id="story" className="text-xl font-bold">
+                Cerita {name}
+              </h2>
+              <p className="max-w-[68ch] text-[17px] leading-[1.75] whitespace-pre-line">{r.description}</p>
+            </section>
+          )}
 
-      <aside aria-label="Tindakan" className="flex min-w-0 flex-[1_1_320px] flex-col gap-5 rounded-3xl border bg-card p-7 lg:sticky lg:top-24">
-        <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
-      </aside>
+          <Evidence detail={detail} requesterName={name} />
+          <History detail={detail} />
+        </article>
+
+        <aside
+          aria-label="Tindakan"
+          className="flex min-w-0 flex-col gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(23_48_42/0.04),0_12px_32px_-12px_rgb(23_48_42/0.12)] lg:sticky lg:top-24"
+        >
+          <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
+        </aside>
+      </div>
     </div>
   );
 }
@@ -155,7 +174,7 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
       <h2 id="evidence" className="text-xl font-bold">
         Bukti
       </h2>
-      <div className="flex flex-wrap items-center gap-4 rounded-3xl border bg-card p-5">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-5">
         <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
           <FileText className="size-5.5" />
         </span>
@@ -223,19 +242,23 @@ function History({ detail }: { detail: Detail }) {
     });
   }
   return (
-    <section aria-labelledby="history" className="flex flex-col">
-      <h2 id="history" className="mb-2 text-xl font-bold">
+    <section aria-labelledby="history" className="flex flex-col gap-4">
+      <h2 id="history" className="text-xl font-bold">
         Riwayat
       </h2>
-      <ul>
-        {rows.map((row) => (
-          <li key={row.tx} className="flex flex-wrap justify-between gap-2 border-b py-3.5">
-            <span>{row.text}</span>
-            <TxLink hash={row.tx}>{formatDate(row.when)}</TxLink>
+      <ol className="flex flex-col">
+        {rows.map((row, i) => (
+          <li key={row.tx} className="relative flex gap-4 pb-6 last:pb-0">
+            {i < rows.length - 1 && <span aria-hidden="true" className="absolute top-4 bottom-0 left-[5px] w-0.5 bg-garis" />}
+            <span aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0 rounded-full", i === 0 ? "bg-pandan" : "border-2 border-garis bg-card")} />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span>{row.text}</span>
+              <TxLink hash={row.tx}>{formatDate(row.when)}</TxLink>
+            </div>
           </li>
         ))}
-      </ul>
-      <p className="mt-2 text-[13px] text-batu">
+      </ol>
+      <p className="text-[13px] text-batu">
         Setiap baris adalah transaksi publik di {chain.name}
         {appConfig.explorerUrl ? ". Ketuk waktunya untuk melihatnya di Etherscan." : "."}
       </p>
@@ -247,60 +270,73 @@ function History({ detail }: { detail: Detail }) {
 
 function Actions({ detail, requesterName, onContributed }: { detail: Detail; requesterName: string; onContributed: () => void }) {
   const { request: r, you } = detail;
-  const left = timeLeft(r.deadline, useNow());
-  const open = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize && left !== null;
+  const remaining = useRemaining(r.deadline);
+  const ended = remaining === 0;
+  const open = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize && !ended;
 
   if (r.status === "finalized") {
     return (
-      <Summary title="Dana sudah diteruskan">
+      <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah diteruskan">
         <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sampai ke {requesterName}
         {r.finalizedAt ? ` pada ${formatDate(r.finalizedAt)}` : ""}.
       </Summary>
     );
   }
   if (r.status === "expired") {
-    return <Summary title="Berakhir">Waktu pengumpulan habis tanpa iuran, jadi tidak ada dana yang diteruskan.</Summary>;
+    return <Summary icon={<Clock className="size-5" />} tone="muted" title="Berakhir">Waktu pengumpulan habis tanpa iuran, jadi tidak ada dana yang diteruskan.</Summary>;
   }
   if (r.status === "cancelled") return <Cancelled detail={detail} requesterName={requesterName} />;
-  if (r.awaitingFinalize || left === null) return <AwaitingFinalize detail={detail} requesterName={requesterName} />;
+  if (r.awaitingFinalize || ended) return <AwaitingFinalize detail={detail} requesterName={requesterName} />;
 
-  if (you?.isRequester) return <RequesterPanel detail={detail} left={left} />;
+  if (you?.isRequester) return <RequesterPanel detail={detail} />;
   if (!you?.inSnapshot) {
     return (
-      <Summary title="Kamu tidak termasuk di permintaan ini">
+      <Summary icon={<UserRound className="size-5" />} tone="muted" title="Kamu tidak termasuk di permintaan ini">
         Permintaan ini hanya ditujukan ke anggota yang sedang siap membantu saat permintaan dibuat.
       </Summary>
     );
   }
   if (you.response === "contributed") {
     return (
-      <Summary title="Iuranmu sudah tercatat">
-        Terima kasih. <strong className="tabular">{formatWhzd(r.share)} WHZD</strong> ikut diteruskan ke {requesterName} saat
-        waktu habis.
-      </Summary>
+      <>
+        <Summary icon={<HeartHandshake className="size-5" />} tone="daun" title="Iuranmu sudah tercatat">
+          Terima kasih. <strong className="tabular">{formatWhzd(r.share)} WHZD</strong> ikut diteruskan ke {requesterName}{" "}
+          saat waktu habis.
+        </Summary>
+        <CountdownPanel openedAt={r.openedAt} deadline={r.deadline} />
+      </>
     );
   }
-  return open ? <ContributePanel detail={detail} requesterName={requesterName} left={left} onContributed={onContributed} /> : null;
+  return open ? <ContributePanel detail={detail} requesterName={requesterName} onContributed={onContributed} /> : null;
 }
 
-function Summary({ title, children }: { title: string; children: React.ReactNode }) {
+const tones = {
+  pandan: "bg-pandan-soft text-pandan",
+  daun: "bg-daun-soft text-daun-ink",
+  muted: "bg-muted text-batu",
+  bata: "bg-bata-soft text-bata-ink",
+} as const;
+
+function Summary({
+  title,
+  icon,
+  tone = "pandan",
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  tone?: keyof typeof tones;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
+      {icon && (
+        <span aria-hidden="true" className={cn("flex size-11 items-center justify-center rounded-full", tones[tone])}>
+          {icon}
+        </span>
+      )}
       <h2 className="text-xl font-bold">{title}</h2>
       <p className="leading-relaxed text-batu">{children}</p>
-    </div>
-  );
-}
-
-function Deadline({ left, deadline }: { left: string; deadline: string }) {
-  return (
-    <div className="flex items-center gap-2.5 border-y py-3.5">
-      <Clock aria-hidden="true" className="size-5 shrink-0" />
-      <span className="leading-snug">
-        Ditutup dalam <strong className="tabular">{left}</strong>
-        <br />
-        <span className="text-[13px] text-batu">{formatDate(deadline)}</span>
-      </span>
     </div>
   );
 }
@@ -318,15 +354,15 @@ const permitTypes = {
 function ContributePanel({
   detail,
   requesterName,
-  left,
   onContributed,
 }: {
   detail: Detail;
   requesterName: string;
-  left: string;
   onContributed: () => void;
 }) {
   const config = useConfig();
+  const queryClient = useQueryClient();
+  const [declining, setDeclining] = useState(false);
   const { address, token: session } = useSession();
   const { data: me } = useMe();
   const tx = useTx();
@@ -368,37 +404,62 @@ function ContributePanel({
     if (receipt) onContributed();
   };
 
+  // The answer is recorded off-chain; refetching makes the page (and the grid) show it right away.
   const decline = async () => {
+    setDeclining(true);
     try {
       await api.respond(session!, r.id, "decline");
-      toast("Kamu tidak ikut membantu permintaan ini.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.request(r.id) }),
+        queryClient.invalidateQueries({ queryKey: ["requests"] }),
+      ]);
+      toast("Kamu tidak ikut kali ini.");
     } catch (error) {
       toast.error(errorMessage(error));
+    } finally {
+      setDeclining(false);
     }
   };
+  const declined = you?.response === "declined";
 
   return (
     <>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-batu">Bagianmu</span>
-        <span className="tabular text-[49px] leading-none font-bold tracking-tighter">
-          {formatWhzd(r.share)} <span className="text-xl font-semibold tracking-normal">WHZD</span>
-        </span>
-        <span className="text-[13px] leading-relaxed text-batu">
-          Sama untuk semua: {formatWhzd(r.amount)} WHZD dibagi {r.snapshotSize} anggota.
-        </span>
-      </div>
-      <Deadline left={left} deadline={r.deadline} />
-      {you?.response === "declined" && (
-        <p className="text-[13px] text-batu">Kamu memilih tidak ikut. Kamu masih bisa berubah pikiran sampai waktunya habis.</p>
+      {declined ? (
+        <div key="declined" className="settle-in flex flex-col gap-3">
+          <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-full bg-muted text-batu">
+            <Hand className="size-5" />
+          </span>
+          <h2 className="text-xl font-bold">Kamu tidak ikut kali ini</h2>
+          <p className="leading-relaxed text-batu">
+            Tidak apa-apa, membantu selalu pilihanmu. Kalau berubah pikiran, kamu masih bisa membantu{" "}
+            <strong className="tabular text-arang">{formatWhzd(r.share)} WHZD</strong> sampai waktunya habis.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-semibold text-batu">Bagianmu</span>
+          <span className="tabular text-[49px] leading-none font-extrabold tracking-tighter">
+            {formatWhzd(r.share)} <span className="text-xl font-semibold tracking-normal">WHZD</span>
+          </span>
+          <span className="text-[13px] leading-relaxed text-batu">
+            Sama untuk semua: {formatWhzd(r.amount)} WHZD dibagi {r.snapshotSize} anggota.
+          </span>
+        </div>
       )}
+      <CountdownPanel openedAt={r.openedAt} deadline={r.deadline} />
       <div className="flex flex-col gap-2.5">
-        <Button size="lg" className="tabular" disabled={tx.busy || !enough} onClick={() => void contribute()}>
+        <Button
+          size="lg"
+          variant={declined ? "outline" : "default"}
+          className="tabular"
+          disabled={tx.busy || declining || !enough}
+          onClick={() => void contribute()}
+        >
           <Swap>{tx.busy ? phaseLabel[tx.phase] : `Bantu ${formatWhzd(r.share)} WHZD`}</Swap>
         </Button>
-        {you?.response !== "declined" && (
-          <Button variant="outline" disabled={tx.busy} onClick={() => void decline()}>
-            Tidak kali ini
+        {!declined && (
+          <Button variant="ghost" disabled={tx.busy || declining} onClick={() => void decline()}>
+            <Swap>{declining ? "Menyimpan" : "Tidak kali ini"}</Swap>
           </Button>
         )}
       </div>
@@ -416,7 +477,7 @@ function ContributePanel({
   );
 }
 
-function RequesterPanel({ detail, left }: { detail: Detail; left: string }) {
+function RequesterPanel({ detail }: { detail: Detail }) {
   const config = useConfig();
   const { token: session } = useSession();
   const tx = useTx();
@@ -432,14 +493,11 @@ function RequesterPanel({ detail, left }: { detail: Detail; left: string }) {
 
   return (
     <>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-batu">Terkumpul untukmu</span>
-        <span className="tabular text-[49px] leading-none font-bold tracking-tighter">
-          {formatWhzd(r.collected)} <span className="text-xl font-semibold tracking-normal">WHZD</span>
-        </span>
-        <span className="text-[13px] text-batu">dari {formatWhzd(r.amount)} WHZD yang kamu minta</span>
-      </div>
-      <Deadline left={left} deadline={r.deadline} />
+      <Summary title="Permintaanmu sedang berjalan">
+        <strong className="tabular text-arang">{formatWhzd(r.collected)} WHZD</strong> sudah terkumpul untukmu dari{" "}
+        {r.contributors} anggota.
+      </Summary>
+      <CountdownPanel openedAt={r.openedAt} deadline={r.deadline} />
       <p className="text-[13px] leading-relaxed text-batu">
         Saat waktu habis, semua yang terkumpul diteruskan ke dompetmu secara otomatis, berapa pun jumlahnya.
       </p>
@@ -470,7 +528,7 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
   const r = detail.request;
   return (
     <>
-      <Summary title="Waktu sudah habis">
+      <Summary icon={<Hourglass className="size-5" />} title="Waktu sudah habis">
         <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sedang diteruskan ke {requesterName}. Biasanya
         selesai dalam beberapa menit.
       </Summary>

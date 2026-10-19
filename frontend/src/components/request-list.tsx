@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { ShareGrid } from "@/components/share-grid";
+import { Avatar, callName } from "@/components/avatar";
+import { CountdownPill } from "@/components/countdown";
+import { FundingProgress } from "@/components/funding";
 import { StatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatWhzd, timeLeft } from "@/lib/format";
-import { useRequests } from "@/lib/queries";
-import { useNow } from "@/lib/now";
+import type { Request } from "@/lib/api";
+import { formatWhzd, shortAddress } from "@/lib/format";
+import { useMember, useRequests } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 const scopes = [
@@ -21,7 +23,6 @@ const scopes = [
 export function RequestList() {
   const [scope, setScope] = useState<(typeof scopes)[number]["id"]>("all");
   const { data, isPending } = useRequests(scope);
-  const now = useNow();
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,33 +59,45 @@ export function RequestList() {
               : "Belum ada permintaan."}
         </p>
       ) : (
-        <ul className="overflow-hidden rounded-3xl border bg-card">
-          {data.map((r, i) => {
-            const left = timeLeft(r.deadline, now);
-            const live = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize && left;
-            return (
-              <li key={r.id} className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 p-6", i > 0 && "border-t")}>
-                <div className="flex min-w-70 flex-1 flex-col gap-2.5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <StatusBadge request={r} />
-                    <span className="text-[13px] text-batu">Nomor {r.id}</span>
-                  </div>
-                  <Link href={`/permintaan/${r.id}`} className="text-xl font-bold hover:underline">
-                    {r.title ?? `Permintaan nomor ${r.id}`}
-                  </Link>
-                  <ShareGrid variant="medium" size={r.snapshotSize} contributed={r.contributors} declined={0} you={r.yourResponse} />
-                </div>
-                <div className="flex flex-col items-start gap-1 sm:items-end">
-                  <span className="tabular font-semibold">
-                    {formatWhzd(r.collected)} dari {formatWhzd(r.amount)} WHZD
-                  </span>
-                  <span className="text-[13px] text-batu">{live ? `Ditutup dalam ${left}` : `Bagian ${formatWhzd(r.share)} WHZD`}</span>
-                </div>
-              </li>
-            );
-          })}
+        <ul className="grid gap-4 md:grid-cols-2">
+          {data.map((r) => (
+            <RequestCard key={r.id} request={r} />
+          ))}
         </ul>
       )}
     </div>
+  );
+}
+
+function RequestCard({ request: r }: { request: Request }) {
+  const { data: member } = useMember(r.requester);
+  const live = (r.status === "open" || r.status === "funding") && !r.awaitingFinalize;
+  return (
+    <li className="lift group relative flex flex-col gap-5 rounded-2xl border bg-card p-5 hover:border-pandan/40 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <StatusBadge request={r} />
+        {live && <CountdownPill deadline={r.deadline} />}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {/* The whole card is the link target; the stretched ::after covers it. */}
+        <Link
+          href={`/permintaan/${r.id}`}
+          className="text-xl leading-snug font-bold text-balance after:absolute after:inset-0 after:rounded-2xl group-hover:underline"
+        >
+          {r.title ?? `Permintaan nomor ${r.id}`}
+        </Link>
+        {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
+      </div>
+      <FundingProgress request={r} className="mt-auto" />
+      <div className="flex items-center justify-between gap-3 border-t pt-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar address={r.requester} profile={member?.profile} className="size-8 text-xs" />
+          <span className="truncate text-sm font-semibold">{callName(member?.profile, shortAddress(r.requester))}</span>
+        </div>
+        <span className="tabular shrink-0 text-sm text-batu">
+          Bagian <strong className="font-semibold text-arang">{formatWhzd(r.share)} WHZD</strong>
+        </span>
+      </div>
+    </li>
   );
 }

@@ -33,19 +33,6 @@ export function timeAgo(value: string | Date, now: number): string {
   return "baru saja";
 }
 
-/** Time left until `deadline`: "2 hari 4 jam", "35 menit", or null once it has passed. */
-export function timeLeft(deadline: string | Date, now: number): string | null {
-  const seconds = Math.floor((new Date(deadline).getTime() - now) / 1000);
-  if (seconds <= 0) return null;
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return hours > 0 ? `${days} hari ${hours} jam` : `${days} hari`;
-  if (hours > 0) return minutes > 0 ? `${hours} jam ${minutes} menit` : `${hours} jam`;
-  if (minutes > 0) return `${minutes} menit`;
-  return "kurang dari 1 menit";
-}
-
 /** Initials for an avatar ("Rina Puspita" → "RP"), or null when there is no name. */
 export function initials(name: string | null | undefined): string | null {
   if (!name?.trim()) return null;
