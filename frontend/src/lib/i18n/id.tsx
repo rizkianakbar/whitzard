@@ -236,9 +236,10 @@ export const id = {
   },
 
   landing: {
+    disclaimer: "Whitzard bukan perusahaan asuransi dan tidak menawarkan produk asuransi. WHZD adalah token uji tanpa nilai uang.",
     footer: "Prototipe untuk skripsi Ilmu Komputer, Universitas Bina Nusantara: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
     navLabel: "Halaman ini",
-    nav: { how: "Cara kerja", transparency: "Transparansi", faq: "Tanya jawab" },
+    nav: { how: "Cara kerja", compare: "Bedanya", join: "Cara bergabung", faq: "Tanya jawab" },
     hero: {
       title: "Biaya berobat terasa ringan kalau ditanggung bersama.",
       body: "Saat ada anggota yang sakit, setiap anggota lain menyumbang bagian yang sama. Iurannya disimpan di smart contract dan diteruskan otomatis saat waktunya habis. Tidak ada admin dan tidak ada voting.",
@@ -255,6 +256,61 @@ export const id = {
       perMember: "per anggota",
       replay: "Ulangi contoh",
       hint: "Contoh. Ketuk kotak kosong untuk ikut membantu.",
+    },
+    /** Short promises for the scrolling band under the hero. */
+    marquee: [
+      "Tanpa admin",
+      "Tanpa voting",
+      "Bagian sama rata",
+      "Dana di smart contract",
+      "Bisa dicek siapa saja",
+      "Uang kembali kalau batal",
+      "Bukan asuransi",
+      "Gratis selama uji coba",
+    ],
+    newWay: {
+      title: "Cara baru saling bantu biaya berobat",
+      intro:
+        "JKN sudah menjangkau sebagian besar warga, tapi biaya berobat belum sepenuhnya tertanggung. Whitzard menghidupkan kebiasaan lama, saling bantu antaranggota, dengan aturan yang dijalankan smart contract.",
+      figures: [
+        { value: "80%+", label: "penduduk Indonesia sudah terdaftar JKN" },
+        { value: "30%+", label: "belanja kesehatan masih dibayar dari kantong sendiri" },
+      ],
+      source: "Sumber: Fattah dkk. (2023); Maulana dkk. (2022).",
+      cards: [
+        {
+          title: "Bukan asuransi",
+          body: "Tidak ada premi bulanan dan tidak ada polis. Iuran baru dikumpulkan setelah ada anggota yang mengajukan bantuan.",
+        },
+        {
+          title: "Sukarela, bagiannya sama",
+          body: "Sebelum memutuskan, kamu melihat ceritanya, tagihannya, dan bagianmu, yang sama untuk semua. Boleh membantu, boleh tidak.",
+        },
+        {
+          title: "Tanpa admin, tanpa voting",
+          body: "Tidak ada yang menyetujui pencairan dan tidak ada potongan biaya pengelola. Saat waktunya habis, kontrak mengirim dananya.",
+        },
+        {
+          title: "Gantian, seperti arisan",
+          body: "Hak mengajukan didapat dengan membantu. Setelah permintaan pertamamu, bantu satu anggota lain dulu sebelum mengajukan lagi.",
+        },
+      ],
+    },
+    compare: {
+      title: "Apa bedanya?",
+      intro: "Saling bantu bukan hal baru. Yang baru: tidak ada orang di tengah yang memegang uangnya.",
+      aspect: "Aspek",
+      columns: ["Whitzard", "Patungan lewat bendahara", "Platform saling bantu terpusat"],
+      rows: [
+        { label: "Siapa memegang dana", values: ["Smart contract, bukan orang", "Bendahara atau pengelola", "Rekening yayasan atau platform"] },
+        { label: "Siapa memutuskan pencairan", values: ["Tidak ada: otomatis saat waktu habis", "Pengelola", "Tim verifikasi platform"] },
+        { label: "Cara iuran", values: ["Sukarela, kamu pilih di setiap permintaan", "Sesuai kesepakatan kelompok", "Umumnya dipotong otomatis dari saldo"] },
+        { label: "Biaya pengelola", values: ["Tidak ada, hanya biaya jaringan", "Tergantung kelompok", "Umumnya ada, berupa persentase"] },
+        { label: "Kalau dibatalkan", values: ["Iuran bisa diambil kembali", "Tergantung kesepakatan", "Tergantung kebijakan platform"] },
+        { label: "Siapa bisa memeriksa", values: ["Siapa saja, langsung di blockchain", "Bergantung catatan pengelola", "Laporan dari platform"] },
+      ],
+      scrollHint: "Geser untuk melihat semua kolom",
+      note: "Kolom pembanding menggambarkan cara kerja yang umum, bukan layanan tertentu.",
     },
     how: {
       title: "Cara kerja",
@@ -288,19 +344,32 @@ export const id = {
       check: "Periksa sendiri",
       onExplorer: (address: string) => `${address} di Etherscan`,
     },
-    trial: {
-      title: "Masih uji coba, jadi gratis dicoba.",
+    join: {
+      title: "Cara bergabung",
       body: (chain: string) =>
-        `Whitzard berjalan di ${chain}, jaringan uji Ethereum. Token WHZD yang dipakai untuk iuran tidak bernilai uang. Setelah bergabung, kamu bisa mengambil 100 WHZD gratis setiap hari dari menu isi saldo.`,
-      needs: (chain: string) => [
-        `Dompet yang mendukung ${chain}, misalnya MetaMask.`,
-        `Sedikit ETH ${chain} untuk biaya jaringan. Ini juga gratis dari faucet.`,
-        "Lima menit untuk bergabung: daftar, isi profil, ambil saldo, lalu nyalakan siap membantu.",
+        `Masih uji coba, jadi gratis dicoba. Whitzard berjalan di ${chain}, jaringan uji Ethereum, dan token WHZD yang dipakai untuk iuran tidak bernilai uang.`,
+      time: "Sekitar lima menit.",
+      steps: (chain: string): { title: string; body: string; link?: string }[] => [
+        {
+          title: "Pasang dompet",
+          body: `MetaMask atau dompet lain yang mendukung ${chain}. Gratis, dan menjadi akunmu di Whitzard.`,
+          link: "Pasang MetaMask",
+        },
+        { title: "Ambil ETH uji", body: `Sedikit ETH ${chain} untuk biaya jaringan, gratis dari faucet Google.`, link: "Buka faucet" },
+        { title: "Masuk dan daftar", body: "Masuk dengan dompetmu, daftar sebagai anggota, lalu isi profil singkat." },
+        {
+          title: "Isi saldo dan siap membantu",
+          body: "Ambil 100 WHZD gratis, lalu nyalakan siap membantu supaya ikut dihitung saat ada permintaan.",
+        },
       ],
     },
     faq: {
       title: "Tanya jawab",
       items: [
+        {
+          q: "Apakah Whitzard asuransi?",
+          a: "Bukan. Tidak ada premi, polis, atau janji pertanggungan. Iuran dikumpulkan setelah ada permintaan, dan setiap anggota bebas memilih membantu atau tidak. Karena mekanisme seperti ini bisa menyerupai asuransi bila memakai uang sungguhan, Whitzard saat ini hanya berjalan dengan token uji.",
+        },
         {
           q: "Apakah saya perlu membayar?",
           a: "Tidak. Selama uji coba, semua iuran memakai token WHZD yang tidak bernilai uang, dan biaya jaringan dibayar dengan ETH uji yang gratis.",
@@ -320,6 +389,14 @@ export const id = {
         {
           q: "Bagaimana kalau dananya tidak terkumpul penuh?",
           a: "Yang terkumpul tetap diteruskan. Kalau tidak ada iuran sama sekali, permintaan berakhir tanpa pencairan.",
+        },
+        {
+          q: "Siapa yang memeriksa kebenaran tagihan?",
+          a: "Tidak ada pemeriksa. Kamu sendiri yang menilai cerita dan tagihannya sebelum membantu. Sidik dokumen di blockchain menjamin tagihannya tidak diganti setelah permintaan dibuat, dan karena bagian setiap anggota sama, permintaan yang berlebihan langsung terlihat sebagai bagian yang besar.",
+        },
+        {
+          q: "Apa itu dompet kripto, dan apakah aman?",
+          a: "Dompet kripto, misalnya MetaMask, adalah aplikasi yang menyimpan kunci akunmu. Whitzard tidak pernah memegang kunci itu: setiap transaksi harus kamu setujui sendiri di dompet. Simpan frasa pemulihannya baik-baik, karena siapa pun yang memegangnya bisa memakai dompetmu.",
         },
       ],
     },

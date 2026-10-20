@@ -238,9 +238,10 @@ export const en: Dict = {
   },
 
   landing: {
+    disclaimer: "Whitzard is not an insurance company and offers no insurance products. WHZD is a test token with no monetary value.",
     footer: "A prototype for a Computer Science thesis at Bina Nusantara University: automated escrow for disbursing health aid between community members.",
     navLabel: "On this page",
-    nav: { how: "How it works", transparency: "Transparency", faq: "FAQ" },
+    nav: { how: "How it works", compare: "What's different", join: "How to join", faq: "FAQ" },
     hero: {
       title: "Medical bills feel lighter when we carry them together.",
       body: "When a member falls ill, every other member chips in the same share. The money is held in a smart contract and sent automatically when time is up. No admin, no voting.",
@@ -257,6 +258,61 @@ export const en: Dict = {
       perMember: "per member",
       replay: "Replay example",
       hint: "An example. Tap an empty box to chip in.",
+    },
+    /** Short promises for the scrolling band under the hero. */
+    marquee: [
+      "No admin",
+      "No voting",
+      "Equal shares",
+      "Funds in a smart contract",
+      "Anyone can check",
+      "Money back if cancelled",
+      "Not insurance",
+      "Free while in testing",
+    ],
+    newWay: {
+      title: "A new way to share medical costs",
+      intro:
+        "JKN now reaches most Indonesians, but medical bills still aren't fully covered. Whitzard brings back an old habit, members helping each other, with the rules enforced by a smart contract.",
+      figures: [
+        { value: "80%+", label: "of Indonesians are enrolled in JKN" },
+        { value: "30%+", label: "of health spending is still paid out of pocket" },
+      ],
+      source: "Sources: Fattah et al. (2023); Maulana et al. (2022).",
+      cards: [
+        {
+          title: "Not insurance",
+          body: "No monthly premium and no policy. Contributions are only collected after a member asks for help.",
+        },
+        {
+          title: "Voluntary, equal shares",
+          body: "Before deciding, you see the story, the bill and your share, which is the same for everyone. Help or don't, it's up to you.",
+        },
+        {
+          title: "No admin, no voting",
+          body: "Nobody approves payouts and there's no management fee. When time is up, the contract sends the funds.",
+        },
+        {
+          title: "Take turns, like an arisan",
+          body: "You earn the right to ask by helping. After your first request, help one other member before asking again.",
+        },
+      ],
+    },
+    compare: {
+      title: "What's different?",
+      intro: "Helping each other isn't new. What's new: nobody in the middle holds the money.",
+      aspect: "Aspect",
+      columns: ["Whitzard", "Collection run by a treasurer", "Centralized mutual-aid platform"],
+      rows: [
+        { label: "Who holds the funds", values: ["A smart contract, not a person", "The treasurer or organizer", "A foundation or platform bank account"] },
+        { label: "Who decides on payouts", values: ["Nobody: automatic when time is up", "The organizer", "The platform's review team"] },
+        { label: "How you contribute", values: ["Voluntarily, you choose on each request", "As the group agrees", "Usually deducted from your balance automatically"] },
+        { label: "Management fee", values: ["None, only the network fee", "Depends on the group", "Usually, as a percentage"] },
+        { label: "If cancelled", values: ["Contributions can be claimed back", "Depends on the agreement", "Depends on the platform's policy"] },
+        { label: "Who can check", values: ["Anyone, directly on the blockchain", "Depends on the organizer's records", "The platform's reports"] },
+      ],
+      scrollHint: "Swipe to see every column",
+      note: "The comparison columns describe how such arrangements usually work, not any specific service.",
     },
     how: {
       title: "How it works",
@@ -290,19 +346,32 @@ export const en: Dict = {
       check: "Check it yourself",
       onExplorer: (address: string) => `${address} on Etherscan`,
     },
-    trial: {
-      title: "Still in testing, so it's free to try.",
+    join: {
+      title: "How to join",
       body: (chain: string) =>
-        `Whitzard runs on ${chain}, an Ethereum test network. The WHZD tokens used for contributions have no monetary value. Once you join, you can claim 100 free WHZD every day from the top-up menu.`,
-      needs: (chain: string) => [
-        `A wallet that supports ${chain}, such as MetaMask.`,
-        `A little ${chain} ETH for network fees. That's free from a faucet too.`,
-        "Five minutes to join: register, fill in your profile, claim a balance, then turn on Ready to help.",
+        `Still in testing, so it's free to try. Whitzard runs on ${chain}, an Ethereum test network, and the WHZD tokens used for contributions have no monetary value.`,
+      time: "About five minutes.",
+      steps: (chain: string): { title: string; body: string; link?: string }[] => [
+        {
+          title: "Install a wallet",
+          body: `MetaMask or another wallet that supports ${chain}. It's free, and it becomes your Whitzard account.`,
+          link: "Install MetaMask",
+        },
+        { title: "Get test ETH", body: `A little ${chain} ETH for network fees, free from Google's faucet.`, link: "Open the faucet" },
+        { title: "Sign in and register", body: "Sign in with your wallet, register as a member, then fill in a short profile." },
+        {
+          title: "Top up and get ready to help",
+          body: "Claim 100 free WHZD, then turn on Ready to help so you're counted in when requests come in.",
+        },
       ],
     },
     faq: {
       title: "FAQ",
       items: [
+        {
+          q: "Is Whitzard insurance?",
+          a: "No. There's no premium, no policy and no promise of cover. Contributions are collected after a request, and every member is free to help or not. Because an arrangement like this could resemble insurance if it used real money, Whitzard currently runs on test tokens only.",
+        },
         {
           q: "Do I have to pay?",
           a: "No. During testing, all contributions use WHZD tokens with no monetary value, and network fees are paid with free test ETH.",
@@ -322,6 +391,14 @@ export const en: Dict = {
         {
           q: "What if the full amount isn't collected?",
           a: "Whatever was collected is still sent. If nobody contributed at all, the request ends with no payout.",
+        },
+        {
+          q: "Who checks that the bills are genuine?",
+          a: "Nobody does. You judge the story and the bill yourself before helping. The document's fingerprint on the blockchain guarantees the bill wasn't swapped after the request was opened, and because every member's share is the same, an inflated request shows up straight away as a large share.",
+        },
+        {
+          q: "What's a crypto wallet, and is it safe?",
+          a: "A crypto wallet, such as MetaMask, is an app that holds the keys to your account. Whitzard never holds those keys: you approve every transaction yourself in your wallet. Keep the recovery phrase safe, because anyone who has it can use your wallet.",
         },
       ],
     },

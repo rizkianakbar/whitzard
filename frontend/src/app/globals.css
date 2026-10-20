@@ -11,6 +11,7 @@
  * pandan  #1B5E4B  primary text accents and actions
  * kunyit  #F0A81C  filled shares and progress only, never text; also the focus ring
  * embun   #F3F6F2  page background (panels are white)
+ * santan  #FBF6EA  warm cream band on the landing page
  * arang   #17302A  body text
  * batu    #5B6A65  secondary text
  * garis   #DAE3DD  lines and borders
@@ -57,6 +58,7 @@
   --color-batu: #5b6a65;
   --color-garis: #dae3dd;
   --color-embun: #f3f6f2;
+  --color-santan: #fbf6ea;
   --color-daun: #2e7d57;
   --color-daun-soft: #e3f1ea;
   --color-daun-ink: #1f5a3e;
@@ -120,12 +122,12 @@
     background-color: color-mix(in oklch, var(--color-kunyit) 45%, white);
     color: var(--color-arang);
   }
-  /* Scrollbars: thin rounded sage thumbs on a clear track, darkening to batu on hover. Firefox and
+  /* Scrollbars: thin rounded kunyit (yellow) thumbs on a clear track, deepening on hover. Firefox and
      Chrome read the standard properties; Safari the ::-webkit-scrollbar ones. Touch screens keep
      their own overlay scrollbars. A component can still hide its own ([scrollbar-width:none]). */
   * {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--color-garis), var(--color-batu) 35%) transparent;
+    scrollbar-color: var(--color-kunyit) transparent;
   }
   ::-webkit-scrollbar {
     width: 12px;
@@ -138,10 +140,10 @@
     border: 3px solid transparent;
     border-radius: 9999px;
     background-clip: content-box;
-    background-color: color-mix(in oklch, var(--color-garis), var(--color-batu) 35%);
+    background-color: var(--color-kunyit);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-batu);
+    background-color: color-mix(in oklch, var(--color-kunyit), var(--color-kunyit-ink) 30%);
   }
   /* Pressables give their own feedback (scale on press), so no grey tap flash, no double-tap-zoom
      delay, and a long press doesn't select the label. Body text stays selectable. */
@@ -269,6 +271,114 @@
 }
 [data-reveal="hidden"] .cell-send {
   background-color: var(--color-kunyit);
+}
+
+/* In the components layer, so Tailwind utilities (sticky, absolute, mt-*) still override these. */
+@layer components {
+  /*
+   * Landing textures (after arc.net): a film of print grain over each section's colour, and scalloped
+   * edges where the colour changes. The grain is an SVG noise tile: dark specks on light surfaces,
+   * light specks (.grain-light) on the green ones. It sits under the content (isolation + z-index -1)
+   * and follows rounded corners.
+   */
+  :root {
+    --noise-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --noise-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-color: #0f3d31;
+  }
+  .grain {
+    --noise: var(--noise-dark);
+    --noise-opacity: 0.16;
+    position: relative;
+    isolation: isolate;
+  }
+  .grain-light {
+    --noise: var(--noise-light);
+    --noise-opacity: 0.2;
+  }
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: var(--noise);
+    opacity: var(--noise-opacity);
+  }
+  /*
+   * Wavy edges are cut into the element itself with a mask (a small smooth ripple: 24px period,
+   * 10px tall), so an edge is always exactly its colour and grain. A green wavy line runs along the
+   * edges between sections, since some neighbours (hero and cream) are too close in colour to tell
+   * apart. The line masks keep the edge 1px past the line, so all of it stays visible.
+   */
+  .wave-top {
+    margin-top: -10px;
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10'%3E%3Cpath d='M0 7C4.3 7 7.7 0 12 0S19.7 7 24 7V10H0Z'/%3E%3C/svg%3E")
+        repeat-x left top / 24px 10px,
+      linear-gradient(#000 0 0) no-repeat left 9px / 100% calc(100% - 9px);
+  }
+  .wave-top::after,
+  .wave-line {
+    background-color: var(--color-pandan);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10'%3E%3Cpath d='M0 8C4.3 8 7.7 1 12 1S19.7 8 24 8' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E")
+      repeat-x left center / 24px 10px;
+  }
+  .wave-top::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 10px;
+    pointer-events: none;
+  }
+  /* The landing header: its frosted background ends on the wave, and .wave-line follows it. The
+     10px of bottom padding is the wave's room. */
+  .wave-bottom {
+    padding-bottom: 10px;
+    mask:
+      linear-gradient(#000 0 0) no-repeat left top / 100% calc(100% - 9px),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10'%3E%3Cpath d='M0 9C4.3 9 7.7 2 12 2S19.7 9 24 9V0H0Z'/%3E%3C/svg%3E")
+        repeat-x left bottom / 24px 10px;
+  }
+  /* A box with a ripple on all four sides: the sides on a wrapper (.wave-box-x) and the top and
+     bottom on the box inside it (.wave-box-y). Nested masks intersect, so each corner is cut by both
+     waves instead of keeping a square nub. */
+  .wave-box-x {
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='24'%3E%3Cpath d='M8 0C8 4.3 1 7.7 1 12S8 19.7 8 24H10V0Z'/%3E%3C/svg%3E")
+        repeat-y left top / 10px 24px,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='24'%3E%3Cpath d='M2 0C2 4.3 9 7.7 9 12S2 19.7 2 24H0V0Z'/%3E%3C/svg%3E")
+        repeat-y right top / 10px 24px,
+      linear-gradient(#000 0 0) no-repeat 9px 0 / calc(100% - 18px) 100%;
+  }
+  .wave-box-y {
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10'%3E%3Cpath d='M0 8C4.3 8 7.7 1 12 1S19.7 8 24 8V10H0Z'/%3E%3C/svg%3E")
+        repeat-x left top / 24px 10px,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10'%3E%3Cpath d='M0 2C4.3 2 7.7 9 12 9S19.7 2 24 2V0H0Z'/%3E%3C/svg%3E")
+        repeat-x left bottom / 24px 10px,
+      linear-gradient(#000 0 0) no-repeat 0 9px / 100% calc(100% - 18px);
+  }
+}
+
+/* The promise band under the landing hero: its content is the list twice over, so sliding it by
+   half loops seamlessly. Hovering pauses it so it can be read. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  animation: marquee 45s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
 }
 
 /* Hero demo: a share being chipped in pops, slightly past full size and back (playful, rare). */
