@@ -113,7 +113,7 @@ function Wallet({ me }: { me: Member }) {
     });
 
   return (
-    <section aria-label={t.dashboard.wallet.label} className="flex flex-col gap-6 rounded-3xl bg-pandan-deep p-6 text-white sm:p-7">
+    <section aria-label={t.dashboard.wallet.label} className="flex flex-col gap-6 rounded-3xl bg-pandan-deep grain grain-light p-6 text-white sm:p-7">
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
