@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Wallet } from "lucide-react";
+import { ExternalLink, Wallet } from "lucide-react";
 import { useConnect, useConnectors, useDisconnect } from "wagmi";
 import { toast } from "sonner";
 import type { Address } from "viem";
@@ -26,8 +26,13 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
   const [open, setOpen] = useState(false);
   const [signing, setSigning] = useState(false);
 
+  // wagmi always lists the generic injected connector; offer it only when a wallet actually injected
+  // window.ethereum, or a member without a wallet gets a bare "Provider not found" on click. The
+  // dialog content renders only on the client, so reading window here is safe.
   const announced = connectors.filter((c) => c.type === "injected" && c.id !== "injected");
-  const browser = announced.length ? announced : connectors.filter((c) => c.id === "injected");
+  const browser = announced.length
+    ? announced
+    : connectors.filter((c) => c.id === "injected" && typeof window !== "undefined" && "ethereum" in window);
   const mocks = connectors.filter((c) => c.type === "mock");
 
   const sign = async (account?: Address) => {
@@ -95,11 +100,7 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
             </li>
           ))}
         </ul>
-        {browser.length === 0 && (
-          <p className="text-sm text-batu">
-            Belum ada dompet di browser ini. Pasang MetaMask atau dompet lain yang mendukung Sepolia, lalu muat ulang halaman.
-          </p>
-        )}
+        {browser.length === 0 && <NoWallet />}
         {mocks.length > 0 && (
           <div className="flex flex-col gap-2 border-t pt-4">
             <p className="text-[13px] text-batu">Pengembangan lokal: akun uji dari node Hardhat.</p>
@@ -114,5 +115,47 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** For newcomers to web3: what a wallet is and how to get one, on a computer or a phone. */
+function NoWallet() {
+  // MetaMask's mobile app opens this link in its built-in browser, where the wallet is available.
+  const inApp = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl bg-muted p-4 text-sm leading-relaxed">
+      <div className="flex flex-col gap-1">
+        <p className="font-bold">Belum ada dompet di browser ini</p>
+        <p className="text-batu">
+          Dompet kripto adalah aplikasi gratis yang menyimpan akunmu di Whitzard. Tidak perlu email atau kata sandi: kamu
+          masuk dengan menyetujui pesan di dompet. Pasang sekali, sekitar 2 menit.
+        </p>
+      </div>
+      <ol className="flex flex-col gap-3">
+        <li>
+          <span className="font-semibold">Di komputer:</span> pasang ekstensi MetaMask, buat dompet baru, lalu muat ulang
+          halaman ini.
+          <Button
+            variant="outline"
+            className="mt-2 w-full gap-2"
+            render={<a href="https://metamask.io/download/" target="_blank" rel="noreferrer" />}
+            nativeButton={false}
+          >
+            Pasang MetaMask
+            <ExternalLink aria-hidden="true" />
+          </Button>
+        </li>
+        <li>
+          <span className="font-semibold">Di HP:</span> pasang aplikasi MetaMask, lalu{" "}
+          <a href={inApp} className="font-semibold text-pandan underline underline-offset-4">
+            buka Whitzard di dalam aplikasinya
+          </a>
+          .
+        </li>
+      </ol>
+      <p className="text-[13px] text-batu">
+        Simpan baik-baik frasa pemulihan yang diberikan MetaMask. Whitzard tidak bisa memulihkan dompetmu.
+      </p>
+    </div>
   );
 }

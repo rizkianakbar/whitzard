@@ -1,4 +1,5 @@
 import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError } from "viem";
+import { ProviderNotFoundError } from "wagmi";
 
 import { ApiError } from "@/lib/api";
 
@@ -32,6 +33,7 @@ const contractErrors: Record<string, string> = {
 /** A short, actionable message for any error from the wallet, the chain or the API. */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
+  if (error instanceof ProviderNotFoundError) return "Dompet tidak ditemukan di browser ini. Pasang MetaMask, lalu muat ulang halaman.";
   if (error instanceof BaseError) {
     if (error.walk((e) => e instanceof UserRejectedRequestError)) return "Kamu membatalkan di dompet.";
     const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
