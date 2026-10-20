@@ -103,7 +103,11 @@ function Wallet({ me }: { me: Member }) {
         ? { title: text.promptOn, detail: t.wallet.call("Registry", "setReady", text.detailOn) }
         : { title: text.promptOff, detail: t.wallet.call("Registry", "setReady", text.detailOff) },
       send: () => writeContract(config, { ...registry, functionName: "setReady", args: [value] }),
-      synced: async () => (await api.member(me.address)).chain.ready === value,
+      // The chain flips first; the member list reads the indexed copy, so wait for both.
+      synced: async () => {
+        const m = await api.member(me.address);
+        return m.chain.ready === value && m.profile?.ready === value;
+      },
       success: value ? text.successOn : text.successOff,
       invalidate: [keys.member(me.address), keys.proof, keys.members],
     });

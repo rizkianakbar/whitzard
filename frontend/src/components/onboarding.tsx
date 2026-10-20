@@ -325,7 +325,10 @@ function ReadyStep({ me, onLater }: { me: Member; onLater: () => void }) {
                 detail: t.wallet.call("Registry", "setReady", t.dashboard.ready.detailOn),
               },
               send: () => writeContract(config, { ...registry, functionName: "setReady", args: [true] }),
-              synced: async () => (await api.member(me.address)).chain.ready,
+              synced: async () => {
+                const m = await api.member(me.address);
+                return m.chain.ready && !!m.profile?.ready;
+              },
               success: t.dashboard.ready.successOn,
               invalidate: [keys.member(me.address), keys.proof],
             })
