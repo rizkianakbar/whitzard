@@ -114,6 +114,35 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* Selected text: a turmeric wash with charcoal text. Strong enough to show on the soft
+     turmeric panels, and the forced text colour keeps it readable on the dark pandan cards. */
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-kunyit) 45%, white);
+    color: var(--color-arang);
+  }
+  /* Scrollbars: thin rounded sage thumbs on a clear track, darkening to batu on hover. Firefox and
+     Chrome read the standard properties; Safari the ::-webkit-scrollbar ones. Touch screens keep
+     their own overlay scrollbars. A component can still hide its own ([scrollbar-width:none]). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--color-garis), var(--color-batu) 35%) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+    background-color: color-mix(in oklch, var(--color-garis), var(--color-batu) 35%);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-batu);
+  }
   /* Pressables give their own feedback (scale on press), so no grey tap flash, no double-tap-zoom
      delay, and a long press doesn't select the label. Body text stays selectable. */
   button,
