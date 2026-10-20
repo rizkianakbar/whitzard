@@ -126,10 +126,19 @@ export type Refunds = { total: string; refunds: { requestId: string; amount: str
 
 export type Notification = {
   id: number;
-  type: "request_opened" | "contribution_received" | "request_cancelled" | "request_finalized" | "request_expired";
+  type:
+    | "request_opened"
+    | "contribution_received"
+    | "request_cancelled"
+    | "request_finalized"
+    | "request_forwarded"
+    | "request_expired";
+  /** Indonesian text from the backend; shown only when the client can't write its own (older rows). */
   title: string;
   description: string;
   requestId: number | null;
+  /** Wei: the share asked for, the contribution received, or the total paid out. Null if none, or written before amounts were kept. */
+  amount: string | null;
   isRead: boolean;
   createdAt: string;
 };
@@ -150,7 +159,8 @@ async function call<T>(path: string, init: RequestInit & { token?: string | null
   const res = await fetch(appConfig.apiUrl + path, { ...init, headers });
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, body.error ?? `Permintaan gagal (${res.status})`);
+  // Without a message from the backend, errorMessage() says it in the member's language.
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "");
   return body as T;
 }
 
@@ -178,7 +188,7 @@ export const api = {
     const res = await fetch(`${appConfig.apiUrl}/members/${address}/photo?v=${hash}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new ApiError(res.status, "Foto tidak bisa dimuat");
+    if (!res.ok) throw new ApiError(res.status, "");
     return res.blob();
   },
   stats: () => call<Stats>("/stats"),
@@ -212,7 +222,7 @@ export const api = {
     const res = await fetch(`${appConfig.apiUrl}/requests/${id}/evidence`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, body.error ?? "Dokumen tidak bisa dibuka");
+      throw new ApiError(res.status, body.error ?? "");
     }
     return { blob: await res.blob(), hash: res.headers.get("X-Evidence-Sha256") };
   },

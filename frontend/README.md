@@ -1,7 +1,7 @@
 # Whitzard — Frontend
 
 Demo UI for [Whitzard](../README.md): members sign in with their wallet, ask for help, chip in their
-share and follow every step on-chain. Indonesian-language, mobile-first.
+share and follow every step on-chain. Indonesian (default) and English, mobile-first.
 
 **It never holds keys or moves funds.** Every state-changing action is a transaction (or signature)
 the member approves in their own wallet, sent straight to the contracts. The [backend](../backend/)
@@ -67,17 +67,25 @@ pnpm build
   evidence documents are hashed in the browser and compared with the hash stored on-chain.
 - **Privacy:** who declined or didn't answer is only counted, never named.
 - **Live updates:** a WebSocket to the backend pushes notifications, which refresh the affected data.
+- **Languages:** every page exists under `app/[lang]` (`id`, `en`), but URLs stay unprefixed:
+  `src/proxy.ts` rewrites each request to the tree named by the `lang` cookie (default `id`). The
+  switch (landing header, account menu) sets the cookie and reloads. All text lives in
+  `src/lib/i18n/id.tsx`; `en.tsx` must match its shape, so TypeScript flags a missing translation.
+  Components read it with `useI18n()` (`t` for text, `fmt` for amounts and dates in that language).
+  Notifications are written from their type and amount, so they follow the language too.
 
 ## Layout
 
 ```
-src/app/(public)/      landing page
-src/app/(app)/         signed-in pages (wrapped in MemberGate)
-src/components/        pages and their parts; ui/ is shadcn (Base UI) primitives
-src/lib/api.ts         backend client and response types
-src/lib/queries.ts     TanStack Query hooks and keys
-src/lib/abi/           GENERATED contract ABIs (scripts/gen-abi.mjs)
-src/lib/contracts.ts   contract addresses + ABIs for wagmi
+src/app/[lang]/(public)/  landing page
+src/app/[lang]/(app)/     signed-in pages (wrapped in MemberGate)
+src/proxy.ts              picks the language tree from the `lang` cookie
+src/lib/i18n/             dictionaries (id is the source, en matches it) and useI18n()
+src/components/           pages and their parts; ui/ is shadcn (Base UI) primitives
+src/lib/api.ts            backend client and response types
+src/lib/queries.ts        TanStack Query hooks and keys
+src/lib/abi/              GENERATED contract ABIs (scripts/gen-abi.mjs)
+src/lib/contracts.ts      contract addresses + ABIs for wagmi
 ```
 
 After a contract change: `(cd ../blockchain && pnpm hardhat build) && node scripts/gen-abi.mjs`.

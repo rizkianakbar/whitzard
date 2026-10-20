@@ -6,6 +6,7 @@ import { Avatar, callName } from "@/components/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MemberProfile } from "@/lib/api";
 import { shortAddress } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { useMembers } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ const PREVIEW = 8;
 
 /** The community: who is in it, and who is counted in new requests right now. */
 export function MemberDirectory() {
+  const { t } = useI18n();
   const { data, isPending } = useMembers();
   const [all, setAll] = useState(false);
   const members = data ?? [];
@@ -24,11 +26,9 @@ export function MemberDirectory() {
     <section aria-labelledby="members" className="flex flex-col gap-4">
       <div className="flex flex-col gap-0.5">
         <h2 id="members" className="text-[25px] leading-tight font-extrabold">
-          Anggota
+          {t.members.title}
         </h2>
-        <p className="text-sm text-batu">
-          {isPending ? "Memuat…" : `${members.length} anggota, ${ready} sedang siap membantu.`}
-        </p>
+        <p className="text-sm text-batu">{isPending ? t.common.loading : t.members.summary(members.length, ready)}</p>
       </div>
       {isPending ? (
         <Skeleton className="h-40 w-full rounded-2xl" />
@@ -45,7 +45,7 @@ export function MemberDirectory() {
               onClick={() => setAll((v) => !v)}
               className="pressable self-start rounded-full px-1 font-semibold text-pandan underline underline-offset-4"
             >
-              {all ? "Tampilkan lebih sedikit" : `Tampilkan semua (${members.length})`}
+              {all ? t.common.showLess : t.common.showAll(members.length)}
             </button>
           )}
         </>
@@ -55,6 +55,7 @@ export function MemberDirectory() {
 }
 
 function MemberTile({ member: m }: { member: MemberProfile }) {
+  const { t } = useI18n();
   const { address } = useSession();
   const you = address?.toLowerCase() === m.address.toLowerCase();
   return (
@@ -69,11 +70,11 @@ function MemberTile({ member: m }: { member: MemberProfile }) {
       <div className="flex min-w-0 flex-col leading-snug">
         <span className="truncate font-semibold">
           {callName(m, shortAddress(m.address))}
-          {you && <span className="font-normal text-batu"> (kamu)</span>}
+          {you && <span className="font-normal text-batu">{t.members.you}</span>}
         </span>
         {m.city && <span className="truncate text-[13px] text-batu">{m.city}</span>}
         <span className="truncate text-[13px] text-batu">
-          {m.ready ? "Siap membantu" : "Sedang tidak siap"}
+          {m.ready ? t.members.ready : t.members.notReady}
           {/* {m.contributions > 0 && ` · ${m.contributions}× membantu`} */}
         </span>
       </div>

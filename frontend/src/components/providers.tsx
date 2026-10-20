@@ -5,34 +5,39 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { toast } from "sonner";
 import { WagmiProvider } from "wagmi";
 
+import { notificationText } from "@/components/notification-list";
 import { Toaster } from "@/components/ui/sonner";
 import type { Notification } from "@/lib/api";
 import { appConfig } from "@/lib/config";
+import { type Locale, LocaleProvider, useI18n } from "@/lib/i18n";
 import { keys } from "@/lib/queries";
 import { SessionProvider, useSession } from "@/lib/session";
 import { wagmiConfig } from "@/lib/wagmi";
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ locale, children }: { locale: Locale; children: ReactNode }) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { staleTime: 10_000, retry: 1 } } }),
   );
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <LiveNotifications />
-          {children}
-          {/* Below the sticky header, so toasts never cover the navigation. */}
-          <Toaster theme="light" position="top-center" offset={84} mobileOffset={{ top: 80 }} />
-        </SessionProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <LocaleProvider locale={locale}>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider>
+            <LiveNotifications />
+            {children}
+            {/* Below the sticky header, so toasts never cover the navigation. */}
+            <Toaster theme="light" position="top-center" offset={84} mobileOffset={{ top: 80 }} />
+          </SessionProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </LocaleProvider>
   );
 }
 
 /** Keeps a WebSocket open while signed in: each new notification refreshes data and shows a toast. */
 function LiveNotifications() {
   const { token, address } = useSession();
+  const i18n = useI18n();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -54,7 +59,8 @@ function LiveNotifications() {
         void queryClient.invalidateQueries({ queryKey: keys.refunds });
         if (n.requestId) void queryClient.invalidateQueries({ queryKey: keys.request(n.requestId) });
         if (address) void queryClient.invalidateQueries({ queryKey: keys.member(address) });
-        toast(n.title, { description: n.description });
+        const { title, description } = notificationText(n, i18n);
+        toast(title, { description });
       };
       socket.onclose = () => {
         if (closed) return;
@@ -68,7 +74,7 @@ function LiveNotifications() {
       clearTimeout(retry);
       socket?.close();
     };
-  }, [token, address, queryClient]);
+  }, [token, address, queryClient, i18n]);
 
   return null;
 }

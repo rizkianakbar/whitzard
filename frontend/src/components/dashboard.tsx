@@ -23,22 +23,23 @@ import { Switch } from "@/components/ui/switch";
 import { api, type Member, type Request } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatWhzd, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
+import { type Dict, useI18n } from "@/lib/i18n";
 import { keys, useEligibility, useMe, useMember, useMemberStats, useRefunds, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { phaseLabel, useTx } from "@/lib/tx";
-import { callDetail } from "@/lib/wallet-prompt";
+import { useTx } from "@/lib/tx";
 import { cn } from "@/lib/utils";
 
-function greeting(): string {
+function greeting(t: Dict): string {
   const hour = new Date().getHours();
-  if (hour < 11) return "Selamat pagi";
-  if (hour < 15) return "Selamat siang";
-  if (hour < 19) return "Selamat sore";
-  return "Selamat malam";
+  if (hour < 11) return t.dashboard.greeting.morning;
+  if (hour < 15) return t.dashboard.greeting.noon;
+  if (hour < 19) return t.dashboard.greeting.afternoon;
+  return t.dashboard.greeting.evening;
 }
 
 export function Dashboard() {
+  const { t } = useI18n();
   const { data: me } = useMe();
   if (!me) return null;
   const name = me.profile?.nickname ?? me.profile?.displayName?.split(" ")[0];
@@ -47,11 +48,11 @@ export function Dashboard() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-[39px] leading-tight font-extrabold text-pandan">
-          {greeting()}
+          {greeting(t)}
           {name ? `, ${name}` : ""}
         </h1>
         <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
-          Ajukan bantuan
+          {t.common.askForHelp}
         </Link>
       </div>
       <SetupBanner me={me} />
@@ -68,6 +69,7 @@ export function Dashboard() {
 
 /** Shown until the profile and first top-up are done (Ready is a choice, so it doesn't count). */
 function SetupBanner({ me }: { me: Member }) {
+  const { t } = useI18n();
   const hasTokens = BigInt(me.chain.faucetClaimed) > 0n || BigInt(me.chain.balance) > 0n;
   if (me.profile?.displayName && hasTokens) return null;
   return (
@@ -76,10 +78,8 @@ function SetupBanner({ me }: { me: Member }) {
       className="flex flex-wrap items-center gap-4 rounded-3xl border-2 border-dashed border-pandan/30 bg-card p-5 hover:border-pandan/60"
     >
       <div className="flex min-w-60 flex-1 flex-col gap-1">
-        <span className="font-bold">Selesaikan pendaftaranmu</span>
-        <span className="text-batu">
-          {!me.profile?.displayName ? "Isi profil" : "Isi saldo"} supaya kamu bisa mulai membantu dan mengajukan bantuan.
-        </span>
+        <span className="font-bold">{t.dashboard.setup.title}</span>
+        <span className="text-batu">{t.dashboard.setup.body(!me.profile?.displayName)}</span>
       </div>
       <ArrowRight aria-hidden="true" className="size-5 text-pandan" />
     </Link>
@@ -91,6 +91,8 @@ function SetupBanner({ me }: { me: Member }) {
 /** Balance, what has moved through it, and whether new requests count you in: one card. */
 function Wallet({ me }: { me: Member }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.dashboard.ready;
   const ready = useTx();
   const { data: st } = useMemberStats();
   const empty = BigInt(me.chain.balance) === 0n;
@@ -98,39 +100,39 @@ function Wallet({ me }: { me: Member }) {
   const toggleReady = (value: boolean) =>
     ready.run({
       prompt: value
-        ? { title: "Nyalakan siap membantu", detail: callDetail("Registry", "setReady", "Kamu ikut dihitung di permintaan baru. Tidak ada dana yang berpindah.") }
-        : { title: "Matikan siap membantu", detail: callDetail("Registry", "setReady", "Kamu tidak dihitung di permintaan baru. Tidak ada dana yang berpindah.") },
+        ? { title: text.promptOn, detail: t.wallet.call("Registry", "setReady", text.detailOn) }
+        : { title: text.promptOff, detail: t.wallet.call("Registry", "setReady", text.detailOff) },
       send: () => writeContract(config, { ...registry, functionName: "setReady", args: [value] }),
       synced: async () => (await api.member(me.address)).chain.ready === value,
-      success: value ? "Kamu siap membantu." : "Kamu tidak dihitung di permintaan baru.",
+      success: value ? text.successOn : text.successOff,
       invalidate: [keys.member(me.address), keys.proof, keys.members],
     });
 
   return (
-    <section aria-label="Saldo" className="flex flex-col gap-6 rounded-3xl bg-pandan-deep p-6 text-white sm:p-7">
+    <section aria-label={t.dashboard.wallet.label} className="flex flex-col gap-6 rounded-3xl bg-pandan-deep p-6 text-white sm:p-7">
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <span className="text-sm text-white/70">Saldo</span>
+            <span className="text-sm text-white/70">{t.dashboard.wallet.label}</span>
             <span className="tabular text-[49px] leading-none font-extrabold tracking-tight">
-              {formatWhzd(me.chain.balance)} <span className="text-xl font-bold tracking-normal">WHZD</span>
+              {fmt.whzd(me.chain.balance)} <span className="text-xl font-bold tracking-normal">WHZD</span>
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <TopUpDialog me={me} trigger={<Button className="bg-white text-pandan-deep hover:bg-pandan-soft">Isi saldo</Button>} />
-            <span className="text-sm text-white/70">Token uji, tidak bernilai uang</span>
+            <TopUpDialog me={me} trigger={<Button className="bg-white text-pandan-deep hover:bg-pandan-soft">{t.common.topUp}</Button>} />
+            <span className="text-sm text-white/70">{t.dashboard.wallet.testToken}</span>
           </div>
         </div>
         <dl className="grid min-w-64 grid-cols-2 gap-x-8 gap-y-1 sm:gap-x-12">
-          <Figure label="Kamu berikan" value={st?.given} note={st && `${st.helped} kali membantu`} />
+          <Figure label={t.dashboard.wallet.given} value={st?.given} note={st && t.dashboard.wallet.givenNote(st.helped)} />
           <Figure
-            label="Kamu terima"
+            label={t.dashboard.wallet.received}
             value={st?.received}
-            note={st && (st.requests ? `${st.funded} permintaan tersalurkan` : "Belum pernah mengajukan")}
+            note={st && (st.requests ? t.dashboard.wallet.receivedNote(st.funded) : t.dashboard.wallet.neverAsked)}
           />
           {/* {st && BigInt(st.refunded) > 0n && (
             <p className="col-span-2 pt-2 text-[13px] text-white/60">
-              <span className="tabular">{formatWhzd(st.refunded)} WHZD</span> kembali dari permintaan yang dibatalkan
+              {t.dashboard.wallet.refunded(<span className="tabular">{fmt.whzd(st.refunded)} WHZD</span>)}
             </p>
           )} */}
         </dl>
@@ -149,16 +151,10 @@ function Wallet({ me }: { me: Member }) {
           />
           <div className="flex min-w-0 flex-col">
             <span id="ready-label" className="font-semibold">
-              Siap membantu
+              {text.label}
             </span>
             <span id="ready-help" className="text-[13px] leading-snug text-white/70">
-              {ready.busy
-                ? phaseLabel[ready.phase]
-                : me.chain.ready
-                  ? "Kamu ikut dihitung saat ada permintaan baru."
-                  : empty
-                    ? "Isi saldo dulu sebelum menyalakan."
-                    : "Kamu tidak dihitung di permintaan baru."}
+              {ready.busy ? t.tx.phase[ready.phase] : me.chain.ready ? text.on : empty ? text.empty : text.off}
             </span>
           </div>
         </div>
@@ -170,12 +166,13 @@ function Wallet({ me }: { me: Member }) {
 
 /** A total on the balance card; a placeholder until (or if) the totals load. */
 function Figure({ label, value, note }: { label: string; value?: string; note?: string | false }) {
+  const { fmt } = useI18n();
   return (
     <div className="flex flex-col gap-1">
       <dt className="text-sm text-white/70">{label}</dt>
       <dd className="flex flex-col gap-0.5">
         <span className="tabular text-2xl font-bold">
-          {value === undefined ? "–" : formatWhzd(value)} <span className="text-sm font-semibold text-white/70">WHZD</span>
+          {value === undefined ? "–" : fmt.whzd(value)} <span className="text-sm font-semibold text-white/70">WHZD</span>
         </span>
         <span className="min-h-lh text-[13px] text-white/60">{note}</span>
       </dd>
@@ -185,32 +182,16 @@ function Figure({ label, value, note }: { label: string; value?: string; note?: 
 
 /** Whether you can open a request right now, and what to do if not. */
 function CanRequest() {
+  const { t } = useI18n();
+  const copy = t.dashboard.canRequest;
   const eligibility = useEligibility();
   const { icon, title, text, href, cta } = !eligibility
-    ? { icon: null, title: "Mengajukan bantuan", text: "Memeriksa…", href: null, cta: null }
+    ? { icon: null, title: copy.title, text: copy.checking, href: null, cta: null }
     : eligibility.can
-      ? {
-        icon: <Check className="size-4.5" strokeWidth={2.5} />,
-        title: "Kamu bisa mengajukan bantuan",
-        text: "Saat butuh biaya berobat, ajukan kapan saja.",
-        href: "/ajukan",
-        cta: "Ajukan",
-      }
+      ? { icon: <Check className="size-4.5" strokeWidth={2.5} />, ...copy.can, href: "/ajukan" }
       : eligibility.reason === "running"
-        ? {
-          icon: <Hourglass className="size-4.5" />,
-          title: "Permintaanmu masih berjalan",
-          text: "Bisa mengajukan lagi setelah waktunya habis.",
-          href: `/permintaan/${eligibility.requestId}`,
-          cta: "Lihat",
-        }
-        : {
-          icon: <HandHeart className="size-4.5" />,
-          title: "Belum bisa mengajukan",
-          text: "Bantu satu permintaan anggota lain dulu.",
-          href: "/permintaan",
-          cta: "Cari",
-        };
+        ? { icon: <Hourglass className="size-4.5" />, ...copy.running, href: `/permintaan/${eligibility.requestId}` }
+        : { icon: <HandHeart className="size-4.5" />, ...copy.helpFirst, href: "/permintaan" };
   return (
     <div className="flex items-center gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
       <span
@@ -238,6 +219,7 @@ function CanRequest() {
 
 function RefundNotice() {
   const config = useConfig();
+  const { t, fmt } = useI18n();
   const { data } = useRefunds();
   const tx = useTx();
   if (!data || data.refunds.length === 0) return null;
@@ -247,28 +229,29 @@ function RefundNotice() {
         <div key={refund.requestId} className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-3xl bg-kunyit-soft px-6 py-5 text-kunyit-ink">
           <RotateCcw aria-hidden="true" className="size-5" />
           <p className="min-w-72 flex-1">
-            <Link href={`/permintaan/${refund.requestId}`} className="font-semibold underline underline-offset-4">
-              Permintaan #{refund.requestId}
-            </Link>{" "}
-            dibatalkan. Iuranmu <strong className="tabular">{formatWhzd(refund.amount)} WHZD</strong> bisa kamu ambil
-            kembali.
+            {t.dashboard.refund.body(
+              <Link href={`/permintaan/${refund.requestId}`} className="font-semibold underline underline-offset-4">
+                {t.common.request(Number(refund.requestId))}
+              </Link>,
+              <strong className="tabular">{fmt.whzd(refund.amount)} WHZD</strong>,
+            )}
           </p>
           <Button
             disabled={tx.busy}
             onClick={() =>
               void tx.run({
                 prompt: {
-                  title: `Ambil kembali ${formatWhzd(refund.amount)} WHZD`,
-                  detail: callDetail("Escrow", "claimRefund", "Iuranmu dari permintaan yang dibatalkan kembali ke dompetmu."),
+                  title: t.common.claimBack(fmt.whzd(refund.amount)),
+                  detail: t.wallet.call("Escrow", "claimRefund", t.common.refundDetail),
                 },
                 send: () =>
                   writeContract(config, { ...escrow, functionName: "claimRefund", args: [BigInt(refund.requestId)] }),
-                success: `${formatWhzd(refund.amount)} WHZD sudah kembali ke saldomu.`,
+                success: t.dashboard.refund.success(fmt.whzd(refund.amount)),
                 invalidate: [keys.refunds, ["member"]],
               })
             }
           >
-            <TxLabel tx={tx}>{`Ambil kembali ${formatWhzd(refund.amount)} WHZD`}</TxLabel>
+            <TxLabel tx={tx}>{t.common.claimBack(fmt.whzd(refund.amount))}</TxLabel>
           </Button>
         </div>
       ))}
@@ -309,6 +292,8 @@ const answerOrder = { pending: 0, participating: 0, declined: 1, contributed: 2 
 const order = (r: Request) => (r.awaitingFinalize ? 3 : answerOrder[r.yourResponse!]);
 
 function Waiting() {
+  const { t } = useI18n();
+  const text = t.dashboard.waiting;
   const { data, isPending } = useRequests("for-me");
   const live = (data ?? [])
     .filter((r) => (isLive(r) || r.awaitingFinalize) && r.yourResponse)
@@ -321,22 +306,22 @@ function Waiting() {
         action={
           live.length > 0 && (
             <span className="text-sm font-semibold text-batu">
-              {waiting ? `${waiting} menunggu jawabanmu` : "Semua sudah kamu jawab"}
+              {waiting ? text.count(waiting) : text.allAnswered}
             </span>
           )
         }
-        description="Permintaan anggota lain yang meminta bagianmu."
+        description={text.description}
       >
-        Membantu anggota lain
+        {text.title}
       </SectionTitle>
       {isPending ? (
         <Skeleton className="h-40 w-full rounded-3xl" />
       ) : live.length === 0 ? (
-        <EmptyState icon={<Users className="size-6" />} title="Belum ada yang meminta bantuanmu">
-          Saat ada anggota yang butuh dan siap membantu menyala, permintaannya muncul di sini.
+        <EmptyState icon={<Users className="size-6" />} title={text.emptyTitle}>
+          {text.emptyBody}
         </EmptyState>
       ) : (
-        <Carousel label="Permintaan anggota lain">
+        <Carousel label={text.carousel}>
           {live.map((r) => (
             <RequestCard key={r.id} request={r} className="w-full shrink-0 snap-start" />
           ))}
@@ -347,13 +332,14 @@ function Waiting() {
 }
 
 function Requester({ request: r, mine }: { request: Request; mine?: boolean }) {
+  const { t } = useI18n();
   const { data: member } = useMember(r.requester);
   const profile = member?.profile;
   return (
     <div className="flex items-center gap-3">
       <Avatar address={r.requester} profile={profile} className="size-11 text-sm" />
       <div className="flex flex-col leading-snug">
-        <span className="font-semibold">{mine ? "Kamu" : callName(profile, shortAddress(r.requester))}</span>
+        <span className="font-semibold">{mine ? t.common.you : callName(profile, shortAddress(r.requester))}</span>
         {profile?.city && <span className="text-sm text-batu">{profile.city}</span>}
       </div>
     </div>
@@ -365,6 +351,7 @@ function Requester({ request: r, mine }: { request: Request; mine?: boolean }) {
  * (`mine`), so both read alike; only the footer differs: your answer, or where your money goes.
  */
 function RequestCard({ request: r, mine, className }: { request: Request; mine?: boolean; className?: string }) {
+  const { t, fmt } = useI18n();
   const { token: session } = useSession();
   const { data: requester } = useMember(r.requester);
   const answer = r.yourResponse;
@@ -380,7 +367,7 @@ function RequestCard({ request: r, mine, className }: { request: Request; mine?:
       </div>
       <div className="flex flex-col gap-1.5">
         <Link href={`/permintaan/${r.id}`} className="text-xl leading-snug font-bold text-balance hover:underline">
-          {r.title ?? `Permintaan #${r.id}`}
+          {r.title ?? t.common.request(r.id)}
         </Link>
         {r.description && <p className="line-clamp-1 leading-relaxed text-batu">{r.description}</p>}
       </div>
@@ -389,17 +376,17 @@ function RequestCard({ request: r, mine, className }: { request: Request; mine?:
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5.5">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-batu">
             <Send aria-hidden="true" className="size-4 shrink-0" />
-            {sending ? "Dana sedang dikirim ke dompetmu." : "Dikirim otomatis ke dompetmu saat waktu habis."}
+            {sending ? t.dashboard.card.sendingToYou : t.dashboard.card.autoToYou}
           </span>
           <Link href={`/permintaan/${r.id}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
-            Lihat riwayat
+            {t.common.seeHistory}
             <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </div>
       ) : open ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Link href={`/permintaan/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
-            Bantu {formatWhzd(r.share)} WHZD
+            {t.common.help(fmt.whzd(r.share))}
           </Link>
           <DeclineButton id={r.id} token={session} />
         </div>
@@ -410,14 +397,14 @@ function RequestCard({ request: r, mine, className }: { request: Request; mine?:
             {sending ? (
               <span className="flex items-center gap-1.5 text-sm text-batu">
                 <Send aria-hidden="true" className="size-4 shrink-0" />
-                Dana sedang dikirim ke {callName(requester?.profile, shortAddress(r.requester))}
+                {t.dashboard.card.sendingTo(callName(requester?.profile, shortAddress(r.requester)))}
               </span>
             ) : (
-              answer === "declined" && <span className="text-sm text-batu">Masih bisa membantu sampai waktunya habis.</span>
+              answer === "declined" && <span className="text-sm text-batu">{t.dashboard.card.canStillHelp}</span>
             )}
           </div>
           {/* <Link href={`/permintaan/${r.id}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
-            {answer === "declined" && !sending ? `Bantu ${formatWhzd(r.share)} WHZD` : "Lihat riwayat"}
+            {answer === "declined" && !sending ? t.common.help(fmt.whzd(r.share)) : t.common.seeHistory}
             <ArrowRight aria-hidden="true" className="size-4" />
           </Link> */}
         </div>
@@ -427,6 +414,7 @@ function RequestCard({ request: r, mine, className }: { request: Request; mine?:
 }
 
 function DeclineButton({ id, token }: { id: number; token: string | null }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   return (
@@ -443,21 +431,21 @@ function DeclineButton({ id, token }: { id: number; token: string | null }) {
             queryClient.invalidateQueries({ queryKey: keys.request(id) }),
             queryClient.invalidateQueries({ queryKey: ["member"] }),
           ]);
-          toast("Kamu tidak ikut kali ini.", {
-            description: "Permintaannya tetap di sini, dan masih bisa kamu bantu sampai waktunya habis.",
-          });
+          toast(t.common.declinedToast, { description: t.dashboard.declined.description });
         } catch (error) {
-          toast.error(errorMessage(error));
+          toast.error(errorMessage(error, t));
           setBusy(false);
         }
       }}
     >
-      <BusyLabel busy={busy ? "Menyimpan" : null}>Tidak kali ini</BusyLabel>
+      <BusyLabel busy={busy ? t.common.saving : null}>{t.common.notThisTime}</BusyLabel>
     </Button>
   );
 }
 
 function MyRequests() {
+  const { t } = useI18n();
+  const text = t.dashboard.mine;
   const { data, isPending } = useRequests("mine");
   // Waiting to be sent still counts as running for the requester: the money hasn't arrived yet.
   // Finished ones live on the Permintaan page; the dashboard only shows what is still under way.
@@ -467,30 +455,30 @@ function MyRequests() {
     <section aria-labelledby="mine" className="flex flex-col gap-4">
       <SectionTitle
         id="mine"
-        description="Bantuan yang kamu ajukan untuk dirimu."
+        description={text.description}
         action={
           finished > 0 && (
             <Link href="/permintaan" className="text-sm font-semibold text-pandan underline underline-offset-4">
-              Riwayat pengajuan
+              {text.history}
             </Link>
           )
         }
       >
-        Bantuan untukmu
+        {text.title}
       </SectionTitle>
       {isPending ? (
         <Skeleton className="h-48 w-full rounded-2xl" />
       ) : live.length === 0 ? (
         <EmptyState
           icon={<HandHeart className="size-6" />}
-          title={finished > 0 ? "Tidak ada pengajuan yang berjalan" : "Belum pernah mengajukan"}
+          title={finished > 0 ? text.noneRunning : text.never}
           action={
             <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
-              Ajukan bantuan
+              {t.common.askForHelp}
             </Link>
           }
         >
-          Saat butuh biaya berobat, ajukan di sini. Anggota yang siap membantu langsung diberi tahu.
+          {text.emptyBody}
         </EmptyState>
       ) : (
         <ul className="flex flex-col gap-4">

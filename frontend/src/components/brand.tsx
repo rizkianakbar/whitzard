@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** The mark echoes the share grid: four equal shares, one being filled. */
@@ -19,9 +22,10 @@ export function Logo({ href = "/", inverted = false }: { href?: string; inverted
 
 /** Always visible while Whitzard runs on a test network. */
 export function TestnetPill({ className }: { className?: string }) {
+  const { t } = useI18n();
   return (
     <span className={cn("inline-flex items-center rounded-full bg-kunyit-soft px-2.5 py-1 text-xs font-bold text-kunyit-ink", className)}>
-      Uji coba
+      {t.common.testnet}
     </span>
   );
 }

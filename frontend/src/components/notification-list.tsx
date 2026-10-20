@@ -8,22 +8,42 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type Notification } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { timeAgo } from "@/lib/format";
+import { type I18n, useI18n } from "@/lib/i18n";
 import { keys, useNotifications } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
+/**
+ * A notification's title and text in the member's language, built from its type, request and amount.
+ * Falls back to the backend's Indonesian text when those aren't enough (rows from before amounts
+ * were kept, or a type this client doesn't know yet).
+ */
+export function notificationText(n: Notification, { t, fmt }: I18n): { title: string; description: string } {
+  const types = t.notifications.types;
+  const id = n.requestId;
+  if (id === null) return n;
+  switch (n.type) {
+    case "request_cancelled":
+    case "request_expired":
+      return { title: types[n.type].title, description: types[n.type].body(id) };
+    default:
+      if (n.amount === null || !(n.type in types)) return n;
+      return { title: types[n.type].title, description: types[n.type].body(id, fmt.whzd(n.amount)) };
+  }
+}
+
 /** Marks notifications read and refreshes every list of them (the bell's and this page's). */
 export function useMarkRead() {
   const { token } = useSession();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   return async (items: Notification[]) => {
     try {
       await Promise.all(items.map((n) => api.markRead(token!, n.id)));
       await queryClient.invalidateQueries({ queryKey: keys.notifications });
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     }
   };
 }
@@ -45,10 +65,12 @@ export function NotificationItem({
   onOpen?: () => void;
 }) {
   const markRead = useMarkRead();
+  const i18n = useI18n();
+  const { title, description } = notificationText(n, i18n);
   return (
     <div className={cn("flex", compact ? "gap-3 px-4 py-3" : "gap-4 p-5", !n.isRead && compact && "bg-kunyit-soft/40")}>
       <span
-        aria-label={n.isRead ? undefined : "Belum dibaca"}
+        aria-label={n.isRead ? undefined : i18n.t.notifications.unread}
         className={cn("mt-2 size-2 shrink-0 rounded-full", n.isRead ? "bg-transparent" : "bg-kunyit")}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -61,19 +83,20 @@ export function NotificationItem({
             }}
             className={cn("font-semibold hover:underline", compact && "text-[15px] leading-snug")}
           >
-            {n.title}
+            {title}
           </Link>
         ) : (
-          <span className={cn("font-semibold", compact && "text-[15px] leading-snug")}>{n.title}</span>
+          <span className={cn("font-semibold", compact && "text-[15px] leading-snug")}>{title}</span>
         )}
-        <span className={cn("text-batu", compact ? "line-clamp-2 text-sm leading-snug" : "leading-relaxed")}>{n.description}</span>
-        <span className={cn("text-batu", compact ? "text-xs" : "text-[13px]")}>{timeAgo(n.createdAt, now)}</span>
+        <span className={cn("text-batu", compact ? "line-clamp-2 text-sm leading-snug" : "leading-relaxed")}>{description}</span>
+        <span className={cn("text-batu", compact ? "text-xs" : "text-[13px]")}>{i18n.fmt.timeAgo(n.createdAt, now)}</span>
       </div>
     </div>
   );
 }
 
 export function NotificationList() {
+  const { t } = useI18n();
   const markRead = useMarkRead();
   const { data, isPending } = useNotifications(100);
   const now = useNow();
@@ -82,10 +105,10 @@ export function NotificationList() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Notifikasi</h1>
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{t.notifications.title}</h1>
         {unread.length > 0 && (
           <Button variant="outline" onClick={() => void markRead(unread)}>
-            Tandai semua sudah dibaca
+            {t.notifications.markAllRead}
           </Button>
         )}
       </div>
@@ -93,8 +116,7 @@ export function NotificationList() {
         <Skeleton className="h-64 w-full rounded-3xl" />
       ) : !data?.length ? (
         <p className="rounded-3xl border border-dashed bg-card p-8 leading-relaxed text-batu">
-          Belum ada notifikasi. Kamu akan diberi tahu saat ada anggota yang butuh bantuan, saat iuran masuk, dan saat dana
-          diteruskan.
+          {t.notifications.empty}
         </p>
       ) : (
         <ul className="overflow-hidden rounded-3xl border bg-card">

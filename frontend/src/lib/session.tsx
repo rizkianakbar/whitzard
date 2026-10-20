@@ -6,6 +6,7 @@ import { disconnect, signMessage } from "wagmi/actions";
 import type { Address, Hex } from "viem";
 
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { dismissWalletPrompt, showWalletPrompt } from "@/lib/wallet-prompt";
 
 type Stored = { token: string; expiresAt: string };
@@ -54,6 +55,7 @@ function write(address: string, value: Stored | null) {
 /** Sign-In with Ethereum against the backend, one session per connected wallet. */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
+  const { t } = useI18n();
   const { address } = useConnection();
   // After a page load wagmi reconnects the stored wallet, from its provider's effect (which runs
   // after this one, so the subscription sees it). Until that finishes, "no address" doesn't mean
@@ -96,12 +98,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (account: Address | undefined = address) => {
-      if (!account) throw new Error("Hubungkan dompet dulu.");
+      if (!account) throw new Error(t.errors.connectFirst);
       const { nonce, message } = await api.nonce(account);
-      showWalletPrompt("wallet-sign-in", {
-        title: "Masuk ke Whitzard",
-        detail: "Dompet meminta tanda tangan pesan masuk. Gratis: bukan transaksi, tidak ada dana yang berpindah.",
-      });
+      showWalletPrompt("wallet-sign-in", t.wallet.signIn);
       let signature: Hex;
       try {
         signature = await signMessage(config, { account, message });
@@ -111,7 +110,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const session = await api.verify(account, nonce, signature);
       write(account, { token: session.token, expiresAt: session.expiresAt });
     },
-    [address, config],
+    [address, config, t],
   );
 
   const signOut = useCallback(async () => {

@@ -6,9 +6,11 @@ import { Check, ChevronDown, RotateCcw } from "lucide-react";
 import { formatEther } from "viem";
 
 import { Logo, TestnetPill } from "@/components/brand";
+import { LanguageSwitch } from "@/components/language-switch";
 import { SignInButton } from "@/components/sign-in-button";
 import { Swap } from "@/components/swap";
 import { appConfig } from "@/lib/config";
+import { useI18n } from "@/lib/i18n";
 import { useStats } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { useReveal } from "@/lib/use-reveal";
@@ -23,6 +25,7 @@ const order = (i: number) => ({ "--i": i }) as CSSProperties;
 
 /** The public page: what Whitzard is, how it works, live totals. Signed-in members go straight to the app. */
 export function Landing() {
+  const { t } = useI18n();
   const router = useRouter();
   const { status } = useSession();
   useEffect(() => {
@@ -43,10 +46,7 @@ export function Landing() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-290 flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-batu sm:px-6">
           <Logo />
-          <p className="max-w-xl">
-            Prototipe untuk skripsi Ilmu Komputer, Universitas Bina Nusantara: escrow otomatis untuk penyaluran bantuan
-            kesehatan antaranggota.
-          </p>
+          <p className="max-w-xl">{t.landing.footer}</p>
         </div>
       </footer>
     </div>
@@ -58,6 +58,7 @@ export function Landing() {
  * and a scrolled reload doesn't flash); the border appears once the page scrolls.
  */
 function Header() {
+  const { t } = useI18n();
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -76,14 +77,15 @@ function Header() {
       <div className="mx-auto flex h-19 w-full max-w-290 items-center gap-8 px-4 sm:px-6">
         <div className="flex items-center gap-2.5">
           <Logo />
-          <TestnetPill />
+          <TestnetPill className="hidden sm:inline-flex" />
         </div>
-        <nav aria-label="Halaman ini" className="hidden flex-1 gap-7 font-semibold text-batu md:flex">
-          <a href="#cara-kerja" className="transition-colors hover:text-arang">Cara kerja</a>
-          <a href="#transparan" className="transition-colors hover:text-arang">Transparansi</a>
-          <a href="#tanya-jawab" className="transition-colors hover:text-arang">Tanya jawab</a>
+        <nav aria-label={t.landing.navLabel} className="hidden flex-1 gap-7 font-semibold text-batu md:flex">
+          <a href="#cara-kerja" className="transition-colors hover:text-arang">{t.landing.nav.how}</a>
+          <a href="#transparan" className="transition-colors hover:text-arang">{t.landing.nav.transparency}</a>
+          <a href="#tanya-jawab" className="transition-colors hover:text-arang">{t.landing.nav.faq}</a>
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <LanguageSwitch />
           <SignInButton />
         </div>
       </div>
@@ -94,23 +96,21 @@ function Header() {
 // ---------------------------------------------------------------- hero
 
 function Hero() {
+  const { t } = useI18n();
   return (
     <section className="mx-auto grid max-w-290 items-center gap-12 px-4 pt-10 pb-20 sm:px-6 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:pb-28">
       <div className="flex flex-col gap-7">
         <h1 className="max-w-[13ch] text-[44px] leading-[1.02] font-extrabold tracking-[-0.035em] text-pandan sm:text-[61px]">
-          Biaya berobat terasa ringan kalau ditanggung bersama.
+          {t.landing.hero.title}
         </h1>
-        <p className="max-w-[52ch] text-lg leading-relaxed text-batu">
-          Saat ada anggota yang sakit, setiap anggota lain menyumbang bagian yang sama. Iurannya disimpan di smart
-          contract dan diteruskan otomatis saat waktunya habis. Tidak ada admin dan tidak ada voting.
-        </p>
+        <p className="max-w-[52ch] text-lg leading-relaxed text-batu">{t.landing.hero.body}</p>
         <div className="flex flex-wrap items-center gap-4">
-          <SignInButton size="lg" label="Masuk dengan dompet" />
+          <SignInButton size="lg" label={t.signIn.withWallet} />
           <a
             href="#cara-kerja"
             className="nudge-down pressable inline-flex h-13 items-center gap-1.5 rounded-full px-5 font-semibold text-pandan hover:bg-pandan-soft"
           >
-            Lihat cara kerjanya
+            {t.landing.hero.seeHow}
             <ChevronDown aria-hidden="true" className="size-4" />
           </a>
         </div>
@@ -129,6 +129,8 @@ const DEMO_SHARE = 20;
  * out together (every share turns green in a wave). Static on load, so a reload never blinks.
  */
 function HeroDemo() {
+  const { t } = useI18n();
+  const demo = t.landing.demo;
   const [filled, setFilled] = useState(() => new Set(range(DEMO_START)));
   const [chipped, setChipped] = useState<Set<number>>(() => new Set());
   const [sent, setSent] = useState(false);
@@ -160,18 +162,18 @@ function HeroDemo() {
             S
           </span>
           <div className="flex flex-1 flex-col">
-            <span className="font-bold">Sari, Bandung</span>
-            <span className="text-sm text-batu">Rawat inap demam berdarah</span>
+            <span className="font-bold">{demo.name}</span>
+            <span className="text-sm text-batu">{demo.need}</span>
           </div>
           {sent && (
             <span className="pop-in flex items-center gap-1 rounded-full bg-daun-soft px-2.5 py-1 text-sm font-semibold text-daun-ink">
               <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-              Diteruskan
+              {demo.forwarded}
             </span>
           )}
         </div>
 
-        <div role="group" aria-label="Contoh kotak iuran: satu kotak satu anggota" className="grid grid-cols-6 gap-2.5">
+        <div role="group" aria-label={demo.gridAria} className="grid grid-cols-6 gap-2.5">
           {range(DEMO_CELLS).map((i) => {
             const style = delay(sent ? i * 45 : 0);
             const look = cn(
@@ -185,7 +187,7 @@ function HeroDemo() {
               <button
                 key={i}
                 type="button"
-                aria-label={`Ikut membantu ${DEMO_SHARE} WHZD`}
+                aria-label={demo.chip(DEMO_SHARE)}
                 onClick={() => chip(i)}
                 className={cn(look, "cursor-pointer hover:border-kunyit active:scale-90", i === firstEmpty && chipped.size === 0 && "invite")}
                 style={style}
@@ -200,13 +202,13 @@ function HeroDemo() {
               <Swap>{`${collected} WHZD`}</Swap>
             </span>
             <span className="text-sm text-batu">
-              <Swap>{sent ? "diteruskan ke Sari, tanpa persetujuan siapa pun" : `terkumpul dari ${DEMO_CELLS * DEMO_SHARE} WHZD`}</Swap>
+              <Swap>{sent ? demo.sent : demo.collectedOf(DEMO_CELLS * DEMO_SHARE)}</Swap>
             </span>
           </div>
           {!sent && (
             <div className="flex flex-col items-end text-right">
               <span className="tabular text-lg font-bold">{DEMO_SHARE} WHZD</span>
-              <span className="text-sm text-batu">per anggota</span>
+              <span className="text-sm text-batu">{demo.perMember}</span>
             </div>
           )}
         </div>
@@ -219,10 +221,10 @@ function HeroDemo() {
             className="pop-in pressable flex items-center gap-1.5 rounded-full px-3 py-2 font-semibold text-pandan hover:bg-pandan-soft"
           >
             <RotateCcw aria-hidden="true" className="size-4" />
-            Ulangi contoh
+            {demo.replay}
           </button>
         ) : (
-          "Contoh. Ketuk kotak kosong untuk ikut membantu."
+          demo.hint
         )}
       </figcaption>
     </figure>
@@ -259,46 +261,32 @@ function MiniGrid({ total = 8, filled = total, play, start }: { total?: number; 
   );
 }
 
-const steps: { title: string; body: string; grid: (start: number) => React.ReactNode }[] = [
-  {
-    title: "Ajukan",
-    body: "Anggota yang butuh biaya berobat menulis ceritanya, jumlah yang dibutuhkan, dan melampirkan tagihan.",
-    grid: (start) => <MiniGrid total={1} play="appear" start={start} />,
-  },
-  {
-    title: "Dibagi rata",
-    body: "Jumlahnya dibagi rata ke semua anggota yang sedang siap membantu. Setiap orang diminta bagian yang sama.",
-    grid: (start) => <MiniGrid play="appear" start={start} />,
-  },
-  {
-    title: "Disimpan di escrow",
-    body: "Iuran masuk ke smart contract, bukan ke rekening siapa pun. Tidak ada yang bisa memindahkannya ke tempat lain.",
-    grid: (start) => <MiniGrid filled={5} play="fill" start={start} />,
-  },
-  {
-    title: "Diteruskan otomatis",
-    body: "Saat waktunya habis, semua yang terkumpul dikirim ke peminta. Kalau dibatalkan, iuran kembali ke pemberinya.",
-    grid: (start) => <MiniGrid play="send" start={start} />,
-  },
+// One grid per step of t.landing.how.steps, in the same order.
+const stepGrids: ((start: number) => React.ReactNode)[] = [
+  (start) => <MiniGrid total={1} play="appear" start={start} />,
+  (start) => <MiniGrid play="appear" start={start} />,
+  (start) => <MiniGrid filled={5} play="fill" start={start} />,
+  (start) => <MiniGrid play="send" start={start} />,
 ];
 
 function HowItWorks() {
+  const { t } = useI18n();
   const intro = useReveal<HTMLDivElement>();
   const list = useReveal<HTMLOListElement>();
   return (
     <section id="cara-kerja" className="scroll-mt-20 border-y bg-card">
       <div className="mx-auto flex max-w-290 flex-col gap-12 px-4 py-20 sm:px-6">
         <div ref={intro} className="flex max-w-2xl flex-col gap-3">
-          <h2 className="rise text-[39px] leading-tight font-extrabold text-pandan">Cara kerja</h2>
+          <h2 className="rise text-[39px] leading-tight font-extrabold text-pandan">{t.landing.how.title}</h2>
           <p className="rise text-lg leading-relaxed text-batu" style={order(1)}>
-            Empat langkah, dan setelah permintaan dibuat tidak ada orang yang perlu menyetujui apa pun.
+            {t.landing.how.intro}
           </p>
         </div>
         {/* Each step's grid starts after the previous one, so the four read as one story. */}
         <ol ref={list} className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-          {steps.map((step, i) => (
+          {t.landing.how.steps.map((step, i) => (
             <li key={step.title} className="rise flex flex-col gap-4" style={order(i)}>
-              <div className="flex h-14 items-end">{step.grid(250 + i * 450)}</div>
+              <div className="flex h-14 items-end">{stepGrids[i](250 + i * 450)}</div>
               <div className="flex items-center gap-3">
                 <span className="tabular flex size-8 items-center justify-center rounded-full bg-pandan text-sm font-bold text-white">
                   {i + 1}
@@ -316,11 +304,8 @@ function HowItWorks() {
 
 // ---------------------------------------------------------------- transparency
 
-const whole = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
-const amount = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
-
 /** Counts up from where it is to `to` (from 0 the first time), once `play` is on. */
-function CountUp({ to, play, format = whole.format }: { to?: number; play: boolean; format?: (n: number) => string }) {
+function CountUp({ to, play, format }: { to?: number; play: boolean; format: (n: number) => string }) {
   const [value, setValue] = useState<number | null>(null);
   const current = useRef(0);
   useEffect(() => {
@@ -343,6 +328,9 @@ function CountUp({ to, play, format = whole.format }: { to?: number; play: boole
 }
 
 function Transparency() {
+  const { t, fmt } = useI18n();
+  const text = t.landing.transparency;
+  const whole = (n: number) => fmt.number(n);
   const { data: stats } = useStats();
   const [count, setCount] = useState(false);
   const block = useReveal<HTMLDivElement>((animate) => {
@@ -350,35 +338,32 @@ function Transparency() {
     if (animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setCount(true);
   });
   const figures = [
-    { value: stats?.members, label: "anggota terdaftar" },
-    { value: stats?.readyMembers, label: "sedang siap membantu" },
-    { value: stats?.funded, label: "permintaan sudah tersalurkan" },
-    { value: stats ? Number(formatEther(BigInt(stats.distributed))) : undefined, label: "WHZD diteruskan ke peminta", format: amount.format },
+    { value: stats?.members, label: text.figures.members, format: whole },
+    { value: stats?.readyMembers, label: text.figures.ready, format: whole },
+    { value: stats?.funded, label: text.figures.funded, format: whole },
+    {
+      value: stats ? Number(formatEther(BigInt(stats.distributed))) : undefined,
+      label: text.figures.distributed,
+      format: (n: number) => fmt.number(n, 2),
+    },
   ];
   const contracts = [
-    { name: "Escrow", address: appConfig.escrow, note: "menyimpan dan meneruskan iuran" },
-    { name: "Registry", address: appConfig.registry, note: "daftar anggota dan status siap membantu" },
-    { name: "Token WHZD", address: appConfig.token, note: "token uji untuk iuran" },
+    { name: "Escrow", address: appConfig.escrow, note: text.contracts.escrow },
+    { name: "Registry", address: appConfig.registry, note: text.contracts.registry },
+    { name: text.contracts.tokenName, address: appConfig.token, note: text.contracts.token },
   ];
 
   return (
     <section id="transparan" className="scroll-mt-20 bg-pandan-deep text-white">
       <div ref={block} className="mx-auto flex max-w-290 flex-col gap-14 px-4 py-20 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-2">
-          <h2 className="rise max-w-[16ch] text-[39px] leading-tight font-extrabold">Tidak ada orang yang memegang uangnya.</h2>
+          <h2 className="rise max-w-[16ch] text-[39px] leading-tight font-extrabold">{text.title}</h2>
           <ul className="rise flex flex-col gap-5 text-lg leading-relaxed text-white/80" style={order(1)}>
-            <li>
-              <strong className="text-white">Tanpa admin.</strong> Aturannya ditulis di smart contract dan berjalan
-              sendiri. Tidak ada yang bisa menahan atau mengalihkan dana.
-            </li>
-            <li>
-              <strong className="text-white">Tercatat untuk semua.</strong> Setiap iuran dan pencairan adalah transaksi
-              publik di {chain.name} yang bisa dicek siapa saja.
-            </li>
-            <li>
-              <strong className="text-white">Uang kembali kalau batal.</strong> Kalau peminta membatalkan, setiap anggota
-              bisa mengambil kembali iurannya.
-            </li>
+            {text.points(chain.name).map((point) => (
+              <li key={point.lead}>
+                <strong className="text-white">{point.lead}</strong> {point.body}
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -394,7 +379,7 @@ function Transparency() {
         </dl>
 
         <div className="rise flex flex-col gap-4" style={order(3)}>
-          <h3 className="text-xl font-bold">Periksa sendiri</h3>
+          <h3 className="text-xl font-bold">{text.check}</h3>
           <ul className="grid gap-3 md:grid-cols-3">
             {contracts.map((c) => (
               <li key={c.name} className="lift flex flex-col gap-1 rounded-2xl border border-white/15 p-5 hover:border-white/35">
@@ -407,7 +392,7 @@ function Transparency() {
                     rel="noreferrer"
                     className="tabular mt-2 self-start text-sm font-semibold text-kunyit underline underline-offset-4"
                   >
-                    {c.address.slice(0, 10)}…{c.address.slice(-6)} di Etherscan
+                    {text.onExplorer(`${c.address.slice(0, 10)}…${c.address.slice(-6)}`)}
                   </a>
                 ) : (
                   <span className="tabular mt-2 text-sm text-white/70">{c.address.slice(0, 10)}…{c.address.slice(-6)}</span>
@@ -424,31 +409,23 @@ function Transparency() {
 // ---------------------------------------------------------------- trial
 
 function Trial() {
+  const { t } = useI18n();
   const block = useReveal<HTMLElement>();
   return (
     <section ref={block} className="mx-auto grid max-w-290 gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.2fr]">
       <div className="rise flex flex-col gap-3">
         <TestnetPill className="self-start" />
-        <h2 className="text-[39px] leading-tight font-extrabold text-pandan">Masih uji coba, jadi gratis dicoba.</h2>
+        <h2 className="text-[39px] leading-tight font-extrabold text-pandan">{t.landing.trial.title}</h2>
       </div>
       <div className="rise flex flex-col gap-5 text-lg leading-relaxed text-batu" style={order(1)}>
-        <p>
-          Whitzard berjalan di {chain.name}, jaringan uji Ethereum. Token WHZD yang dipakai untuk iuran tidak bernilai
-          uang. Setelah bergabung, kamu bisa mengambil 100 WHZD gratis setiap hari dari menu isi saldo.
-        </p>
+        <p>{t.landing.trial.body(chain.name)}</p>
         <ul className="flex flex-col gap-3 text-base">
-          <li className="flex gap-3">
-            <Dot />
-            Dompet yang mendukung {chain.name}, misalnya MetaMask.
-          </li>
-          <li className="flex gap-3">
-            <Dot />
-            Sedikit ETH {chain.name} untuk biaya jaringan. Ini juga gratis dari faucet.
-          </li>
-          <li className="flex gap-3">
-            <Dot />
-            Lima menit untuk bergabung: daftar, isi profil, ambil saldo, lalu nyalakan siap membantu.
-          </li>
+          {t.landing.trial.needs(chain.name).map((need) => (
+            <li key={need} className="flex gap-3">
+              <Dot />
+              {need}
+            </li>
+          ))}
         </ul>
       </div>
     </section>
@@ -461,37 +438,15 @@ function Dot() {
 
 // ---------------------------------------------------------------- FAQ
 
-const faq = [
-  {
-    q: "Apakah saya perlu membayar?",
-    a: "Tidak. Selama uji coba, semua iuran memakai token WHZD yang tidak bernilai uang, dan biaya jaringan dibayar dengan ETH uji yang gratis.",
-  },
-  {
-    q: "Siapa yang memutuskan dana dicairkan?",
-    a: "Tidak ada. Saat waktu pengumpulan habis, smart contract meneruskan semua yang terkumpul ke peminta, berapa pun jumlahnya. Tidak ada persetujuan atau voting.",
-  },
-  {
-    q: "Siapa yang bisa melihat cerita dan tagihanku?",
-    a: "Cerita permintaan hanya terlihat oleh anggota yang sudah masuk. Dokumen tagihan hanya bisa dibuka olehmu dan anggota yang diminta membantu, dan diperiksa dengan sidiknya di blockchain supaya tidak bisa diubah diam-diam.",
-  },
-  {
-    q: "Kenapa saya harus membantu dulu sebelum mengajukan lagi?",
-    a: "Permintaan pertama boleh langsung. Setelah itu, kamu perlu membantu satu permintaan anggota lain sebelum mengajukan lagi, supaya semua orang ikut menanggung.",
-  },
-  {
-    q: "Bagaimana kalau dananya tidak terkumpul penuh?",
-    a: "Yang terkumpul tetap diteruskan. Kalau tidak ada iuran sama sekali, permintaan berakhir tanpa pencairan.",
-  },
-];
-
 function Faq() {
+  const { t } = useI18n();
   const block = useReveal<HTMLDivElement>();
   return (
     <section id="tanya-jawab" className="scroll-mt-20 border-t bg-card">
       <div ref={block} className="mx-auto grid max-w-290 gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr]">
-        <h2 className="rise text-[39px] leading-tight font-extrabold text-pandan">Tanya jawab</h2>
+        <h2 className="rise text-[39px] leading-tight font-extrabold text-pandan">{t.landing.faq.title}</h2>
         <div className="flex flex-col">
-          {faq.map((item, i) => (
+          {t.landing.faq.items.map((item, i) => (
             <details key={item.q} className="rise accordion group border-b py-5 first:pt-0" style={order(i + 1)}>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold [&::-webkit-details-marker]:hidden">
                 {item.q}

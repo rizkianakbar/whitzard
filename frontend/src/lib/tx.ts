@@ -8,25 +8,20 @@ import { waitForTransactionReceipt } from "wagmi/actions";
 import type { Hash, TransactionReceipt } from "viem";
 
 import { errorMessage } from "@/lib/errors";
+import { useI18n } from "@/lib/i18n";
 import { dismissWalletPrompt, showWalletPrompt, type WalletPrompt } from "@/lib/wallet-prompt";
 
 /** wallet → pending (mined?) → syncing (indexed by the backend?) → done. */
 export type TxPhase = "idle" | "wallet" | "pending" | "syncing" | "done";
 
-/** Short enough for a button. Says what is happening for the member, not the chain mechanics. */
-export const phaseLabel: Record<TxPhase, string> = {
-  idle: "",
-  wallet: "Setujui di dompetmu",
-  pending: "Sedang diproses",
-  syncing: "Hampir selesai",
-  done: "Selesai",
-};
+// Phase labels (t.tx.phase) are short enough for a button: what is happening for the member, not
+// the chain mechanics.
 
-/** Polls `check` until it returns true (e.g. the backend has indexed a transaction). */
-export async function until(check: () => Promise<boolean>, timeoutMs = 45_000, intervalMs = 800): Promise<void> {
+/** Polls `check` until it returns true (e.g. the backend has indexed a transaction); throws `timeout` if it never does. */
+export async function until(check: () => Promise<boolean>, timeout: string, timeoutMs = 45_000, intervalMs = 800): Promise<void> {
   const start = Date.now();
   while (!(await check().catch(() => false))) {
-    if (Date.now() - start > timeoutMs) throw new Error("Transaksi tercatat, tapi tampilan belum diperbarui. Muat ulang sebentar lagi.");
+    if (Date.now() - start > timeoutMs) throw new Error(timeout);
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
@@ -50,6 +45,7 @@ type RunOptions = {
 export function useTx() {
   const config = useConfig();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [phase, setPhase] = useState<TxPhase>("idle");
   const promptId = `wallet-${useId()}`;
 
@@ -65,10 +61,10 @@ export function useTx() {
       }
       setPhase("pending");
       const receipt = await waitForTransactionReceipt(config, { hash });
-      if (receipt.status !== "success") throw new Error("Transaksi gagal di blockchain.");
+      if (receipt.status !== "success") throw new Error(t.tx.failed);
       if (synced) {
         setPhase("syncing");
-        await until(() => synced(receipt));
+        await until(() => synced(receipt), t.tx.slowSync);
       }
       await Promise.all(invalidate.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
       setPhase("done");
@@ -76,7 +72,7 @@ export function useTx() {
       return receipt;
     } catch (error) {
       setPhase("idle");
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
       return null;
     }
   }

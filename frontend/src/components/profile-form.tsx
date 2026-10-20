@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type Member } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
+import { useI18n } from "@/lib/i18n";
 import { keys } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { useFieldErrors } from "@/lib/use-field-errors";
@@ -21,6 +22,8 @@ const MAX_PHOTO = 2 * 1024 * 1024;
 
 /** Name, nickname, birth date, city and photo. Self-declared, never verified. */
 export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLabel: string; onSaved?: () => void }) {
+  const { t } = useI18n();
+  const text = t.profile.form;
   const { token } = useSession();
   const queryClient = useQueryClient();
   const p = me.profile;
@@ -34,13 +37,13 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
   const [photoError, setPhotoError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
   const { errors, validateAll, change, blur } = useFieldErrors({ displayName, birthDate }, (field, v) => {
-    if (field === "displayName") return v.displayName.trim() ? null : "Isi nama lengkapmu.";
-    return v.birthDate && v.birthDate > today ? "Tanggal lahir tidak boleh di masa depan." : null;
+    if (field === "displayName") return v.displayName.trim() ? null : text.nameRequired;
+    return v.birthDate && v.birthDate > today ? text.birthFuture : null;
   });
 
   const pickPhoto = (file: File | null) => {
     if (!file) return;
-    if (file.size > MAX_PHOTO) return setPhotoError("Foto lebih dari 2 MB.");
+    if (file.size > MAX_PHOTO) return setPhotoError(text.photoTooLarge);
     setPhotoError(null);
     setPhoto(file);
     setPreview((old) => {
@@ -73,10 +76,10 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
       if (photo) await api.setPhoto(token!, photo);
       await queryClient.invalidateQueries({ queryKey: keys.member(me.address) });
       clearPicked();
-      toast.success("Profil tersimpan.");
+      toast.success(text.saved);
       onSaved?.();
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     } finally {
       setSaving(false);
     }
@@ -86,9 +89,9 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
     try {
       await api.deletePhoto(token!);
       await queryClient.invalidateQueries({ queryKey: keys.member(me.address) });
-      toast("Foto dihapus.");
+      toast(text.photoRemoved);
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     }
   };
 
@@ -105,7 +108,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
           <span className="absolute right-0 bottom-0 flex size-9 items-center justify-center rounded-full border-2 border-card bg-pandan text-white group-hover:bg-pandan-deep">
             <Camera aria-hidden="true" className="size-4" />
           </span>
-          <span className="sr-only">Pilih foto profil</span>
+          <span className="sr-only">{text.pickPhoto}</span>
           <input
             id="photo"
             type="file"
@@ -118,22 +121,20 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
           />
         </label>
         <div className="flex min-w-52 flex-1 flex-col gap-1">
-          <span className="font-semibold">Foto profil</span>
-          <span className="text-sm leading-relaxed text-batu">
-            Opsional. PNG, JPG atau WebP, maksimal 2 MB. Hanya anggota yang sudah masuk yang bisa melihatnya.
-          </span>
+          <span className="font-semibold">{text.photo}</span>
+          <span className="text-sm leading-relaxed text-batu">{text.photoHint}</span>
           {photoError && <span role="alert" className="text-sm font-medium text-bata-ink">{photoError}</span>}
           {photo ? (
             <span className="text-sm text-batu">
-              Foto baru tersimpan setelah kamu menekan &ldquo;{submitLabel}&rdquo;.{" "}
+              {text.photoPending(submitLabel)}{" "}
               <button type="button" onClick={clearPicked} className="font-semibold text-bata-ink underline underline-offset-4">
-                Batal
+                {text.cancel}
               </button>
             </span>
           ) : (
             p?.photo && (
               <button type="button" onClick={() => void removePhoto()} className="self-start text-sm font-semibold text-bata-ink underline underline-offset-4">
-                Hapus foto
+                {text.removePhoto}
               </button>
             )
           )}
@@ -141,7 +142,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="displayName" label="Nama lengkap" error={errors.displayName} className="sm:col-span-2">
+        <Field id="displayName" label={text.displayName} error={errors.displayName} className="sm:col-span-2">
           <Input id="displayName" value={displayName} maxLength={50} autoComplete="name" onChange={(e) => {
               setDisplayName(e.target.value);
               change("displayName", e.target.value);
@@ -150,13 +151,13 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
             aria-invalid={!!errors.displayName}
           />
         </Field>
-        <Field id="nickname" label="Nama panggilan" hint="Dipakai untuk menyapamu.">
+        <Field id="nickname" label={text.nickname} hint={text.nicknameHint}>
           <Input id="nickname" value={nickname} maxLength={30} autoComplete="nickname" onChange={(e) => setNickname(e.target.value)} />
         </Field>
-        <Field id="city" label="Kota atau kabupaten" hint="Terlihat oleh anggota lain.">
+        <Field id="city" label={text.city} hint={text.cityHint}>
           <Input id="city" value={city} maxLength={60} autoComplete="address-level2" onChange={(e) => setCity(e.target.value)} />
         </Field>
-        <Field id="birthDate" label="Tanggal lahir" hint="Hanya terlihat olehmu." error={errors.birthDate}>
+        <Field id="birthDate" label={text.birthDate} hint={text.birthDateHint} error={errors.birthDate}>
           <Input id="birthDate" type="date" value={birthDate} max={today} autoComplete="bday" onChange={(e) => {
               setBirthDate(e.target.value);
               change("birthDate", e.target.value);
@@ -167,13 +168,10 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
         </Field>
       </div>
 
-      <p className="rounded-2xl bg-muted p-4 text-sm leading-relaxed text-batu">
-        Whitzard tidak memeriksa data ini. Isi seperlunya, cukup supaya sesama anggota mengenalmu. Data profil disimpan di
-        server Whitzard, tidak di blockchain.
-      </p>
+      <p className="rounded-2xl bg-muted p-4 text-sm leading-relaxed text-batu">{text.note}</p>
 
       <Button type="submit" size="lg" disabled={saving} className="self-start">
-        <BusyLabel busy={saving ? "Menyimpan" : null}>{submitLabel}</BusyLabel>
+        <BusyLabel busy={saving ? t.common.saving : null}>{submitLabel}</BusyLabel>
       </Button>
     </form>
   );

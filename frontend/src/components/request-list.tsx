@@ -12,23 +12,16 @@ import { StatusBadge, YourAnswer } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Request } from "@/lib/api";
-import { formatWhzd, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { useMember, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
-const scopes = [
-  { id: "all", label: "Semua" },
-  { id: "for-me", label: "Untukku" },
-  { id: "mine", label: "Milikku" },
-] as const;
-const states = [
-  { id: "all", label: "Semua" },
-  { id: "live", label: "Berjalan" },
-  { id: "done", label: "Selesai" },
-] as const;
-type Scope = (typeof scopes)[number]["id"];
-type State = (typeof states)[number]["id"];
+const scopes = ["all", "for-me", "mine"] as const;
+const states = ["all", "live", "done"] as const;
+type Scope = (typeof scopes)[number];
+type State = (typeof states)[number];
 
 const PAST_PREVIEW = 5;
 
@@ -42,6 +35,8 @@ const byEndedDesc = (a: Request, b: Request) => new Date(endedAt(b)).getTime() -
  * first), then everything else still collecting, then finished ones as one-line outcomes.
  */
 export function RequestList() {
+  const { t } = useI18n();
+  const text = t.requests;
   const { address } = useSession();
   const [scope, setScope] = useState<Scope>("all");
   const [state, setState] = useState<State>("all");
@@ -70,45 +65,47 @@ export function RequestList() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Permintaan</h1>
+          <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{text.title}</h1>
           {!isPending && (
             <p className="text-batu">
-              {forYou.length > 0 ? (
-                <>
-                  <strong className="tabular text-arang">{forYou.length}</strong> permintaan menunggu jawabanmu.
-                </>
-              ) : live.length > 0 ? (
-                <>
-                  <strong className="tabular text-arang">{live.length}</strong> permintaan sedang berjalan.
-                </>
-              ) : (
-                "Tidak ada permintaan yang sedang berjalan."
-              )}
+              {forYou.length > 0
+                ? text.waitingYou(<strong className="tabular text-arang">{forYou.length}</strong>)
+                : live.length > 0
+                  ? text.running(<strong className="tabular text-arang">{live.length}</strong>)
+                  : text.noneRunning}
             </p>
           )}
         </div>
         <Link href="/ajukan" className={buttonVariants({ variant: "outline" })}>
-          Ajukan bantuan
+          {t.common.askForHelp}
         </Link>
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <Segmented label="Tampilkan" options={scopes} value={scope} onChange={(v) => { setScope(v); setShowAllPast(false); }} />
-        <Segmented label="Status" options={states} value={state} onChange={setState} />
+        <Segmented
+          label={text.scopeLabel}
+          options={scopes.map((id) => ({ id, label: text.scopes[id] }))}
+          value={scope}
+          onChange={(v) => {
+            setScope(v);
+            setShowAllPast(false);
+          }}
+        />
+        <Segmented label={text.stateLabel} options={states.map((id) => ({ id, label: text.states[id] }))} value={state} onChange={setState} />
         <label className="relative flex-1 md:max-w-80 md:ml-auto">
-          <span className="sr-only">Cari permintaan</span>
+          <span className="sr-only">{text.search}</span>
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-batu" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari judul atau cerita"
+            placeholder={text.searchPlaceholder}
             className="h-11 w-full rounded-full border bg-card pr-10 pl-10 text-base outline-none placeholder:text-batu focus-visible:border-ring [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
               type="button"
-              aria-label="Hapus pencarian"
+              aria-label={text.clearSearch}
               onClick={() => setQuery("")}
               className="pressable absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-batu hover:bg-muted"
             >
@@ -126,21 +123,21 @@ export function RequestList() {
       ) : nothing ? (
         <p className="rounded-2xl border border-dashed bg-card p-8 leading-relaxed text-batu">
           {q
-            ? `Tidak ada permintaan yang cocok dengan "${query.trim()}".`
+            ? text.empty.query(query.trim())
             : state === "live"
-              ? "Tidak ada permintaan yang sedang berjalan."
+              ? text.empty.live
               : state === "done"
-                ? "Belum ada permintaan yang selesai."
+                ? text.empty.done
                 : scope === "mine"
-                  ? "Kamu belum pernah mengajukan bantuan."
+                  ? text.empty.mine
                   : scope === "for-me"
-                    ? "Belum ada permintaan yang ditujukan kepadamu. Nyalakan siap membantu di beranda supaya ikut dihitung."
-                    : "Belum ada permintaan."}
+                    ? text.empty.forMe
+                    : text.empty.all}
         </p>
       ) : (
         <div className="flex flex-col gap-10">
           {showLive && forYou.length > 0 && (
-            <Section id="for-you" title="Menunggu jawabanmu" count={forYou.length}>
+            <Section id="for-you" title={text.sections.forYou} count={forYou.length}>
               <ul className="grid gap-4 md:grid-cols-2">
                 {forYou.map((r) => (
                   <RequestCard key={r.id} request={r} highlight />
@@ -149,7 +146,7 @@ export function RequestList() {
             </Section>
           )}
           {showLive && running.length > 0 && (
-            <Section id="running" title="Sedang berjalan" count={running.length}>
+            <Section id="running" title={text.sections.running} count={running.length}>
               <ul className="grid gap-4 md:grid-cols-2">
                 {running.map((r) => (
                   <RequestCard key={r.id} request={r} />
@@ -158,7 +155,7 @@ export function RequestList() {
             </Section>
           )}
           {showPast && past.length > 0 && (
-            <Section id="past" title="Sudah selesai" count={past.length}>
+            <Section id="past" title={text.sections.past} count={past.length}>
               <ul className="overflow-hidden rounded-2xl border bg-card">
                 {shownPast.map((r, i) => (
                   <PastRequestRow key={r.id} request={r} first={i === 0} mine={mine(r)} />
@@ -170,7 +167,7 @@ export function RequestList() {
                   onClick={() => setShowAllPast((v) => !v)}
                   className="pressable self-start rounded-full px-1 font-semibold text-pandan underline underline-offset-4"
                 >
-                  {showAllPast ? "Tampilkan lebih sedikit" : `Tampilkan semua (${past.length})`}
+                  {showAllPast ? t.common.showLess : t.common.showAll(past.length)}
                 </button>
               )}
             </Section>
@@ -225,6 +222,7 @@ function Section({ id, title, count, children }: { id: string; title: string; co
 }
 
 function RequestCard({ request: r, highlight }: { request: Request; highlight?: boolean }) {
+  const { t, fmt } = useI18n();
   const { data: member } = useMember(r.requester);
   return (
     <li
@@ -243,7 +241,7 @@ function RequestCard({ request: r, highlight }: { request: Request; highlight?: 
           href={`/permintaan/${r.id}`}
           className="text-xl leading-snug font-bold text-balance after:absolute after:inset-0 after:rounded-2xl group-hover:underline"
         >
-          {r.title ?? `Permintaan #${r.id}`}
+          {r.title ?? t.common.request(r.id)}
         </Link>
         {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
       </div>
@@ -256,12 +254,12 @@ function RequestCard({ request: r, highlight }: { request: Request; highlight?: 
         </div>
         {highlight ? (
           <span className="tabular flex shrink-0 items-center gap-1 text-sm font-bold text-pandan">
-            Bantu {formatWhzd(r.share)} WHZD
+            {t.common.help(fmt.whzd(r.share))}
             <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
           </span>
         ) : (
           <span className="tabular shrink-0 text-sm text-batu">
-            Bagian <strong className="font-semibold text-arang">{formatWhzd(r.share)} WHZD</strong>
+            {t.requests.share(<strong className="font-semibold text-arang">{fmt.whzd(r.share)} WHZD</strong>)}
           </span>
         )}
       </div>

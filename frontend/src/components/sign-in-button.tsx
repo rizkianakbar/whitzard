@@ -10,15 +10,17 @@ import { BusyLabel } from "@/components/tx-label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { errorMessage } from "@/lib/errors";
+import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { devAccounts } from "@/lib/wagmi";
 
 /**
  * One step to sign in: connects a wallet if none is connected (the browser's EIP-6963 wallets, plus
  * local test accounts in dev), then asks it to sign the SIWE message. A refused signature disconnects
  * again, so the member is never left connected but signed out.
  */
-export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default" | "lg"; label?: string }) {
+export function SignInButton({ size, label }: { size?: "default" | "lg"; label?: string }) {
+  const { t } = useI18n();
+  const idle = label ?? t.signIn.button;
   const connectors = useConnectors();
   const { mutateAsync: connect, isPending } = useConnect();
   const { mutate: disconnect } = useDisconnect();
@@ -41,7 +43,7 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
       await signIn(account);
     } catch (error) {
       disconnect();
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     } finally {
       setSigning(false);
     }
@@ -52,15 +54,15 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
     try {
       [account] = (await connect({ connector })).accounts;
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
       return;
     }
     setOpen(false);
     await sign(account);
   };
 
-  const label = (
-    <BusyLabel busy={signing ? "Setujui di dompetmu" : null} wallet>
+  const labelComponent = (
+    <BusyLabel busy={signing ? t.tx.phase.wallet : null} wallet>
       {idle}
     </BusyLabel>
   );
@@ -69,21 +71,18 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
   if (address) {
     return (
       <Button size={size} disabled={signing} onClick={() => sign()}>
-        {label}
+        {labelComponent}
       </Button>
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={size} disabled={signing}>{label}</Button>} />
+      <DialogTrigger render={<Button size={size} disabled={signing}>{labelComponent}</Button>} />
       <DialogContent className="gap-5 rounded-3xl p-6 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Masuk dengan dompet</DialogTitle>
-          <DialogDescription className="text-batu">
-            Pilih dompetmu, lalu tanda tangani pesan masuk. Gratis, dan tidak mengirim transaksi apa pun. Whitzard
-            tidak pernah memegang kuncimu.
-          </DialogDescription>
+          <DialogTitle className="text-2xl font-bold">{t.signIn.withWallet}</DialogTitle>
+          <DialogDescription className="text-batu">{t.signIn.intro}</DialogDescription>
         </DialogHeader>
         <ul className="flex flex-col gap-2">
           {browser.map((connector) => (
@@ -95,7 +94,7 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
                 ) : (
                   <Wallet aria-hidden="true" className="size-6" />
                 )}
-                {connector.id === "injected" ? "Dompet di browser" : connector.name}
+                {connector.id === "injected" ? t.signIn.browserWallet : connector.name}
               </Button>
             </li>
           ))}
@@ -103,11 +102,11 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
         {browser.length === 0 && <NoWallet />}
         {mocks.length > 0 && (
           <div className="flex flex-col gap-2 border-t pt-4">
-            <p className="text-[13px] text-batu">Pengembangan lokal: akun uji dari node Hardhat.</p>
+            <p className="text-[13px] text-batu">{t.signIn.devAccounts}</p>
             <div className="grid grid-cols-2 gap-2">
               {mocks.map((connector, i) => (
                 <Button key={connector.uid} variant="outline" size="default" disabled={isPending} onClick={() => choose(connector)}>
-                  {devAccounts[i]?.name ?? connector.name}
+                  {t.signIn.devAccount(i + 1)}
                 </Button>
               ))}
             </div>
@@ -120,42 +119,39 @@ export function SignInButton({ size, label: idle = "Masuk" }: { size?: "default"
 
 /** For newcomers to web3: what a wallet is and how to get one, on a computer or a phone. */
 function NoWallet() {
+  const { t } = useI18n();
+  const text = t.signIn.noWallet;
   // MetaMask's mobile app opens this link in its built-in browser, where the wallet is available.
   const inApp = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-muted p-4 text-sm leading-relaxed">
       <div className="flex flex-col gap-1">
-        <p className="font-bold">Belum ada dompet di browser ini</p>
-        <p className="text-batu">
-          Dompet kripto adalah aplikasi gratis yang menyimpan akunmu di Whitzard. Tidak perlu email atau kata sandi: kamu
-          masuk dengan menyetujui pesan di dompet. Pasang sekali, sekitar 2 menit.
-        </p>
+        <p className="font-bold">{text.title}</p>
+        <p className="text-batu">{text.body}</p>
       </div>
       <ol className="flex flex-col gap-3">
         <li>
-          <span className="font-semibold">Di komputer:</span> pasang ekstensi MetaMask, buat dompet baru, lalu muat ulang
-          halaman ini.
+          <span className="font-semibold">{text.desktopLabel}</span> {text.desktop}
           <Button
             variant="outline"
             className="mt-2 w-full gap-2"
             render={<a href="https://metamask.io/download/" target="_blank" rel="noreferrer" />}
             nativeButton={false}
           >
-            Pasang MetaMask
+            {text.install}
             <ExternalLink aria-hidden="true" />
           </Button>
         </li>
         <li>
-          <span className="font-semibold">Di HP:</span> pasang aplikasi MetaMask, lalu{" "}
-          <a href={inApp} className="font-semibold text-pandan underline underline-offset-4">
-            buka Whitzard di dalam aplikasinya
-          </a>
-          .
+          <span className="font-semibold">{text.phoneLabel}</span>{" "}
+          {text.phone(
+            <a href={inApp} className="font-semibold text-pandan underline underline-offset-4">
+              {text.phoneLink}
+            </a>,
+          )}
         </li>
       </ol>
-      <p className="text-[13px] text-batu">
-        Simpan baik-baik frasa pemulihan yang diberikan MetaMask. Whitzard tidak bisa memulihkan dompetmu.
-      </p>
+      <p className="text-[13px] text-batu">{text.recovery}</p>
     </div>
   );
 }

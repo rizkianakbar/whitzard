@@ -3,6 +3,7 @@
 import { Children, type ReactNode, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
  * with the arrows and dots. Each child should be an <li> that sets its own width (w-full).
  */
 export function Carousel({ label, children }: { label: string; children: ReactNode }) {
+  const { t } = useI18n();
   const track = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
   const count = Children.count(children);
@@ -47,7 +49,7 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
       </ul>
       {count > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Arrow label="Sebelumnya" disabled={current === 0} onClick={() => go(current - 1)}>
+          <Arrow label={t.carousel.previous} disabled={current === 0} onClick={() => go(current - 1)}>
             <ChevronLeft className="size-4.5" />
           </Arrow>
           <div className="flex items-center">
@@ -55,7 +57,7 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
               <button
                 key={i}
                 type="button"
-                aria-label={`Permintaan ${i + 1} dari ${count}`}
+                aria-label={t.carousel.item(i + 1, count)}
                 aria-current={i === current}
                 onClick={() => go(i)}
                 className="group flex h-8 items-center px-1"
@@ -69,7 +71,7 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
               </button>
             ))}
           </div>
-          <Arrow label="Berikutnya" disabled={current === count - 1} onClick={() => go(current + 1)}>
+          <Arrow label={t.carousel.next} disabled={current === count - 1} onClick={() => go(current + 1)}>
             <ChevronRight className="size-4.5" />
           </Arrow>
         </div>

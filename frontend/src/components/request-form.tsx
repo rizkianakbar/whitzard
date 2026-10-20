@@ -19,28 +19,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatWhzd } from "@/lib/format";
+import { type Dict, useI18n } from "@/lib/i18n";
 import { keys, useEligibility, useMe, useProof } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { phaseLabel, useTx } from "@/lib/tx";
-import { callDetail } from "@/lib/wallet-prompt";
+import { useTx } from "@/lib/tx";
 import { useFieldErrors } from "@/lib/use-field-errors";
 import { cn } from "@/lib/utils";
 
 const DAY = 24 * 60 * 60;
 // The short ones are for demos and testing (the contract's minimum is 5 minutes).
-const durations: { seconds: number; label: string; demo?: boolean }[] = [
-  { seconds: 5 * 60, label: "5 menit", demo: true },
-  { seconds: 10 * 60, label: "10 menit", demo: true },
-  { seconds: DAY, label: "1 hari" },
-  { seconds: 3 * DAY, label: "3 hari" },
-  { seconds: 7 * DAY, label: "7 hari" },
-  { seconds: 14 * DAY, label: "14 hari" },
+const durations: { seconds: number; demo?: boolean }[] = [
+  { seconds: 5 * 60, demo: true },
+  { seconds: 10 * 60, demo: true },
+  { seconds: DAY },
+  { seconds: 3 * DAY },
+  { seconds: 7 * DAY },
+  { seconds: 14 * DAY },
 ];
+const durationLabel = (seconds: number, t: Dict) =>
+  seconds < DAY ? t.ask.duration.minutes(seconds / 60) : t.ask.duration.days(seconds / DAY);
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 
 export function RequestForm() {
+  const { t } = useI18n();
+  const text = t.ask;
   const { data: me } = useMe();
   const { data: proof } = useProof();
   const eligibility = useEligibility();
@@ -49,8 +52,8 @@ export function RequestForm() {
   // Nothing to fill in yet: one centred message saying why, and where to go instead.
   if (!me.chain.registered) {
     return (
-      <Blocked icon={<UserRound className="size-6" />} title="Daftar dulu sebagai anggota" href="/gabung" cta="Daftar sekarang">
-        Hanya anggota yang bisa mengajukan bantuan. Pendaftaran cukup sekali.
+      <Blocked icon={<UserRound className="size-6" />} title={text.blocked.register.title} href="/gabung" cta={text.blocked.register.cta}>
+        {text.blocked.register.body}
       </Blocked>
     );
   }
@@ -58,16 +61,20 @@ export function RequestForm() {
     return eligibility.reason === "running" ? (
       <Blocked
         icon={<Hourglass className="size-6" />}
-        title="Permintaanmu masih berjalan"
+        title={text.blocked.running.title}
         href={`/permintaan/${eligibility.requestId}`}
-        cta="Lihat permintaanmu"
+        cta={text.blocked.running.cta}
       >
-        Satu anggota hanya bisa punya satu permintaan berjalan. Kamu bisa mengajukan lagi setelah waktunya habis.
+        {text.blocked.running.body}
       </Blocked>
     ) : (
-      <Blocked icon={<HandHeart className="size-6" />} title="Bantu satu anggota dulu" href="/permintaan" cta="Cari permintaan untuk dibantu">
-        Setelah permintaan pertamamu, kamu perlu membantu satu permintaan anggota lain sebelum mengajukan lagi. Begitu
-        iuranmu tercatat, kamu bisa langsung mengajukan.
+      <Blocked
+        icon={<HandHeart className="size-6" />}
+        title={text.blocked.helpFirst.title}
+        href="/permintaan"
+        cta={text.blocked.helpFirst.cta}
+      >
+        {text.blocked.helpFirst.body}
       </Blocked>
     );
   }
@@ -75,11 +82,8 @@ export function RequestForm() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex max-w-160 flex-col gap-2.5">
-        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">Ajukan bantuan</h1>
-        <p className="leading-relaxed text-batu">
-          Ceritakan kebutuhanmu dan lampirkan tagihan. Anggota yang sedang siap membantu akan diberi tahu, dan
-          masing-masing diminta bagian yang sama.
-        </p>
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{text.title}</h1>
+        <p className="leading-relaxed text-batu">{text.intro}</p>
       </div>
       <Form proofId={BigInt(proof.proofId ?? 0)} meReady={me.chain.ready} />
     </div>
@@ -99,13 +103,14 @@ function Blocked({
   cta: string;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <section className="mx-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-3xl border bg-card px-6 py-10 text-center sm:mt-8 sm:px-10 sm:py-12">
       <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-2xl bg-pandan-soft text-pandan">
         {icon}
       </span>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-semibold text-batu">Ajukan bantuan</span>
+        <span className="text-sm font-semibold text-batu">{t.ask.title}</span>
         <h1 className="text-[25px] leading-tight font-extrabold text-balance">{title}</h1>
       </div>
       <p className="max-w-[44ch] leading-relaxed text-pretty text-batu">{children}</p>
@@ -118,6 +123,8 @@ function Blocked({
 
 function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.ask;
   const router = useRouter();
   const { token: session } = useSession();
   const tx = useTx();
@@ -125,7 +132,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [duration, setDuration] = useState(durations.find((d) => d.label === "3 hari")!.seconds);
+  const [duration, setDuration] = useState(3 * DAY);
   const [file, setFile] = useState<File | null>(null);
 
   const { data: readyCount } = useReadContract({ ...registry, functionName: "readyCount" });
@@ -136,16 +143,16 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
   const { errors, validateAll, change, blur } = useFieldErrors({ title, description, amount, file }, (field, v) => {
     switch (field) {
       case "title":
-        if (!v.title.trim()) return "Isi judul permintaan.";
-        return v.title.trim().length > 120 ? "Judul paling banyak 120 karakter." : null;
+        if (!v.title.trim()) return text.errors.title;
+        return v.title.trim().length > 120 ? text.errors.titleLong : null;
       case "description":
-        return v.description.trim() ? null : "Ceritakan untuk apa dana ini.";
+        return v.description.trim() ? null : text.errors.description;
       case "amount":
-        if (members !== undefined && members <= 0) return "Belum ada anggota lain yang siap membantu.";
-        return parseAmount(v.amount) ? null : "Isi jumlah dalam WHZD, misalnya 300.";
+        if (members !== undefined && members <= 0) return text.errors.noMembers;
+        return parseAmount(v.amount) ? null : text.errors.amount;
       case "file":
-        if (!v.file) return "Lampirkan tagihan atau surat dokter.";
-        return v.file.size > MAX_BYTES ? "Dokumen lebih dari 10 MB." : null;
+        if (!v.file) return text.errors.file;
+        return v.file.size > MAX_BYTES ? text.errors.fileLarge : null;
     }
   });
 
@@ -162,7 +169,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
       form.set("file", file);
       evidenceHash = (await api.createDraft(session!, form)).evidenceHash;
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
       return;
     } finally {
       setUploading(false);
@@ -171,8 +178,8 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
     let id: bigint | undefined;
     const receipt = await tx.run({
       prompt: {
-        title: `Ajukan ${formatWhzd(amountWei)} WHZD`,
-        detail: callDetail("Escrow", "openRequest", "Mencatat permintaanmu dan sidik dokumennya. Tidak ada dana yang berpindah sekarang."),
+        title: text.prompt(fmt.whzd(amountWei)),
+        detail: t.wallet.call("Escrow", "openRequest", text.promptDetail),
       },
       send: () =>
         writeContract(config, {
@@ -184,14 +191,14 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         id ??= parseEventLogs({ abi: escrow.abi, eventName: "RequestOpened", logs: receipt.logs })[0]?.args.id;
         return id !== undefined && (await api.request(Number(id), session)).request.id === Number(id);
       },
-      success: "Permintaanmu sudah dikirim ke anggota yang siap membantu.",
+      success: text.success,
       invalidate: [["requests"], keys.proof],
     });
     if (receipt && id !== undefined) router.push(`/permintaan/${id}`);
   };
 
   const busy = uploading || tx.busy;
-  const status = uploading ? "Mengunggah dokumen" : tx.busy ? phaseLabel[tx.phase] : null;
+  const status = uploading ? text.uploading : tx.busy ? t.tx.phase[tx.phase] : null;
 
   return (
     <div className="flex flex-wrap items-start gap-10">
@@ -200,7 +207,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         onSubmit={submit}
         className="flex min-w-0 flex-[999_1_560px] flex-col gap-7 rounded-3xl border bg-card p-6 sm:p-8"
       >
-        <Field id="title" label="Judul" error={errors.title}>
+        <Field id="title" label={text.fields.title} error={errors.title}>
           <Input
             id="title"
             value={title}
@@ -214,7 +221,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
           />
         </Field>
 
-        <Field id="description" label="Ceritamu" hint="Apa yang terjadi, dan untuk apa dana ini. Tidak perlu menyebut diagnosis lengkap." error={errors.description}>
+        <Field id="description" label={text.fields.story} hint={text.fields.storyHint} error={errors.description}>
           <Textarea
             id="description"
             rows={5}
@@ -229,7 +236,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         </Field>
 
         <div className="flex flex-wrap gap-6">
-          <Field id="amount" label="Jumlah yang dibutuhkan" error={errors.amount} className="flex-[1_1_220px]">
+          <Field id="amount" label={text.fields.amount} error={errors.amount} className="flex-[1_1_220px]">
             <div className="flex h-12 items-center gap-2 rounded-xl border bg-card px-3.5 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-ring">
               <input
                 id="amount"
@@ -248,7 +255,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
             </div>
           </Field>
           <fieldset className="flex flex-[2_1_320px] flex-col gap-2">
-            <legend className="mb-2 font-semibold">Lama pengumpulan</legend>
+            <legend className="mb-2 font-semibold">{text.fields.duration}</legend>
             <div className="flex flex-wrap gap-2">
               {durations.map((d) => (
                 <label
@@ -265,7 +272,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
                     checked={duration === d.seconds}
                     onChange={() => setDuration(d.seconds)}
                   />
-                  {d.label}
+                  {durationLabel(d.seconds, t)}
                   {d.demo && (
                     <span className="rounded-full bg-kunyit-soft px-2 py-0.5 text-[11px] font-semibold text-kunyit-ink">Demo</span>
                   )}
@@ -275,7 +282,7 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
           </fieldset>
         </div>
 
-        <Field id="file" label="Dokumen bukti" error={errors.file}>
+        <Field id="file" label={text.fields.file} error={errors.file}>
           <label
             htmlFor="file"
             className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl border border-dashed border-[#a7b8af] bg-embun p-6 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
@@ -284,10 +291,8 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
               <Upload className="size-5" />
             </span>
             <span className="flex min-w-60 flex-1 flex-col gap-1">
-              <span className="font-semibold">{file ? file.name : "Pilih tagihan atau surat dokter"}</span>
-              <span className="text-[13px] leading-relaxed text-batu">
-                PDF atau foto, maksimal 10 MB. Hanya anggota yang diminta membantu yang bisa melihatnya.
-              </span>
+              <span className="font-semibold">{file ? file.name : text.fields.filePick}</span>
+              <span className="text-[13px] leading-relaxed text-batu">{text.fields.fileHint}</span>
             </span>
             <input id="file" type="file" accept={ACCEPT} className="sr-only" onChange={(e) => {
                 const picked = e.target.files?.[0] ?? null;
@@ -301,40 +306,37 @@ function Form({ proofId, meReady }: { proofId: bigint; meReady: boolean }) {
         <div className="flex flex-wrap items-center gap-4 border-t pt-6">
           <Button type="submit" size="lg" disabled={busy}>
             <BusyLabel busy={status} wallet={!uploading && tx.phase === "wallet"}>
-              Ajukan permintaan
+              {text.submit}
             </BusyLabel>
           </Button>
-          <span className="min-w-64 flex-1 text-[13px] leading-relaxed text-batu">
-            Dokumen diunggah dulu, lalu kamu menandatangani satu transaksi di dompet. Setelah dikirim, jumlah dan bukti
-            tidak bisa diubah.
-          </span>
+          <span className="min-w-64 flex-1 text-[13px] leading-relaxed text-batu">{text.submitNote}</span>
         </div>
       </form>
 
-      <aside aria-label="Pratinjau bagian" className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-        <h2 className="text-xl font-bold">Yang akan diminta ke anggota</h2>
+      <aside aria-label={text.preview.label} className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+        <h2 className="text-xl font-bold">{text.preview.title}</h2>
         <div className="flex flex-col gap-4.5 rounded-3xl border bg-card p-6">
           {members !== undefined && members > 0 && (
             <ShareGrid size={Math.min(members, 48)} contributed={0} declined={0} className="grid-cols-[repeat(auto-fill,minmax(24px,1fr))]" />
           )}
           <div className="flex flex-col gap-1">
-            <span className="tabular text-[31px] font-bold tracking-tight">{share ? `${formatWhzd(share)} WHZD` : "Isi jumlah"}</span>
+            <span className="tabular text-[31px] font-bold tracking-tight">{share ? `${fmt.whzd(share)} WHZD` : text.preview.fillAmount}</span>
             <span className="text-[13px] leading-relaxed text-batu">
               {members === undefined
-                ? "Menghitung anggota yang siap membantu"
+                ? text.preview.counting
                 : members > 0
-                  ? `per anggota, dari ${members} anggota yang siap membantu saat ini`
-                  : "Belum ada anggota lain yang siap membantu"}
+                  ? text.preview.perMember(members)
+                  : text.preview.noMembers}
             </span>
           </div>
           <ul className="flex flex-col gap-2.5 text-[13px] leading-relaxed">
-            <li>Dana diteruskan kepadamu saat waktu habis, berapa pun yang terkumpul.</li>
-            <li>Kamu bisa membatalkan sebelum waktu habis. Iuran dikembalikan ke anggota.</li>
-            <li>Jumlah anggota dikunci saat kamu mengirim, jadi bagian di atas bisa sedikit berubah.</li>
+            {text.preview.points.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
           </ul>
         </div>
         <Link href="/permintaan" className={cn(buttonVariants({ variant: "link" }), "self-start px-0")}>
-          Lihat permintaan lain
+          {text.preview.others}
         </Link>
       </aside>
     </div>

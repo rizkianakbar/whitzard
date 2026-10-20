@@ -1,23 +1,26 @@
+"use client";
+
 import { Check, Hand } from "lucide-react";
 
 import type { Request } from "@/lib/api";
-import { formatWhzd } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const styles = {
-  open: ["Terbuka", "bg-pandan-soft text-pandan"],
-  funding: ["Mengumpulkan", "bg-kunyit-soft text-kunyit-ink"],
-  awaiting: ["Sedang dikirim", "bg-kunyit-soft text-kunyit-ink"],
-  finalized: ["Terkirim", "bg-daun-soft text-daun-ink"],
-  expired: ["Berakhir", "bg-muted text-batu"],
-  cancelled: ["Dibatalkan", "bg-bata-soft text-bata-ink"],
+  open: "bg-pandan-soft text-pandan",
+  funding: "bg-kunyit-soft text-kunyit-ink",
+  awaiting: "bg-kunyit-soft text-kunyit-ink",
+  finalized: "bg-daun-soft text-daun-ink",
+  expired: "bg-muted text-batu",
+  cancelled: "bg-bata-soft text-bata-ink",
 } as const;
 
 export function StatusBadge({ request, className }: { request: Pick<Request, "status" | "awaitingFinalize">; className?: string }) {
-  const [label, style] = styles[request.awaitingFinalize ? "awaiting" : request.status];
+  const { t } = useI18n();
+  const status = request.awaitingFinalize ? "awaiting" : request.status;
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[13px] font-semibold", style, className)}>
-      {label}
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[13px] font-semibold", styles[status], className)}>
+      {t.status[status]}
     </span>
   );
 }
@@ -30,6 +33,7 @@ export function YourAnswer({
   request: Pick<Request, "yourResponse" | "share">;
   className?: string;
 }) {
+  const { t, fmt } = useI18n();
   if (r.yourResponse === "contributed") {
     return (
       <span
@@ -41,7 +45,7 @@ export function YourAnswer({
         <span aria-hidden="true" className="flex size-5 items-center justify-center rounded-full bg-kunyit text-white">
           <Check className="size-3" strokeWidth={3} />
         </span>
-        <span className="tabular">Kamu membantu {formatWhzd(r.share)} WHZD</span>
+        <span className="tabular">{t.status.youHelped(fmt.whzd(r.share))}</span>
       </span>
     );
   }
@@ -49,7 +53,7 @@ export function YourAnswer({
     return (
       <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[13px] font-semibold text-batu", className)}>
         <Hand aria-hidden="true" className="size-3.5" />
-        Kamu tidak ikut
+        {t.status.youDeclined}
       </span>
     );
   }

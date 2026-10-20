@@ -1,12 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Check, ChevronRight, Clock, X } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import type { Request } from "@/lib/api";
-import { formatWhzd } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-
-const shortDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" });
 
 /** Still collecting: open or funding, and not yet past its deadline. */
 export function isLive(r: Request) {
@@ -20,27 +20,27 @@ export function endedAt(r: Request): string {
 
 /** A finished request, reduced to its outcome. `mine`: the viewer is the requester. */
 export function PastRequestRow({ request: r, first, mine }: { request: Request; first: boolean; mine?: boolean }) {
+  const { t, fmt } = useI18n();
   const outcome =
     r.status === "finalized"
       ? {
         icon: <Check className="size-4.5" strokeWidth={2.5} />,
         tone: "bg-daun-soft text-daun-ink",
-        text: (
-          <>
-            <strong className="tabular font-semibold text-arang">{formatWhzd(r.collected)} WHZD</strong>{" "}
-            {mine ? "diterima" : "terkirim"} dari {r.contributors} anggota
-          </>
+        text: t.outcome.finalized(
+          <strong className="tabular font-semibold text-arang">{fmt.whzd(r.collected)} WHZD</strong>,
+          !!mine,
+          r.contributors,
         ),
       }
       : r.status === "cancelled"
         ? {
           icon: <X className="size-4.5" />,
           tone: "bg-bata-soft text-bata-ink",
-          text: mine ? "Kamu membatalkannya" : "Dibatalkan oleh peminta",
+          text: mine ? t.outcome.cancelledMine : t.outcome.cancelled,
         }
         : r.awaitingFinalize
-          ? { icon: <Clock className="size-4.5" />, tone: "bg-kunyit-soft text-kunyit-ink", text: "Waktu habis, dana sedang dikirim" }
-          : { icon: <Clock className="size-4.5" />, tone: "bg-muted text-batu", text: "Berakhir tanpa iuran" };
+          ? { icon: <Clock className="size-4.5" />, tone: "bg-kunyit-soft text-kunyit-ink", text: t.outcome.awaiting }
+          : { icon: <Clock className="size-4.5" />, tone: "bg-muted text-batu", text: t.outcome.expired };
 
   return (
     <li className={cn(!first && "border-t")}>
@@ -49,9 +49,9 @@ export function PastRequestRow({ request: r, first, mine }: { request: Request; 
           {outcome.icon}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-semibold">{r.title ?? `Permintaan #${r.id}`}</span>
+          <span className="truncate font-semibold">{r.title ?? t.common.request(r.id)}</span>
           <span className="truncate text-sm text-batu">
-            {outcome.text} · {shortDate.format(new Date(endedAt(r)))}
+            {outcome.text} · {fmt.dayMonth(endedAt(r))}
           </span>
         </span>
         <StatusBadge request={r} className="hidden sm:inline-flex" />

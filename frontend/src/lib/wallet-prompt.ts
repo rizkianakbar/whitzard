@@ -8,7 +8,7 @@ import { toast } from "sonner";
  * open the page says what this step is and what the wallet will show for it.
  */
 export type WalletPrompt = {
-  /** The step in the member's words: "Bantu 30 WHZD". */
+  /** The step in the member's words: "Bantu 30 WHZD" / "Chip in 30 WHZD". */
   title: string;
   /** What the wallet will show (contract and function, or the signature type) and what it does. */
   detail: string;
@@ -27,8 +27,5 @@ export function showWalletPrompt(id: string, prompt: WalletPrompt) {
 export function dismissWalletPrompt(id: string) {
   toast.dismiss(id);
 }
-
-/** "Di dompet tertulis: Escrow · contribute." plus what it does, for a contract call. */
-export function callDetail(contract: "Escrow" | "Registry" | "WhitzardToken", fn: string, effect: string) {
-  return `Di dompet tertulis: ${contract} · ${fn}. ${effect}`;
-}
+// The detail for a contract call names the contract and function as the wallet shows them:
+// t.wallet.call("Escrow", "contribute", effect).

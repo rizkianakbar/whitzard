@@ -3,7 +3,7 @@
 import { type ReactNode, Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LogOut, Plus, UserRound } from "lucide-react";
+import { Bell, Languages, LogOut, Plus, UserRound } from "lucide-react";
 import { useConnection, useSwitchChain } from "wagmi";
 
 import { Avatar, callName } from "@/components/avatar";
@@ -17,12 +17,16 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatWhzd, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
+import { locales } from "@/lib/i18n/config";
+import { type Locale, switchLocale, useI18n } from "@/lib/i18n";
 import { useMe, useNotifications } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
@@ -30,13 +34,14 @@ import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
 
 const nav = [
-  { href: "/beranda", label: "Beranda" },
-  { href: "/permintaan", label: "Permintaan" },
-  { href: "/ajukan", label: "Ajukan" },
+  { href: "/beranda", label: "home" },
+  { href: "/permintaan", label: "requests" },
+  { href: "/ajukan", label: "ask" },
 ] as const;
 
 /** Reads the URL, so it renders inside <Suspense> (Cache Components); the fallback has no active state. */
 function NavLinks({ placement, pathname = "" }: { placement: "top" | "bottom"; pathname?: string }) {
+  const { t } = useI18n();
   return nav.map((item) => {
     const active = pathname.startsWith(item.href);
     return (
@@ -50,7 +55,7 @@ function NavLinks({ placement, pathname = "" }: { placement: "top" | "bottom"; p
             : cn("flex items-center justify-center text-[13px] font-semibold text-batu", active && "text-pandan shadow-[inset_0_3px_0_var(--color-pandan)]")
         }
       >
-        {item.label}
+        {t.shell.nav[item.label]}
       </Link>
     );
   });
@@ -62,6 +67,7 @@ function ActiveNavLinks({ placement }: { placement: "top" | "bottom" }) {
 
 /** The members-only area's frame. Each page guards its own content with <MemberGate>. */
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-full flex-col pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
       <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
@@ -71,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <TestnetPill className="hidden sm:inline-flex" />
           </div>
           <MemberOnly>
-            <nav aria-label="Utama" className="hidden flex-1 gap-1 md:flex">
+            <nav aria-label={t.shell.navLabel} className="hidden flex-1 gap-1 md:flex">
               <Suspense fallback={<NavLinks placement="top" />}>
                 <ActiveNavLinks placement="top" />
               </Suspense>
@@ -90,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
       <MemberOnly>
         <nav
-          aria-label="Utama"
+          aria-label={t.shell.navLabel}
           className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom,0px))] grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom,0px)] md:hidden"
         >
           <Suspense fallback={<NavLinks placement="bottom" />}>
@@ -112,6 +118,7 @@ function MemberOnly({ children }: { children: ReactNode }) {
 function Wallet() {
   const { status } = useSession();
   const { data: me } = useMe();
+  const { t, fmt } = useI18n();
   if (status !== "signed-in" || !me?.chain.registered) return null;
   return (
     <TopUpDialog
@@ -119,11 +126,11 @@ function Wallet() {
       trigger={
         <button
           type="button"
-          aria-label={`Saldo ${formatWhzd(me.chain.balance)} WHZD. Isi saldo`}
+          aria-label={t.shell.balance(fmt.whzd(me.chain.balance))}
           className="pressable flex h-11 items-center gap-2 rounded-full border bg-card pr-1.5 pl-4 hover:bg-muted"
         >
           <span className="tabular text-sm font-bold whitespace-nowrap">
-            {formatWhzd(me.chain.balance)}
+            {fmt.whzd(me.chain.balance)}
             <span className="hidden sm:inline"> WHZD</span>
           </span>
           <span className="flex size-8 items-center justify-center rounded-full bg-pandan text-white">
@@ -143,6 +150,7 @@ function NotificationBell() {
   const { data, isPending } = useNotifications(20);
   const markRead = useMarkRead();
   const now = useNow();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   if (status !== "signed-in") return null;
   const unreadItems = data?.filter((n) => !n.isRead) ?? [];
@@ -152,7 +160,7 @@ function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        aria-label={unread ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
+        aria-label={unread ? t.shell.unread(unread) : t.shell.notifications}
         // No press scale (`pressable`) here: the popup is positioned from the bell's box while it is
         // still scaled down from the click, then jumps right as the bell springs back.
         className={cn(
@@ -169,14 +177,14 @@ function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={12} className="flex w-[min(380px,calc(100vw-32px))] flex-col rounded-2xl">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          <PopoverTitle className="text-base font-bold">Notifikasi</PopoverTitle>
+          <PopoverTitle className="text-base font-bold">{t.shell.notifications}</PopoverTitle>
           {unread > 0 && (
             <button
               type="button"
               onClick={() => void markRead(unreadItems)}
               className="pressable text-[13px] font-semibold text-pandan hover:underline"
             >
-              Tandai semua dibaca
+              {t.shell.markAllRead}
             </button>
           )}
         </div>
@@ -188,7 +196,7 @@ function NotificationBell() {
             </div>
           ) : latest.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm leading-relaxed text-batu">
-              Belum ada notifikasi. Kamu diberi tahu saat ada yang butuh bantuan, saat iuran masuk, dan saat dana diteruskan.
+              {t.shell.bellEmpty}
             </p>
           ) : (
             <ul>
@@ -205,7 +213,7 @@ function NotificationBell() {
           onClick={() => setOpen(false)}
           className="border-t px-4 py-3 text-center text-sm font-semibold text-pandan hover:bg-muted"
         >
-          Lihat semua notifikasi
+          {t.shell.seeAll}
         </Link>
       </PopoverContent>
     </Popover>
@@ -216,13 +224,14 @@ function AccountMenu() {
   const router = useRouter();
   const { address, status, signOut } = useSession();
   const { data: me } = useMe();
+  const { locale, t } = useI18n();
   if (status !== "signed-in" || !address) return null;
   const profile = me?.profile;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<button type="button" aria-label="Akun" className="pressable flex rounded-full hover:opacity-90" />}
+        render={<button type="button" aria-label={t.shell.account} className="pressable flex rounded-full hover:opacity-90" />}
       >
         <Avatar address={address} profile={profile} className="size-11 text-sm" />
       </DropdownMenuTrigger>
@@ -230,18 +239,33 @@ function AccountMenu() {
         {/* Base UI requires a label to sit inside a group. */}
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex flex-col gap-0.5 px-2.5 py-2">
-            <span className="text-base font-bold text-arang">{callName(profile, "Anggota")}</span>
+            <span className="text-base font-bold text-arang">{callName(profile, t.common.member)}</span>
             <span className="tabular text-xs font-normal text-batu">{shortAddress(address)}</span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2.5 rounded-xl px-2.5 py-2 text-base" onClick={() => router.push("/profil")}>
           <UserRound aria-hidden="true" className="size-4" />
-          Profil
+          {t.shell.profile}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex items-center gap-2.5 px-2.5 pt-2 pb-1 text-[13px] font-semibold text-batu">
+            <Languages aria-hidden="true" className="size-4" />
+            {t.language.label}
+          </DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={locale} onValueChange={(value: Locale) => value !== locale && switchLocale(value)}>
+            {locales.map((l) => (
+              <DropdownMenuRadioItem key={l} value={l} lang={l} className="rounded-xl px-2.5 py-2 text-base">
+                {t.language.names[l]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2.5 rounded-xl px-2.5 py-2 text-base" onClick={() => void signOut()}>
           <LogOut aria-hidden="true" className="size-4" />
-          Keluar
+          {t.shell.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -252,13 +276,14 @@ function WrongNetwork() {
   const { address } = useSession();
   const { chainId } = useConnection();
   const { mutate: switchChain, isPending } = useSwitchChain();
+  const { t } = useI18n();
   if (!address || chainId === undefined || chainId === chain.id) return null;
   return (
     <div className="border-b bg-kunyit-soft">
       <div className="mx-auto flex max-w-290 flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-        <p className="flex-1 text-kunyit-ink">Dompetmu terhubung ke jaringan lain. Whitzard berjalan di {chain.name}.</p>
+        <p className="flex-1 text-kunyit-ink">{t.shell.wrongNetwork(chain.name)}</p>
         <Button variant="outline" disabled={isPending} onClick={() => switchChain({ chainId: chain.id })}>
-          Pindah ke {chain.name}
+          {t.shell.switchTo(chain.name)}
         </Button>
       </div>
     </div>

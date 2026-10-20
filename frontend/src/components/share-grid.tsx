@@ -1,4 +1,7 @@
+"use client";
+
 import type { SnapshotResponse } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -35,13 +38,11 @@ export function shareCells(size: number, contributed: number, declined: number, 
  * Filled = contributed, hatched = declined, empty = no answer yet; the viewer's cell is outlined.
  */
 export function ShareGrid({ size, contributed, declined, you, justContributed, variant = "large", className }: Props) {
+  const { t } = useI18n();
   const cells = shareCells(size, contributed, declined, you);
   const large = variant === "large";
   const medium = variant === "medium";
-  const label =
-    `${contributed} dari ${size} anggota sudah membantu` +
-    (declined ? `, ${declined} tidak ikut` : "") +
-    (you ? ", kotakmu bergaris tebal" : "");
+  const label = t.shareGrid.aria(contributed, size, declined, !!you);
 
   return (
     <div
@@ -76,26 +77,27 @@ export function ShareGrid({ size, contributed, declined, you, justContributed, v
 }
 
 export function ShareLegend() {
+  const { t } = useI18n();
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-batu">
       <li className="flex items-center gap-2">
         <span aria-hidden="true" className="size-3.5 rounded-[3px] bg-kunyit" />
-        Sudah membantu
+        {t.shareGrid.helped}
       </li>
       <li className="flex items-center gap-2">
         <span aria-hidden="true" className="size-3.5 rounded-[3px] border-2 border-pandan" />
-        Kamu
+        {t.shareGrid.you}
       </li>
       <li className="flex items-center gap-2">
         <span
           aria-hidden="true"
           className="size-3.5 rounded-[3px] border border-[#9aa8a1] bg-[repeating-linear-gradient(135deg,#fff_0_2px,#8a9891_2px_3.5px)]"
         />
-        Tidak ikut
+        {t.shareGrid.declined}
       </li>
       <li className="flex items-center gap-2">
         <span aria-hidden="true" className="size-3.5 rounded-[3px] border border-garis bg-card" />
-        Belum menjawab
+        {t.shareGrid.noAnswer}
       </li>
     </ul>
   );

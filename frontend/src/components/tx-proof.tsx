@@ -1,7 +1,10 @@
+"use client";
+
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
 
 import { appConfig } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,7 +13,7 @@ import { cn } from "@/lib/utils";
  */
 export function TxProof({
   hash,
-  label = "Bukti transaksi",
+  label,
   compact,
   className,
 }: {
@@ -20,10 +23,11 @@ export function TxProof({
   compact?: boolean;
   className?: string;
 }) {
+  const { t } = useI18n();
   const body = (
     <>
       <ShieldCheck aria-hidden="true" className="size-3.5 shrink-0" />
-      {!compact && <span>{label}</span>}
+      {!compact && <span>{label ?? t.txProof.label}</span>}
       <span className={cn("tabular font-mono text-[12px]", !compact && "opacity-80")}>{shortAddress(hash)}</span>
       {appConfig.explorerUrl && <ArrowUpRight aria-hidden="true" className="size-3 shrink-0" />}
     </>
@@ -40,7 +44,7 @@ export function TxProof({
       href={`${appConfig.explorerUrl}/tx/${hash}`}
       target="_blank"
       rel="noreferrer"
-      title={`Buka ${hash} di Etherscan`}
+      title={t.txProof.open(hash)}
       className={cn(style, !compact && "pressable transition-colors hover:border-pandan/50 hover:bg-white")}
     >
       {body}

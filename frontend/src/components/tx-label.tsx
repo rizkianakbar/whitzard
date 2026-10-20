@@ -3,7 +3,8 @@
 import { LoaderCircle, Wallet } from "lucide-react";
 
 import { Swap } from "@/components/swap";
-import { phaseLabel, type TxPhase } from "@/lib/tx";
+import { useI18n } from "@/lib/i18n";
+import type { TxPhase } from "@/lib/tx";
 
 /**
  * A button label that becomes a loading state while work is in flight: a spinner while we wait on
@@ -26,8 +27,9 @@ export function BusyLabel({ busy, wallet, children }: { busy: string | null; wal
 
 /** BusyLabel for a useTx() transaction. */
 export function TxLabel({ tx, children }: { tx: { busy: boolean; phase: TxPhase }; children: string }) {
+  const { t } = useI18n();
   return (
-    <BusyLabel busy={tx.busy ? phaseLabel[tx.phase] : null} wallet={tx.phase === "wallet"}>
+    <BusyLabel busy={tx.busy ? t.tx.phase[tx.phase] : null} wallet={tx.phase === "wallet"}>
       {children}
     </BusyLabel>
   );

@@ -51,29 +51,28 @@ import { api, ApiError, type RequestDetail as Detail } from "@/lib/api";
 import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
-import { formatDate, formatWhzd, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { keys, useActivity, useMe, useMember, useRequest } from "@/lib/queries";
 import { useNow } from "@/lib/now";
 import { useSession } from "@/lib/session";
 import { useTx } from "@/lib/tx";
-import { callDetail } from "@/lib/wallet-prompt";
 import { cn } from "@/lib/utils";
 import { chain } from "@/lib/wagmi";
 
 export function RequestDetail({ id }: { id: number }) {
+  const { t } = useI18n();
   const { data, error, isPending } = useRequest(id);
   if (isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
   if (error) {
     return (
       <div className="flex max-w-xl flex-col gap-3 rounded-3xl border bg-card p-8">
-        <h1 className="text-xl font-semibold">Permintaan tidak ditemukan</h1>
+        <h1 className="text-xl font-semibold">{t.request.notFound}</h1>
         <p className="text-batu">
-          {error instanceof ApiError && error.status === 404
-            ? "Mungkin baru saja dibuat dan belum tercatat. Coba muat ulang sebentar lagi."
-            : errorMessage(error)}
+          {error instanceof ApiError && error.status === 404 ? t.request.notFoundYet : errorMessage(error, t)}
         </p>
         <Link href="/permintaan" className="font-semibold underline underline-offset-4">
-          Semua permintaan
+          {t.request.all}
         </Link>
       </div>
     );
@@ -81,9 +80,8 @@ export function RequestDetail({ id }: { id: number }) {
   return <View detail={data} />;
 }
 
-const shortDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" });
-
 function View({ detail }: { detail: Detail }) {
+  const { t, fmt } = useI18n();
   const { request: r, responses, you } = detail;
   const { data: requester } = useMember(r.requester);
   const [justContributed, setJustContributed] = useState(false);
@@ -97,11 +95,11 @@ function View({ detail }: { detail: Detail }) {
           className="pressable -ml-1.5 flex items-center gap-1 self-start rounded-full px-1.5 py-1 text-sm font-semibold text-batu hover:text-pandan"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Permintaan
+          {t.request.back}
         </Link>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="max-w-[24ch] text-[32px] leading-[1.1] font-extrabold text-pandan sm:text-[39px]">
-            {r.title ?? `Permintaan #${r.id}`}
+            {r.title ?? t.common.request(r.id)}
           </h1>
           <StatusBadge request={r} />
         </div>
@@ -110,8 +108,8 @@ function View({ detail }: { detail: Detail }) {
           <span className="min-w-0 truncate">
             <span className="font-semibold text-arang">{name}</span>
             {requester?.profile?.city && <> · {requester.profile.city}</>} ·{" "}
-            <time dateTime={r.openedAt} title={formatDate(r.openedAt)}>
-              {shortDate.format(new Date(r.openedAt))}
+            <time dateTime={r.openedAt} title={fmt.date(r.openedAt)}>
+              {fmt.dayMonthYear(r.openedAt)}
             </time>
           </span>
         </div>
@@ -124,7 +122,7 @@ function View({ detail }: { detail: Detail }) {
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
           <section aria-labelledby="grid" className="order-1 flex flex-col gap-6 rounded-2xl border bg-card p-6 sm:p-7">
             <h2 id="grid" className="sr-only">
-              Dana terkumpul
+              {t.request.collected}
             </h2>
             <FundingProgress request={r} size="lg" />
             <div className="flex flex-col gap-4 rounded-xl bg-embun p-4 sm:p-5">
@@ -137,14 +135,11 @@ function View({ detail }: { detail: Detail }) {
               />
               <ShareLegend />
             </div>
-            <p className="text-[13px] leading-relaxed text-batu">
-              Setiap kotak satu anggota, semuanya bernilai sama: {formatWhzd(r.share)} WHZD. Anggota dihitung saat
-              permintaan dibuat, yaitu {r.snapshotSize} orang yang sedang siap membantu, tidak termasuk {name}.
-            </p>
+            <p className="text-[13px] leading-relaxed text-batu">{t.request.gridNote(fmt.whzd(r.share), r.snapshotSize, name)}</p>
           </section>
 
           {r.description && (
-            <Panel id="story" icon={<BookOpen className="size-4.5" />} title={`Cerita ${name}`} className="order-3">
+            <Panel id="story" icon={<BookOpen className="size-4.5" />} title={t.request.story(name)} className="order-3">
               <p className="max-w-[65ch] text-[17px] leading-[1.75] whitespace-pre-line">{r.description}</p>
             </Panel>
           )}
@@ -155,7 +150,7 @@ function View({ detail }: { detail: Detail }) {
         {/* Right column: where the request stands. Actions first, then what has happened so far. */}
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
           <aside
-            aria-label="Tindakan"
+            aria-label={t.request.actions}
             className="order-2 flex min-w-0 flex-col gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(23_48_42/0.04),0_12px_32px_-12px_rgb(23_48_42/0.12)]"
           >
             <Actions detail={detail} requesterName={name} onContributed={() => setJustContributed(true)} />
@@ -204,6 +199,8 @@ function Panel({
 // ---------------------------------------------------------------- evidence
 
 function Evidence({ detail, requesterName }: { detail: Detail; requesterName: string }) {
+  const { t } = useI18n();
+  const text = t.request.evidence;
   const { token: session } = useSession();
   const [check, setCheck] = useState<"idle" | "loading" | "match" | "mismatch">("idle");
   const [url, setUrl] = useState<string | null>(null);
@@ -223,7 +220,7 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
       setUrl(URL.createObjectURL(blob));
     } catch (error) {
       setCheck("idle");
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     }
   };
 
@@ -231,12 +228,8 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
     <Panel
       id="evidence"
       icon={<FileText className="size-4.5" />}
-      title="Bukti"
-      description={
-        allowed
-          ? `Hanya ${requesterName} dan anggota yang diminta membantu yang bisa membukanya.`
-          : `Hanya untuk ${requesterName} dan anggota yang diminta membantu.`
-      }
+      title={text.title}
+      description={allowed ? text.allowed(requesterName) : text.restricted(requesterName)}
     >
       <div className="flex flex-wrap items-center gap-4 rounded-xl bg-embun p-4">
         <span
@@ -255,29 +248,26 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
           )}
         </span>
         <div className="flex min-w-48 flex-1 flex-col gap-0.5" aria-live="polite">
-          <span className="font-semibold">{r.hasEvidence ? "Tagihan atau surat dokter" : "Dokumen tidak tersedia"}</span>
-          {check === "match" && <span className="text-[13px] text-daun-ink">Asli: cocok dengan sidik di blockchain</span>}
-          {check === "mismatch" && <span className="text-[13px] text-bata-ink">Tidak cocok dengan sidik di blockchain: dokumen ini sudah diubah</span>}
+          <span className="font-semibold">{r.hasEvidence ? text.document : text.unavailable}</span>
+          {check === "match" && <span className="text-[13px] text-daun-ink">{text.match}</span>}
+          {check === "mismatch" && <span className="text-[13px] text-bata-ink">{text.mismatch}</span>}
           {(check === "idle" || check === "loading") && (
-            <span className="tabular text-[13px] text-batu">Sidik di blockchain {shortAddress(r.evidenceHash)}</span>
+            <span className="tabular text-[13px] text-batu">{text.fingerprint(shortAddress(r.evidenceHash))}</span>
           )}
         </div>
         {r.hasEvidence && allowed && !url && (
           <Button variant="outline" disabled={check === "loading"} className="w-full bg-card sm:w-auto" onClick={() => void fetchAndCheck()}>
-            <BusyLabel busy={check === "loading" ? "Memeriksa" : null}>Periksa dokumen</BusyLabel>
+            <BusyLabel busy={check === "loading" ? text.checking : null}>{text.check}</BusyLabel>
           </Button>
         )}
         {url && (
           <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", className: "w-full bg-card sm:w-auto" })}>
-            Lihat dokumen
+            {text.open}
             <ArrowUpRight data-icon="inline-end" aria-hidden="true" />
           </a>
         )}
       </div>
-      <p className="text-[13px] leading-relaxed text-batu">
-        Sidik (SHA-256) dokumen dicatat di blockchain saat permintaan dibuat. Sebelum dibuka, dokumen diperiksa dengan
-        sidik itu, jadi kamu tahu dokumennya tidak diganti.
-      </p>
+      <p className="text-[13px] leading-relaxed text-batu">{text.note}</p>
     </Panel>
   );
 }
@@ -295,8 +285,6 @@ type Event = {
   tx: string | null;
 };
 
-const stamp = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
 // Past this many steps the middle contributions fold away; the opening and the latest steps stay.
 const FOLD_AFTER = 6;
 const KEEP_LAST = 3;
@@ -307,6 +295,8 @@ const KEEP_LAST = 3;
  * declined or didn't answer is never named, only counted in the share grid.
  */
 function History({ detail, requesterName }: { detail: Detail; requesterName: string }) {
+  const { t, fmt } = useI18n();
+  const text = t.request.history;
   const { request: r } = detail;
   const { data } = useActivity(r.id);
   const [unfolded, setUnfolded] = useState(false);
@@ -317,11 +307,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
       icon: <FilePlus className="size-3.5" />,
       tone: "bg-pandan-soft text-pandan",
       who: r.requester,
-      text: (
-        <>
-          meminta <strong className="tabular">{formatWhzd(r.amount)} WHZD</strong>
-        </>
-      ),
+      text: text.opened(<strong className="tabular">{fmt.whzd(r.amount)} WHZD</strong>),
       when: r.openedAt,
       tx: r.openedTx,
     },
@@ -333,11 +319,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
       icon: helped ? <HeartHandshake className="size-3.5" /> : <RotateCcw className="size-3.5" />,
       tone: helped ? "bg-kunyit-soft text-kunyit-ink" : "bg-muted text-batu",
       who: a.member,
-      text: (
-        <>
-          {helped ? "membantu" : "mengambil kembali"} <strong className="tabular">{formatWhzd(a.amount)} WHZD</strong>
-        </>
-      ),
+      text: (helped ? text.helped : text.refunded)(<strong className="tabular">{fmt.whzd(a.amount)} WHZD</strong>),
       when: a.at,
       tx: a.txHash,
     });
@@ -348,7 +330,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
       icon: <X className="size-3.5" />,
       tone: "bg-bata-soft text-bata-ink",
       who: r.requester,
-      text: "membatalkan",
+      text: text.cancelled,
       when: r.cancelledAt,
       tx: r.cancelledTx,
     });
@@ -358,11 +340,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
       key: "finalized",
       icon: <Check className="size-3.5" strokeWidth={2.5} />,
       tone: "bg-daun-soft text-daun-ink",
-      text: (
-        <>
-          <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> diteruskan ke {requesterName}
-        </>
-      ),
+      text: text.finalized(<strong className="tabular">{fmt.whzd(r.collected)} WHZD</strong>, requesterName),
       when: r.finalizedAt,
       tx: r.finalizedTx,
     });
@@ -371,7 +349,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
       key: "expired",
       icon: <Clock className="size-3.5" />,
       tone: "bg-muted text-batu",
-      text: "Berakhir tanpa iuran",
+      text: text.expired,
       when: r.finalizedAt ?? r.deadline,
       tx: r.finalizedTx,
     });
@@ -385,8 +363,8 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
     <Panel
       id="history"
       icon={<HistoryIcon className="size-4.5" />}
-      title="Riwayat"
-      description={`Tercatat permanen di ${chain.name}${appConfig.explorerUrl ? ". Tekan kodenya untuk memeriksa di Etherscan" : ""}.`}
+      title={text.title}
+      description={text.description(chain.name, !!appConfig.explorerUrl)}
       className="order-4"
     >
       <ol className="flex flex-col">
@@ -402,8 +380,8 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
                   {e.who && <Who address={e.who} />} {e.text}
                 </span>
                 <span className="flex flex-wrap items-center gap-x-2 text-[12px] text-batu">
-                  <time dateTime={e.when} title={formatDate(e.when)}>
-                    {stamp.format(new Date(e.when))}
+                  <time dateTime={e.when} title={fmt.date(e.when)}>
+                    {fmt.stamp(e.when)}
                   </time>
                   {e.tx && <TxProof hash={e.tx} compact />}
                 </span>
@@ -416,7 +394,7 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
                   +{folded}
                 </span>
                 <button type="button" onClick={() => setUnfolded(true)} className="pressable self-center text-[13px] font-semibold text-pandan">
-                  Tampilkan {folded} langkah lainnya
+                  {text.more(folded)}
                 </button>
               </li>
             )}
@@ -424,23 +402,25 @@ function History({ detail, requesterName }: { detail: Detail; requesterName: str
         ))}
       </ol>
       <p className="border-t pt-4 text-[12px] leading-relaxed text-batu">
-        Dana ditahan kontrak <AddressLink address={escrow.address}>{shortAddress(escrow.address)}</AddressLink>, bukan oleh siapa pun.
+        {text.heldBy(<AddressLink address={escrow.address}>{shortAddress(escrow.address)}</AddressLink>)}
       </p>
     </Panel>
   );
 }
 
-/** A member's name in a history line: "Kamu" for the viewer. */
+/** A member's name in a history line: "Kamu" / "You" for the viewer. */
 function Who({ address }: { address: Address }) {
+  const { t } = useI18n();
   const { address: me } = useSession();
   const { data: member } = useMember(address);
   const mine = me?.toLowerCase() === address.toLowerCase();
-  return <strong className="font-semibold">{mine ? "Kamu" : callName(member?.profile, shortAddress(address))}</strong>;
+  return <strong className="font-semibold">{mine ? t.common.you : callName(member?.profile, shortAddress(address))}</strong>;
 }
 
 // ---------------------------------------------------------------- actions
 
 function Actions({ detail, requesterName, onContributed }: { detail: Detail; requesterName: string; onContributed: () => void }) {
+  const { t, fmt } = useI18n();
   const { request: r, you } = detail;
   const remaining = useRemaining(r.deadline);
   const ended = remaining === 0;
@@ -449,16 +429,23 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
   if (r.status === "finalized") {
     return (
       <>
-        <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title="Dana sudah terkirim">
-          <strong className="tabular">{formatWhzd(r.collected)} WHZD</strong> sampai ke {requesterName}
-          {r.finalizedAt ? ` pada ${formatDate(r.finalizedAt)}` : ""}, langsung dari kontrak tanpa perantara.
+        <Summary icon={<Check className="size-5" strokeWidth={2.5} />} tone="daun" title={t.request.finalized.title}>
+          {t.request.finalized.body(
+            <strong className="tabular">{fmt.whzd(r.collected)} WHZD</strong>,
+            requesterName,
+            r.finalizedAt ? fmt.date(r.finalizedAt) : null,
+          )}
         </Summary>
-        {r.finalizedTx && <TxProof hash={r.finalizedTx} label="Bukti transfer" className="px-3 py-1.5 text-[13px]" />}
+        {r.finalizedTx && <TxProof hash={r.finalizedTx} label={t.request.finalized.proof} className="px-3 py-1.5 text-[13px]" />}
       </>
     );
   }
   if (r.status === "expired") {
-    return <Summary icon={<Clock className="size-5" />} tone="muted" title="Berakhir">Waktu pengumpulan habis tanpa iuran, jadi tidak ada dana yang diteruskan.</Summary>;
+    return (
+      <Summary icon={<Clock className="size-5" />} tone="muted" title={t.request.expired.title}>
+        {t.request.expired.body}
+      </Summary>
+    );
   }
   if (r.status === "cancelled") return <Cancelled detail={detail} requesterName={requesterName} />;
   if (r.awaitingFinalize || ended) return <AwaitingFinalize detail={detail} requesterName={requesterName} />;
@@ -466,17 +453,16 @@ function Actions({ detail, requesterName, onContributed }: { detail: Detail; req
   if (you?.isRequester) return <RequesterPanel detail={detail} />;
   if (!you?.inSnapshot) {
     return (
-      <Summary icon={<UserRound className="size-5" />} tone="muted" title="Kamu tidak termasuk di permintaan ini">
-        Permintaan ini hanya ditujukan ke anggota yang sedang siap membantu saat permintaan dibuat.
+      <Summary icon={<UserRound className="size-5" />} tone="muted" title={t.request.notIncluded.title}>
+        {t.request.notIncluded.body}
       </Summary>
     );
   }
   if (you.response === "contributed") {
     return (
       <>
-        <Summary icon={<HeartHandshake className="size-5" />} tone="daun" title="Iuranmu sudah tercatat">
-          Terima kasih. <strong className="tabular">{formatWhzd(r.share)} WHZD</strong> ikut diteruskan ke {requesterName}{" "}
-          saat waktu habis.
+        <Summary icon={<HeartHandshake className="size-5" />} tone="daun" title={t.request.contributed.title}>
+          {t.request.contributed.body(<strong className="tabular">{fmt.whzd(r.share)} WHZD</strong>, requesterName)}
         </Summary>
         <CountdownPanel openedAt={r.openedAt} deadline={r.deadline} />
       </>
@@ -536,6 +522,8 @@ function ContributePanel({
   onContributed: () => void;
 }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.request.contribute;
   const queryClient = useQueryClient();
   const [declining, setDeclining] = useState(false);
   const { address, token: session } = useSession();
@@ -549,9 +537,10 @@ function ContributePanel({
   const contribute = async () => {
     // Recording the intent is a courtesy for the requester; the chain decides.
     void api.respond(session!, r.id, "participate").catch(() => undefined);
+    const amount = fmt.whzd(r.share);
     const contributeStep = (fn: string) => ({
-      title: `Kirim iuran ${formatWhzd(r.share)} WHZD`,
-      detail: callDetail("Escrow", fn, `Dana ditahan kontrak dan diteruskan ke ${requesterName} saat waktu habis.`),
+      title: text.prompt(amount),
+      detail: t.wallet.call("Escrow", fn, text.detail(requesterName)),
     });
     const receipt = await tx.run({
       prompt: contributeStep("contribute"),
@@ -564,10 +553,7 @@ function ContributePanel({
           readContract(config, { ...token, functionName: "nonces", args: [address!] }),
         ]);
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-        step({
-          title: `Izinkan ${formatWhzd(r.share)} WHZD untuk iuran (1 dari 2)`,
-          detail: `Dompet meminta tanda tangan "Permit": izin bagi kontrak Escrow memakai ${formatWhzd(r.share)} WHZD. Gratis, belum ada dana yang berpindah.`,
-        });
+        step({ title: text.permit(amount), detail: text.permitDetail(amount) });
         const signature = await signTypedData(config, {
           domain: { name, version: "1", chainId: chain.id, verifyingContract: token.address },
           types: permitTypes,
@@ -575,7 +561,7 @@ function ContributePanel({
           message: { owner: address!, spender: escrow.address, value: share, nonce, deadline },
         });
         const { v, r: sigR, s } = parseSignature(signature);
-        step({ ...contributeStep("contributeWithPermit"), title: `Kirim iuran ${formatWhzd(r.share)} WHZD (2 dari 2)` });
+        step({ ...contributeStep("contributeWithPermit"), title: text.promptStep2(amount) });
         return writeContract(config, {
           ...escrow,
           functionName: "contributeWithPermit",
@@ -583,7 +569,7 @@ function ContributePanel({
         });
       },
       synced: async () => (await api.request(r.id, session)).you?.response === "contributed",
-      success: `Iuranmu ${formatWhzd(r.share)} WHZD tercatat. Terima kasih.`,
+      success: text.success(amount),
       invalidate: [keys.request(r.id), ["requests"], ["member"]],
     });
     if (receipt) onContributed();
@@ -599,9 +585,9 @@ function ContributePanel({
         queryClient.invalidateQueries({ queryKey: ["requests"] }),
         queryClient.invalidateQueries({ queryKey: ["member"] }),
       ]);
-      toast("Kamu tidak ikut kali ini.");
+      toast(t.common.declinedToast);
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, t));
     } finally {
       setDeclining(false);
     }
@@ -615,20 +601,19 @@ function ContributePanel({
           <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-full bg-muted text-batu">
             <Hand className="size-5" />
           </span>
-          <h2 className="text-xl font-bold">Kamu tidak ikut kali ini</h2>
+          <h2 className="text-xl font-bold">{text.declinedTitle}</h2>
           <p className="leading-relaxed text-batu">
-            Tidak apa-apa, membantu selalu pilihanmu. Kalau berubah pikiran, kamu masih bisa membantu{" "}
-            <strong className="tabular text-arang">{formatWhzd(r.share)} WHZD</strong> sampai waktunya habis.
+            {text.declinedBody(<strong className="tabular text-arang">{fmt.whzd(r.share)} WHZD</strong>)}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-batu">Bagianmu</span>
+          <span className="text-[13px] font-semibold text-batu">{text.yourShare}</span>
           <span className="tabular text-[49px] leading-none font-extrabold tracking-tighter">
-            {formatWhzd(r.share)} <span className="text-xl font-semibold tracking-normal">WHZD</span>
+            {fmt.whzd(r.share)} <span className="text-xl font-semibold tracking-normal">WHZD</span>
           </span>
           <span className="text-[13px] leading-relaxed text-batu">
-            Sama untuk semua: {formatWhzd(r.amount)} WHZD dibagi {r.snapshotSize} anggota.
+            {text.sameForAll(fmt.whzd(r.amount), r.snapshotSize)}
           </span>
         </div>
       )}
@@ -641,69 +626,66 @@ function ContributePanel({
           disabled={tx.busy || declining || !enough}
           onClick={() => void contribute()}
         >
-          <TxLabel tx={tx}>{`Bantu ${formatWhzd(r.share)} WHZD`}</TxLabel>
+          <TxLabel tx={tx}>{t.common.help(fmt.whzd(r.share))}</TxLabel>
         </Button>
         {!declined && (
           <Button variant="ghost" disabled={tx.busy || declining} onClick={() => void decline()}>
-            <BusyLabel busy={declining ? "Menyimpan" : null}>Tidak kali ini</BusyLabel>
+            <BusyLabel busy={declining ? t.common.saving : null}>{t.common.notThisTime}</BusyLabel>
           </Button>
         )}
       </div>
       {!enough && me && (
         <div className="flex flex-col gap-2 rounded-2xl bg-bata-soft p-4 text-sm text-bata-ink">
-          <p>Saldomu {formatWhzd(me.chain.balance)} WHZD, kurang dari bagianmu.</p>
-          <TopUpDialog me={me} trigger={<button type="button" className="self-start font-semibold underline underline-offset-4">Isi saldo</button>} />
+          <p>{text.notEnough(fmt.whzd(me.chain.balance))}</p>
+          <TopUpDialog
+            me={me}
+            trigger={
+              <button type="button" className="self-start font-semibold underline underline-offset-4">
+                {t.common.topUp}
+              </button>
+            }
+          />
         </div>
       )}
-      <p className="text-[13px] leading-relaxed text-batu">
-        Dana disimpan di kontrak dan diteruskan ke {requesterName} saat waktu habis, berapa pun yang terkumpul. Kalau
-        permintaan dibatalkan, kamu bisa mengambilnya kembali.
-      </p>
+      <p className="text-[13px] leading-relaxed text-batu">{text.note(requesterName)}</p>
     </>
   );
 }
 
 function RequesterPanel({ detail }: { detail: Detail }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.request.requester;
   const { token: session } = useSession();
   const tx = useTx();
   const r = detail.request;
 
   const cancel = () =>
     tx.run({
-      prompt: {
-        title: "Batalkan permintaan",
-        detail: callDetail("Escrow", "cancelRequest", "Tidak ada dana yang diteruskan kepadamu; setiap anggota bisa mengambil iurannya kembali."),
-      },
+      prompt: { title: text.cancel, detail: t.wallet.call("Escrow", "cancelRequest", text.cancelDetail) },
       send: () => writeContract(config, { ...escrow, functionName: "cancelRequest", args: [BigInt(r.id)] }),
       synced: async () => (await api.request(r.id, session)).request.status === "cancelled",
-      success: "Permintaan dibatalkan. Anggota bisa mengambil iurannya kembali.",
+      success: text.cancelSuccess,
       invalidate: [keys.request(r.id), ["requests"], keys.proof],
     });
 
   return (
     <>
-      <Summary title="Permintaanmu sedang berjalan">
-        <strong className="tabular text-arang">{formatWhzd(r.collected)} WHZD</strong> sudah terkumpul untukmu dari{" "}
-        {r.contributors} anggota.
+      <Summary title={text.title}>
+        {text.body(<strong className="tabular text-arang">{fmt.whzd(r.collected)} WHZD</strong>, r.contributors)}
       </Summary>
       <CountdownPanel openedAt={r.openedAt} deadline={r.deadline} />
-      <p className="text-[13px] leading-relaxed text-batu">
-        Saat waktu habis, semua yang terkumpul diteruskan ke dompetmu secara otomatis, berapa pun jumlahnya.
-      </p>
+      <p className="text-[13px] leading-relaxed text-batu">{text.note}</p>
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}><TxLabel tx={tx}>Batalkan permintaan</TxLabel></Button>} />
+        <DialogTrigger render={<Button variant="outline" disabled={tx.busy}><TxLabel tx={tx}>{text.cancel}</TxLabel></Button>} />
         <DialogContent className="gap-5 p-6 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Batalkan permintaan ini?</DialogTitle>
-            <DialogDescription className="leading-relaxed text-batu">
-              Tidak ada dana yang diteruskan kepadamu. Setiap anggota bisa mengambil kembali iurannya. Pembatalan tidak
-              bisa diurungkan.
-            </DialogDescription>
+            <DialogTitle className="text-xl font-semibold">{text.confirmTitle}</DialogTitle>
+            <DialogDescription className="leading-relaxed text-batu">{text.confirmBody}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <DialogClose render={<Button variant="outline">Kembali</Button>} />
-            <DialogClose render={<Button variant="destructive" onClick={() => void cancel()}>Batalkan permintaan</Button>} />
+            <DialogClose render={<Button variant="outline">{text.back}</Button>} />
+            <DialogClose render={<Button variant="destructive" onClick={() => void cancel()}>{text.cancel}</Button>} />
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -724,12 +706,15 @@ const OPEN_ON_CHAIN = [0, 1]; // IEscrow.Status.Open, IEscrow.Status.Funding
  */
 function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requesterName: string }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.request.awaiting;
   const queryClient = useQueryClient();
   const { token: session } = useSession();
   const tx = useTx();
   const r = detail.request;
   const empty = BigInt(r.collected) === 0n;
-  const recipient = detail.you?.isRequester ? "dompetmu" : requesterName;
+  const recipient = detail.you?.isRequester ? text.yourWallet : requesterName;
+  const amount = fmt.whzd(r.collected);
   const overdue = useNow() - new Date(r.deadline).getTime() > MANUAL_AFTER;
 
   useEffect(() => {
@@ -748,41 +733,34 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
     const status = await readContract(config, { ...escrow, functionName: "status", args: [BigInt(r.id)] });
     if (!OPEN_ON_CHAIN.includes(status)) {
       await queryClient.invalidateQueries({ queryKey: keys.request(r.id) });
-      toast("Dananya sudah terkirim otomatis.");
+      toast(text.alreadySent);
       return;
     }
     await tx.run({
       prompt: {
-        title: empty ? "Tutup permintaan" : `Kirim ${formatWhzd(r.collected)} WHZD ke ${recipient}`,
-        detail: callDetail("Escrow", "finalize", `Kontrak hanya bisa mengirim ke ${requesterName}; kamu hanya membayar biaya jaringan.`),
+        title: empty ? text.close : text.send(amount, recipient),
+        detail: t.wallet.call("Escrow", "finalize", text.sendDetail(requesterName)),
       },
       send: () => writeContract(config, { ...escrow, functionName: "finalize", args: [BigInt(r.id)] }),
       synced: async () => (await api.request(r.id, session)).request.status !== r.status,
-      success: empty ? "Permintaan ditutup." : `Dana terkirim ke ${recipient}.`,
+      success: empty ? text.closed : text.sent(recipient),
       invalidate: [keys.request(r.id), ["requests"], ["member"]],
     });
   };
 
   const steps = [
-    { label: "Waktu pengumpulan habis", state: "done" },
-    { label: empty ? "Menutup permintaan" : `Mengirim ${formatWhzd(r.collected)} WHZD otomatis`, state: "active" },
-    { label: empty ? "Selesai" : `Diterima ${recipient}`, state: "todo" },
+    { label: text.steps.ended, state: "done" },
+    { label: empty ? text.steps.closing : text.steps.sending(amount), state: "active" },
+    { label: empty ? text.steps.done : text.steps.received(recipient), state: "todo" },
   ] as const;
 
   return (
     <>
-      <Summary icon={<Hourglass className="size-5" />} title={empty ? "Waktu habis" : "Waktu habis, dana segera dikirim"}>
-        {empty ? (
-          "Tidak ada iuran yang masuk, jadi tidak ada dana yang dikirim. Permintaan ini ditutup otomatis."
-        ) : (
-          <>
-            Tinggal tunggu sebentar. <strong className="tabular text-arang">{formatWhzd(r.collected)} WHZD</strong> dikirim
-            otomatis ke {recipient}, tidak perlu menekan apa pun. Halaman ini berubah sendiri begitu dananya sampai.
-          </>
-        )}
+      <Summary icon={<Hourglass className="size-5" />} title={empty ? text.titleEmpty : text.title}>
+        {empty ? text.bodyEmpty : text.body(<strong className="tabular text-arang">{amount} WHZD</strong>, recipient)}
       </Summary>
 
-      <ol aria-label="Proses" className="flex flex-col gap-3 rounded-xl bg-embun p-4">
+      <ol aria-label={text.process} className="flex flex-col gap-3 rounded-xl bg-embun p-4">
         {steps.map((step) => (
           <li key={step.label} className="flex items-center gap-3 text-sm">
             <span
@@ -804,12 +782,9 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
 
       {overdue && (
         <div className="settle-in flex flex-col gap-3 border-t pt-5">
-          <p className="text-[13px] leading-relaxed text-batu">
-            Pengirimannya lebih lama dari biasanya. Kalau tidak mau menunggu, kamu bisa mengirimnya sendiri. Dananya tetap
-            hanya bisa sampai ke {requesterName}, dan tidak mungkin terkirim dua kali.
-          </p>
+          <p className="text-[13px] leading-relaxed text-batu">{text.overdue(requesterName)}</p>
           <Button variant="outline" disabled={tx.busy} onClick={() => void forward()}>
-            <TxLabel tx={tx}>Kirim sekarang</TxLabel>
+            <TxLabel tx={tx}>{text.sendNow}</TxLabel>
           </Button>
         </div>
       )}
@@ -819,22 +794,22 @@ function AwaitingFinalize({ detail, requesterName }: { detail: Detail; requester
 
 function Cancelled({ detail, requesterName }: { detail: Detail; requesterName: string }) {
   const config = useConfig();
+  const { t, fmt } = useI18n();
+  const text = t.request.cancelled;
   const tx = useTx();
   const { request: r, you } = detail;
   const contribution = you?.contribution;
   if (!contribution || contribution.refunded) {
     return (
-      <Summary title="Dibatalkan">
-        {requesterName} membatalkan permintaan ini{r.cancelledAt ? ` pada ${formatDate(r.cancelledAt)}` : ""}.
-        {contribution?.refunded ? " Iuranmu sudah kembali ke dompetmu." : ""}
+      <Summary title={text.title}>
+        {text.body(requesterName, r.cancelledAt ? fmt.date(r.cancelledAt) : null, !!contribution?.refunded)}
       </Summary>
     );
   }
   return (
     <>
-      <Summary title="Dibatalkan">
-        {requesterName} membatalkan permintaan ini. Iuranmu <strong className="tabular">{formatWhzd(contribution.amount)} WHZD</strong>{" "}
-        bisa kamu ambil kembali.
+      <Summary title={text.title}>
+        {text.claimable(requesterName, <strong className="tabular">{fmt.whzd(contribution.amount)} WHZD</strong>)}
       </Summary>
       <Button
         size="lg"
@@ -842,16 +817,16 @@ function Cancelled({ detail, requesterName }: { detail: Detail; requesterName: s
         onClick={() =>
           void tx.run({
             prompt: {
-              title: `Ambil kembali ${formatWhzd(contribution.amount)} WHZD`,
-              detail: callDetail("Escrow", "claimRefund", "Iuranmu dari permintaan yang dibatalkan kembali ke dompetmu."),
+              title: t.common.claimBack(fmt.whzd(contribution.amount)),
+              detail: t.wallet.call("Escrow", "claimRefund", t.common.refundDetail),
             },
             send: () => writeContract(config, { ...escrow, functionName: "claimRefund", args: [BigInt(r.id)] }),
-            success: `${formatWhzd(contribution.amount)} WHZD sudah kembali ke dompetmu.`,
+            success: text.success(fmt.whzd(contribution.amount)),
             invalidate: [keys.request(r.id), keys.refunds, ["member"]],
           })
         }
       >
-        <TxLabel tx={tx}>{`Ambil kembali ${formatWhzd(contribution.amount)} WHZD`}</TxLabel>
+        <TxLabel tx={tx}>{t.common.claimBack(fmt.whzd(contribution.amount))}</TxLabel>
       </Button>
     </>
   );
