@@ -400,15 +400,16 @@ type Notification struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	RequestID   *int64    `json:"requestId"`
+	Amount      *string   `json:"amount"` // wei; null if the notification has no amount
 	IsRead      bool      `json:"isRead"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-const notificationColumns = `id, member, type, title, description, request_id, is_read, created_at`
+const notificationColumns = `id, member, type, title, description, request_id, amount::text, is_read, created_at`
 
 func scanNotification(row pgx.Row) (*Notification, error) {
 	var n Notification
-	err := row.Scan(&n.ID, &n.Member, &n.Type, &n.Title, &n.Description, &n.RequestID, &n.IsRead, &n.CreatedAt)
+	err := row.Scan(&n.ID, &n.Member, &n.Type, &n.Title, &n.Description, &n.RequestID, &n.Amount, &n.IsRead, &n.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

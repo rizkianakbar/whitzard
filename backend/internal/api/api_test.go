@@ -600,7 +600,7 @@ func TestNotifications(t *testing.T) {
 	if err := wsjson.Read(ctx, ws, &pushed); err != nil {
 		t.Fatalf("no live notification: %v", err)
 	}
-	if pushed["type"] != "request_opened" || pushed["requestId"] != float64(1) {
+	if pushed["type"] != "request_opened" || pushed["requestId"] != float64(1) || pushed["amount"] == nil {
 		t.Fatalf("pushed = %v", pushed)
 	}
 

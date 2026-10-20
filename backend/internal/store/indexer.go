@@ -149,13 +149,13 @@ func (t *IndexTx) AddSnapshotMembers(ctx context.Context, requestID uint64, memb
 }
 
 // Notify stores a notification for `member` and announces it on NotifyChannel; the announcement
-// is delivered only when the transaction commits.
-func (t *IndexTx) Notify(ctx context.Context, member, kind, title, description string, requestID uint64) error {
+// is delivered only when the transaction commits. amount (wei) is "" when the notification has none.
+func (t *IndexTx) Notify(ctx context.Context, member, kind, title, description string, requestID uint64, amount string) error {
 	var id int64
 	if err := t.tx.QueryRow(ctx, `
-		INSERT INTO notifications (member, type, title, description, request_id)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		member, kind, title, description, int64(requestID)).Scan(&id); err != nil {
+		INSERT INTO notifications (member, type, title, description, request_id, amount)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::numeric) RETURNING id`,
+		member, kind, title, description, int64(requestID), amount).Scan(&id); err != nil {
 		return err
 	}
 	payload, err := json.Marshal(map[string]any{"id": id, "member": member})

@@ -84,4 +84,4 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | `POST /notifications/{id}/read` 🔒 | mark as read |
 | `GET /ws?token=<token>` | WebSocket: each new notification is pushed as JSON |
 
-Types: `request_opened`, `contribution_received`, `request_cancelled`, `request_finalized`, `request_expired`.
+Types: `request_opened`, `contribution_received`, `request_cancelled`, `request_finalized` (to the requester), `request_forwarded` (to the contributors), `request_expired`. `amount` (wei, or null) is the share asked for, the contribution received, or the total paid out; `title` and `description` are Indonesian text, kept for clients that do not write their own.

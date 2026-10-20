@@ -157,7 +157,7 @@ func TestIndexerMirrorsScenario(t *testing.T) {
 		{eve, "request_opened", 0},
 		{alice, "contribution_received", 2}, {bob, "contribution_received", 2},
 		{alice, "request_cancelled", 1}, {dave, "request_cancelled", 1},
-		{alice, "request_finalized", 1}, {bob, "request_finalized", 1}, {carol, "request_finalized", 1},
+		{alice, "request_finalized", 1}, {bob, "request_forwarded", 1}, {carol, "request_forwarded", 1},
 	}
 	for _, ck := range checks {
 		if got := count(ck.who, ck.kind); got != ck.want {

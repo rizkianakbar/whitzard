@@ -184,7 +184,7 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 			return err
 		}
 		return tx.Notify(ctx, requester, "contribution_received", "Iuran baru masuk",
-			fmt.Sprintf("Seorang anggota membantu %s WHZD untuk permintaanmu nomor %d.", chain.FormatUnits(e.Amount), id), id)
+			fmt.Sprintf("Seorang anggota membantu %s WHZD untuk permintaanmu nomor %d.", chain.FormatUnits(e.Amount), id), id, e.Amount.String())
 
 	case *bindings.EscrowRequestCancelled:
 		id := e.Id.Uint64()
@@ -194,7 +194,7 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 		}
 		for _, m := range contributors {
 			if err := tx.Notify(ctx, m, "request_cancelled", "Permintaan dibatalkan",
-				fmt.Sprintf("Permintaan nomor %d dibatalkan oleh peminta. Kamu bisa mengambil iuranmu kembali.", id), id); err != nil {
+				fmt.Sprintf("Permintaan nomor %d dibatalkan oleh peminta. Kamu bisa mengambil iuranmu kembali.", id), id, ""); err != nil {
 				return err
 			}
 		}
@@ -212,15 +212,15 @@ func (ix *Indexer) apply(ctx context.Context, tx *store.IndexTx, event any, ref 
 		}
 		if expired {
 			return tx.Notify(ctx, requester, "request_expired", "Permintaan berakhir",
-				fmt.Sprintf("Waktu permintaan nomor %d habis tanpa iuran.", id), id)
+				fmt.Sprintf("Waktu permintaan nomor %d habis tanpa iuran.", id), id, "")
 		}
 		if err := tx.Notify(ctx, requester, "request_finalized", "Dana sudah diterima",
-			fmt.Sprintf("%s WHZD dari permintaan nomor %d sudah masuk ke dompetmu.", total, id), id); err != nil {
+			fmt.Sprintf("%s WHZD dari permintaan nomor %d sudah masuk ke dompetmu.", total, id), id, e.Total.String()); err != nil {
 			return err
 		}
 		for _, m := range contributors {
-			if err := tx.Notify(ctx, m, "request_finalized", "Dana sudah diteruskan",
-				fmt.Sprintf("Permintaan nomor %d yang kamu bantu sudah selesai: %s WHZD sampai ke peminta.", id, total), id); err != nil {
+			if err := tx.Notify(ctx, m, "request_forwarded", "Dana sudah diteruskan",
+				fmt.Sprintf("Permintaan nomor %d yang kamu bantu sudah selesai: %s WHZD sampai ke peminta.", id, total), id, e.Total.String()); err != nil {
 				return err
 			}
 		}
@@ -267,7 +267,7 @@ func (ix *Indexer) applyOpened(ctx context.Context, tx *store.IndexTx, e *bindin
 	}
 	for _, m := range members {
 		if err := tx.Notify(ctx, m, "request_opened", "Ada yang butuh bantuan",
-			fmt.Sprintf("Permintaan nomor %d meminta %s WHZD dari setiap anggota.", id, chain.FormatUnits(e.Share)), id); err != nil {
+			fmt.Sprintf("Permintaan nomor %d meminta %s WHZD dari setiap anggota.", id, chain.FormatUnits(e.Share)), id, e.Share.String()); err != nil {
 			return err
 		}
 	}
