@@ -127,7 +127,7 @@
      their own overlay scrollbars. A component can still hide its own ([scrollbar-width:none]). */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-kunyit) transparent;
+    scrollbar-color: var(--color-pandan-deep) transparent;
   }
   ::-webkit-scrollbar {
     width: 12px;
@@ -140,10 +140,14 @@
     border: 3px solid transparent;
     border-radius: 9999px;
     background-clip: content-box;
-    background-color: var(--color-kunyit);
+    background-color: var(--color-pandan-deep);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: color-mix(in oklch, var(--color-kunyit), var(--color-kunyit-ink) 30%);
+    background-color: color-mix(
+      in oklch,
+      var(--color-pandan-deep),
+      var(--color-pandan-ink) 30%
+    );
   }
   /* Pressables give their own feedback (scale on press), so no grey tap flash, no double-tap-zoom
      delay, and a long press doesn't select the label. Body text stays selectable. */
@@ -284,7 +288,11 @@
   :root {
     --noise-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     --noise-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-color: #0f3d31;
+    background-color: #e6eae6;
+    --noise: var(--noise-dark);
+    --noise-opacity: 0.16;
+    position: relative;
+    isolation: isolate;
   }
   .grain {
     --noise: var(--noise-dark);
