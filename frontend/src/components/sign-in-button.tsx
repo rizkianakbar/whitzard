@@ -18,7 +18,7 @@ import { useSession } from "@/lib/session";
  * local test accounts in dev), then asks it to sign the SIWE message. A refused signature disconnects
  * again, so the member is never left connected but signed out.
  */
-export function SignInButton({ size, label }: { size?: "default" | "lg"; label?: string }) {
+export function SignInButton({ size, label, className }: { size?: "default" | "lg"; label?: string; className?: string }) {
   const { t } = useI18n();
   const idle = label ?? t.signIn.button;
   const connectors = useConnectors();
@@ -70,7 +70,7 @@ export function SignInButton({ size, label }: { size?: "default" | "lg"; label?:
   // Already connected (wagmi reconnected on load, or the wallet switched accounts): only the signature is missing.
   if (address) {
     return (
-      <Button size={size} disabled={signing} onClick={() => sign()}>
+      <Button size={size} disabled={signing} className={className} onClick={() => sign()}>
         {labelComponent}
       </Button>
     );
@@ -78,7 +78,7 @@ export function SignInButton({ size, label }: { size?: "default" | "lg"; label?:
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={size} disabled={signing}>{labelComponent}</Button>} />
+      <DialogTrigger render={<Button size={size} disabled={signing} className={className}>{labelComponent}</Button>} />
       <DialogContent className="gap-5 rounded-3xl p-6 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">{t.signIn.withWallet}</DialogTitle>
