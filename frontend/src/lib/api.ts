@@ -173,8 +173,11 @@ export const api = {
     return call<MemberProfile>("/members/me/photo", { method: "PUT", token, body: form });
   },
   deletePhoto: (token: string) => call<MemberProfile>("/members/me/photo", { method: "DELETE", token }),
-  photo: async (token: string, address: Address) => {
-    const res = await fetch(`${appConfig.apiUrl}/members/${address}/photo`, { headers: { Authorization: `Bearer ${token}` } });
+  /** `hash` versions the URL: the backend lets browsers cache a photo for a day. */
+  photo: async (token: string, address: Address, hash: string) => {
+    const res = await fetch(`${appConfig.apiUrl}/members/${address}/photo?v=${hash}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) throw new ApiError(res.status, "Foto tidak bisa dimuat");
     return res.blob();
   },

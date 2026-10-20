@@ -49,6 +49,15 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
     });
   };
 
+  // Back to the saved photo (if any), so the Avatar shows what the server has.
+  const clearPicked = () => {
+    setPhoto(null);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validateAll()) return;
@@ -63,7 +72,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
       });
       if (photo) await api.setPhoto(token!, photo);
       await queryClient.invalidateQueries({ queryKey: keys.member(me.address) });
-      setPhoto(null);
+      clearPicked();
       toast.success("Profil tersimpan.");
       onSaved?.();
     } catch (error) {
@@ -102,7 +111,10 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
             type="file"
             accept="image/png,image/jpeg,image/webp"
             className="sr-only"
-            onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              pickPhoto(e.target.files?.[0] ?? null);
+              e.target.value = ""; // so picking the same file again still fires onChange
+            }}
           />
         </label>
         <div className="flex min-w-52 flex-1 flex-col gap-1">
@@ -111,10 +123,19 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
             Opsional. PNG, JPG atau WebP, maksimal 2 MB. Hanya anggota yang sudah masuk yang bisa melihatnya.
           </span>
           {photoError && <span role="alert" className="text-sm font-medium text-bata-ink">{photoError}</span>}
-          {p?.photo && !photo && (
-            <button type="button" onClick={() => void removePhoto()} className="self-start text-sm font-semibold text-bata-ink underline underline-offset-4">
-              Hapus foto
-            </button>
+          {photo ? (
+            <span className="text-sm text-batu">
+              Foto baru tersimpan setelah kamu menekan &ldquo;{submitLabel}&rdquo;.{" "}
+              <button type="button" onClick={clearPicked} className="font-semibold text-bata-ink underline underline-offset-4">
+                Batal
+              </button>
+            </span>
+          ) : (
+            p?.photo && (
+              <button type="button" onClick={() => void removePhoto()} className="self-start text-sm font-semibold text-bata-ink underline underline-offset-4">
+                Hapus foto
+              </button>
+            )
           )}
         </div>
       </div>

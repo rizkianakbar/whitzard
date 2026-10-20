@@ -144,7 +144,7 @@ export function usePhotoUrl(address: Address | undefined, photo: string | null |
   const { token } = useSession();
   const { data: url } = useQuery({
     queryKey: ["photo", address?.toLowerCase(), photo],
-    queryFn: async () => URL.createObjectURL(await api.photo(token!, address!)),
+    queryFn: async () => URL.createObjectURL(await api.photo(token!, address!, photo!)),
     enabled: !!token && !!address && !!photo,
     staleTime: Infinity,
     gcTime: Infinity,
