@@ -16,6 +16,7 @@ import {
   History as HistoryIcon,
   Hourglass,
   LoaderCircle,
+  MessageCircle,
   RotateCcw,
   ShieldCheck,
   TriangleAlert,
@@ -47,6 +48,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError, type RequestDetail as Detail } from "@/lib/api";
 import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
@@ -145,6 +147,7 @@ function View({ detail }: { detail: Detail }) {
           )}
 
           <Evidence detail={detail} requesterName={name} />
+          <Discussion detail={detail} />
         </div>
 
         {/* Right column: where the request stands. Actions first, then what has happened so far. */}
@@ -268,6 +271,73 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
         )}
       </div>
       <p className="text-[13px] leading-relaxed text-batu">{text.note}</p>
+    </Panel>
+  );
+}
+
+// ---------------------------------------------------------------- history
+
+function Discussion({ detail }: { detail: Detail }) {
+  const { t, fmt } = useI18n();
+  const text = t.request.discussion;
+  const { token: session } = useSession();
+  const queryClient = useQueryClient();
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const comments = detail.comments ?? [];
+
+  const submit = async () => {
+    const value = body.trim();
+    if (!value) return;
+    setSending(true);
+    try {
+      await api.comment(session!, detail.request.id, value);
+      setBody("");
+      await queryClient.invalidateQueries({ queryKey: keys.request(detail.request.id) });
+      toast.success(text.posted);
+    } catch (error) {
+      toast.error(errorMessage(error, t));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Panel id="discussion" icon={<MessageCircle className="size-4.5" />} title={text.title} description={text.description} className="order-4">
+      {comments.length === 0 ? (
+        <p className="text-sm text-batu">{text.empty}</p>
+      ) : (
+        <ol className="flex flex-col gap-3">
+          {comments.map((comment) => (
+            <li key={comment.id} className="flex flex-col gap-2 rounded-xl border bg-embun p-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <Who address={comment.member} />
+                <span className="text-batu">·</span>
+                <time className="text-batu" dateTime={comment.createdAt} title={fmt.date(comment.createdAt)}>
+                  {fmt.stamp(comment.createdAt)}
+                </time>
+              </div>
+              <p className="text-[15px] leading-relaxed whitespace-pre-line">{comment.body}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="flex flex-col gap-3 border-t pt-4">
+        <Textarea
+          value={body}
+          maxLength={1000}
+          rows={4}
+          placeholder={text.placeholder}
+          onChange={(e) => setBody(e.target.value)}
+          aria-label={text.placeholder}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-batu">{body.trim().length}/1000</span>
+          <Button disabled={sending || !body.trim()} onClick={() => void submit()}>
+            <BusyLabel busy={sending ? text.sending : null}>{text.send}</BusyLabel>
+          </Button>
+        </div>
+      </div>
     </Panel>
   );
 }

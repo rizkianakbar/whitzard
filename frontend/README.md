@@ -48,7 +48,7 @@ pnpm build
 | `/gabung` | Onboarding: test ETH for gas, top up WHZD, register, profile, turn on _Siap membantu_ |
 | `/beranda` | Dashboard: balance and totals, _Siap membantu_ switch, whether you can open a request, running requests for you (carousel, unanswered first) and yours, the member list |
 | `/permintaan` | Every request, filtered (all / for me / mine, running / finished) and searchable |
-| `/permintaan/[id]` | One request: funding and share grid, story, evidence (checked against its on-chain hash), actions, and the full history with a transaction link for each step |
+| `/permintaan/[id]` | One request: funding and share grid, story, discussion comments, evidence (checked against its on-chain hash), actions, and the full history with a transaction link for each step |
 | `/ajukan` | Open a request: story, amount, duration, evidence document; or why you can't yet |
 | `/notifikasi` | All notifications (the bell in the header shows the latest) |
 | `/profil` | Your profile and photo |

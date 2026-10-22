@@ -40,6 +40,11 @@ type Config struct {
 	MaxPhotoBytes  int64
 	MaxUploadBytes int64
 	SessionTTL     time.Duration
+	SMTPHost       string
+	SMTPPort       uint64
+	SMTPUsername   string
+	SMTPPassword   string
+	SMTPFrom       string
 
 	KeeperKey          *ecdsa.PrivateKey // nil if KEEPER_PRIVATE_KEY is not set
 	KeeperPollInterval time.Duration
@@ -78,6 +83,11 @@ func Load() (*Config, error) {
 	c.PhotoDir = get("PHOTO_DIR", "./data/photos")
 	c.MaxPhotoBytes = int64(uintVar("MAX_PHOTO_BYTES", 2<<20, &errs))
 	c.SessionTTL = duration("SESSION_TTL", "168h", &errs)
+	c.SMTPHost = os.Getenv("SMTP_HOST")
+	c.SMTPPort = uintVar("SMTP_PORT", 587, &errs)
+	c.SMTPUsername = os.Getenv("SMTP_USERNAME")
+	c.SMTPPassword = os.Getenv("SMTP_PASSWORD")
+	c.SMTPFrom = os.Getenv("SMTP_FROM")
 
 	if v := os.Getenv("KEEPER_PRIVATE_KEY"); v != "" {
 		key, err := crypto.HexToECDSA(strings.TrimPrefix(v, "0x"))

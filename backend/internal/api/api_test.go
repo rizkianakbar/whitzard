@@ -78,7 +78,7 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hub := api.NewHub(e.st, quiet)
+	hub := api.NewHub(e.st, quiet, nil)
 	hubCtx, cancel := context.WithCancel(ctx)
 	t.Cleanup(cancel)
 	go hub.Run(hubCtx, e.st.Pool.Config().ConnString())
@@ -258,31 +258,34 @@ func TestMembers(t *testing.T) {
 		b, _ := json.Marshal(v)
 		return e.do("PUT", "/members/me", token, bytes.NewReader(b), "application/json")
 	}
-	full := put(token, map[string]any{"displayName": "Alice Liddell", "nickname": "Al", "birthDate": "1990-05-17", "city": " Bandung "})
+	full := put(token, map[string]any{"displayName": "Alice Liddell", "nickname": "Al", "birthDate": "1990-05-17", "city": " Bandung ", "email": " Alice@Example.com "})
 	expect(t, full, 200)
-	if p := full.json(t); p["nickname"] != "Al" || p["birthDate"] != "1990-05-17" || p["city"] != "Bandung" {
+	if p := full.json(t); p["nickname"] != "Al" || p["birthDate"] != "1990-05-17" || p["city"] != "Bandung" || p["email"] != "alice@example.com" {
 		t.Fatalf("profile = %s", full.body)
 	}
 	expect(t, put(token, map[string]any{"birthDate": "17-05-1990"}), 400)
 	expect(t, put(token, map[string]any{"birthDate": "2999-01-01"}), 400)
 	expect(t, put(token, map[string]any{"nickname": strings.Repeat("x", 31)}), 400)
+	expect(t, put(token, map[string]any{"email": "not-an-email"}), 400)
 
-	// The birth date is only for alice; the city only for signed-in viewers.
+	// The birth date and email are only for alice; the city only for signed-in viewers.
 	bobToken := e.login(e.bob)
-	if p := e.get("/members/me", token).json(t)["profile"].(map[string]any); p["birthDate"] != "1990-05-17" {
+	if p := e.get("/members/me", token).json(t)["profile"].(map[string]any); p["birthDate"] != "1990-05-17" || p["email"] != "alice@example.com" {
 		t.Fatalf("own profile = %v", p)
 	}
-	if p := e.get("/members/"+e.alice.Addr.Hex(), bobToken).json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != "Bandung" {
+	if p := e.get("/members/"+e.alice.Addr.Hex(), bobToken).json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != "Bandung" || p["email"] != nil {
 		t.Fatalf("bob's view = %v", p)
 	}
-	if p := e.get("/members/"+e.alice.Addr.Hex(), "").json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != nil || p["nickname"] != "Al" {
+	if p := e.get("/members/"+e.alice.Addr.Hex(), "").json(t)["profile"].(map[string]any); p["birthDate"] != nil || p["city"] != nil || p["nickname"] != "Al" || p["email"] != nil {
 		t.Fatalf("anonymous view = %v", p)
 	}
 
 	// Replacing the profile clears what is left out.
-	if p := put(token, map[string]any{"displayName": "Alice"}).json(t); p["nickname"] != nil || p["city"] != nil || p["birthDate"] != nil {
+	if p := put(token, map[string]any{"displayName": "Alice"}).json(t); p["nickname"] != nil || p["city"] != nil || p["birthDate"] != nil || p["email"] != nil {
 		t.Fatalf("after replace = %v", p)
 	}
+	expect(t, put(token, map[string]any{"displayName": "Alice", "email": "alice@example.com"}), 200)
+	expect(t, put(bobToken, map[string]any{"displayName": "Bob", "email": "alice@example.com"}), 409)
 
 	long, _ := json.Marshal(map[string]any{"displayName": strings.Repeat("x", 51)})
 	expect(t, e.do("PUT", "/members/me", token, bytes.NewReader(long), "application/json"), 400)
@@ -434,6 +437,23 @@ func TestRequestFlow(t *testing.T) {
 	}
 	if detail["request"].(map[string]any)["status"] != "funding" {
 		t.Fatalf("status = %v", detail["request"])
+	}
+	if comments := detail["comments"].([]any); len(comments) != 0 {
+		t.Fatalf("comments = %v", comments)
+	}
+
+	comment := e.post("/requests/1/comments", bobToken, map[string]string{"body": "Semoga lekas sembuh, ada estimasi jadwal operasi?"})
+	expect(t, comment, 201)
+	if got := comment.json(t)["member"]; got != strings.ToLower(e.bob.Addr.Hex()) {
+		t.Fatalf("comment member = %v", got)
+	}
+	expect(t, e.post("/requests/1/comments", bobToken, map[string]string{"body": "  "}), 400)
+	expect(t, e.post("/requests/1/comments", "", map[string]string{"body": "x"}), 401)
+
+	detail = e.get("/requests/1", aliceToken).json(t)
+	comments := detail["comments"].([]any)
+	if len(comments) != 1 || comments[0].(map[string]any)["body"] == "" {
+		t.Fatalf("comments in detail = %v", comments)
 	}
 
 	list := e.get("/requests?member=me", bobToken).json(t)["requests"].([]any)

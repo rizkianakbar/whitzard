@@ -532,6 +532,15 @@ export const en: Dict = {
       open: "View document",
       note: "The document's fingerprint (SHA-256) was recorded on the blockchain when the request was opened. Before opening, the document is checked against it, so you know it hasn't been swapped.",
     },
+    discussion: {
+      title: "Discussion",
+      description: "A place for members to ask and clarify this request.",
+      placeholder: "Write a comment or question…",
+      send: "Post comment",
+      sending: "Posting comment",
+      empty: "No comments yet.",
+      posted: "Comment posted.",
+    },
     history: {
       title: "History",
       description: (chain: string, explorer: boolean) =>
@@ -787,6 +796,8 @@ export const en: Dict = {
     form: {
       photoTooLarge: "The photo is larger than 2 MB.",
       nameRequired: "Enter your full name.",
+      emailRequired: "Enter your email.",
+      emailInvalid: "Email format is invalid.",
       birthFuture: "Your birth date can't be in the future.",
       saved: "Profile saved.",
       photoRemoved: "Photo removed.",
@@ -799,6 +810,8 @@ export const en: Dict = {
       displayName: "Full name",
       nickname: "Nickname",
       nicknameHint: "What we call you.",
+      email: "Email",
+      emailHint: "Used for email notifications.",
       city: "City or regency",
       cityHint: "Visible to other members.",
       birthDate: "Birth date",

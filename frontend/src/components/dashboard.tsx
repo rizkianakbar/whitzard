@@ -71,7 +71,8 @@ export function Dashboard() {
 function SetupBanner({ me }: { me: Member }) {
   const { t } = useI18n();
   const hasTokens = BigInt(me.chain.faucetClaimed) > 0n || BigInt(me.chain.balance) > 0n;
-  if (me.profile?.displayName && hasTokens) return null;
+  const profileDone = !!me.profile?.displayName && !!me.profile?.email;
+  if (profileDone && hasTokens) return null;
   return (
     <Link
       href="/gabung"
@@ -79,7 +80,7 @@ function SetupBanner({ me }: { me: Member }) {
     >
       <div className="flex min-w-60 flex-1 flex-col gap-1">
         <span className="font-bold">{t.dashboard.setup.title}</span>
-        <span className="text-batu">{t.dashboard.setup.body(!me.profile?.displayName)}</span>
+        <span className="text-batu">{t.dashboard.setup.body(!profileDone)}</span>
       </div>
       <ArrowRight aria-hidden="true" className="size-5 text-pandan" />
     </Link>

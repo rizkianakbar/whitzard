@@ -117,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /requests/{id}/evidence", s.authed(s.handleEvidence))
 	mux.HandleFunc("GET /requests/{id}/activity", s.authed(s.handleActivity))
 	mux.HandleFunc("POST /requests/{id}/contribute", s.authed(s.handleRespond))
+	mux.HandleFunc("POST /requests/{id}/comments", s.authed(s.handleComment))
 
 	mux.HandleFunc("GET /notifications", s.authed(s.handleListNotifications))
 	mux.HandleFunc("POST /notifications/{id}/read", s.authed(s.handleMarkRead))

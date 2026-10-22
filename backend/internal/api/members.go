@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/rizkianakbar/whitzard/backend/internal/auth"
 	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
@@ -165,13 +167,24 @@ func (s *Server) handleListMembers(w http.ResponseWriter, r *http.Request) {
 	viewer := caller(r)
 	out := make([]any, len(members))
 	for i, m := range members {
-		out[i] = profileView(m, viewer)
+		out[i] = listProfileView(m, viewer)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"members": out})
 }
 
-// profileView is a member's profile as the viewer may see it: the birth date only for the member
-// themself, the city only for signed-in viewers.
+func listProfileView(m *store.Member, viewer string) any {
+	if m == nil {
+		return nil
+	}
+	v := *m
+	if viewer == "" {
+		v.City = nil
+	}
+	return v
+}
+
+// profileView is a member's profile as the viewer may see it: birth date and email only for the
+// member themself, city only for signed-in viewers.
 func profileView(m *store.Member, viewer string) any {
 	if m == nil {
 		return nil
@@ -179,6 +192,7 @@ func profileView(m *store.Member, viewer string) any {
 	v := struct {
 		store.Member
 		BirthDate *string `json:"birthDate,omitempty"`
+		Email     *string `json:"email,omitempty"`
 	}{Member: *m}
 	if viewer == "" {
 		v.City = nil
@@ -187,17 +201,21 @@ func profileView(m *store.Member, viewer string) any {
 		d := m.BirthDate.Format(time.DateOnly)
 		v.BirthDate = &d
 	}
+	if viewer == m.Address {
+		v.Email = m.Email
+	}
 	return v
 }
 
-// PUT /members/me {displayName, nickname, birthDate, city}: replaces the profile (missing or empty
-// fields are cleared), for registered members. Nothing here is verified.
+// PUT /members/me {displayName, nickname, birthDate, city, email}: replaces the profile (missing
+// or empty fields are cleared), for registered members. Nothing here is verified.
 func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DisplayName *string `json:"displayName"`
 		Nickname    *string `json:"nickname"`
 		BirthDate   *string `json:"birthDate"` // YYYY-MM-DD
 		City        *string `json:"city"`
+		Email       *string `json:"email"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return
@@ -234,10 +252,31 @@ func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		}
 		p.BirthDate = &d
 	}
+	if body.Email != nil {
+		v := strings.TrimSpace(*body.Email)
+		if v != "" {
+			parsed, err := mail.ParseAddress(v)
+			if err != nil || !strings.EqualFold(parsed.Address, v) {
+				writeError(w, http.StatusBadRequest, "email must be a valid address")
+				return
+			}
+			v = strings.ToLower(v)
+			if utf8.RuneCountInString(v) > 254 {
+				writeError(w, http.StatusBadRequest, "email is at most 254 characters")
+				return
+			}
+			p.Email = &v
+		}
+	}
 
 	err := s.store.SetProfile(r.Context(), caller(r), p)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusConflict, "register on-chain first (Registry.register)")
+		return
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		writeError(w, http.StatusConflict, "email is already used by another member")
 		return
 	}
 	if err != nil {

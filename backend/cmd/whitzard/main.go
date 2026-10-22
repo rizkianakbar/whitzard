@@ -28,6 +28,7 @@ import (
 	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
 	"github.com/rizkianakbar/whitzard/backend/internal/indexer"
 	"github.com/rizkianakbar/whitzard/backend/internal/keeper"
+	"github.com/rizkianakbar/whitzard/backend/internal/notify"
 	"github.com/rizkianakbar/whitzard/backend/internal/store"
 )
 
@@ -83,11 +84,17 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 	}
 
 	var tasks []func(context.Context) error
+	mailer, err := notify.NewSMTP(notify.SMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, From: cfg.SMTPFrom,
+	})
+	if err != nil {
+		return err
+	}
 	switch command {
 	case "indexer":
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
 	case "api":
-		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
+		tasks = append(tasks, apiTasks(cfg, client, st, log, mailer)...)
 	case "keeper":
 		if cfg.KeeperKey == nil {
 			return errors.New("KEEPER_PRIVATE_KEY is required for the keeper")
@@ -95,7 +102,7 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 		tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
 	case "all":
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
-		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
+		tasks = append(tasks, apiTasks(cfg, client, st, log, mailer)...)
 		if cfg.KeeperKey != nil {
 			tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
 		} else {
@@ -150,8 +157,8 @@ func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, c
 	}
 }
 
-func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger) []func(context.Context) error {
-	hub := api.NewHub(st, log.With("component", "hub"))
+func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger, mailer *notify.SMTP) []func(context.Context) error {
+	hub := api.NewHub(st, log.With("component", "hub"), mailer)
 	serve := func(ctx context.Context) error {
 		ev, err := evidence.NewDisk(cfg.EvidenceDir, cfg.MaxUploadBytes)
 		if err != nil {

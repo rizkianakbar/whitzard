@@ -117,14 +117,20 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 type Hub struct {
 	store *store.Store
 	log   *slog.Logger
+	mail  Mailer
 
 	mu   sync.Mutex
 	subs map[string]map[chan *store.Notification]struct{}
 }
 
+// Mailer sends notification emails.
+type Mailer interface {
+	Send(ctx context.Context, to, subject, body string) error
+}
+
 // NewHub creates a hub; call Run to start listening.
-func NewHub(st *store.Store, log *slog.Logger) *Hub {
-	return &Hub{store: st, log: log, subs: map[string]map[chan *store.Notification]struct{}{}}
+func NewHub(st *store.Store, log *slog.Logger, mail Mailer) *Hub {
+	return &Hub{store: st, log: log, mail: mail, subs: map[string]map[chan *store.Notification]struct{}{}}
 }
 
 // Subscribe returns a channel of `member`'s new notifications. The channel is closed if the
@@ -215,6 +221,33 @@ func (h *Hub) listen(ctx context.Context, databaseURL string) error {
 			h.log.Error("load notification", "id", payload.ID, "err", err)
 			continue
 		}
+		h.sendNotificationEmail(ctx, n)
 		h.deliver(n)
 	}
+}
+
+func (h *Hub) sendNotificationEmail(ctx context.Context, n *store.Notification) {
+	if h.mail == nil {
+		return
+	}
+	email, err := h.store.MemberEmail(ctx, n.Member)
+	if err != nil {
+		h.log.Error("load member email", "member", n.Member, "err", err)
+		return
+	}
+	if email == nil || *email == "" {
+		return
+	}
+	subject, body := n.Title, n.Description
+	if n.RequestID != nil {
+		body = body + "\n\nRequest ID: " + strconv.FormatInt(*n.RequestID, 10)
+	}
+	member := n.Member
+	go func(to, sub, content, member string) {
+		sendCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := h.mail.Send(sendCtx, to, sub, content); err != nil {
+			h.log.Error("send notification email", "member", member, "to", to, "err", err)
+		}
+	}(*email, subject, body, member)
 }
