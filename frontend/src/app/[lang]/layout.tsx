@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
   if (!isLocale(locale)) notFound();
   return (
     <html lang={locale} className={`${jakarta.variable} h-full`} data-scroll-behavior="smooth">
-      <body className="min-h-full">
+      <body className="min-h-full" suppressHydrationWarning>
         <Providers locale={locale}>{children}</Providers>
       </body>
     </html>
