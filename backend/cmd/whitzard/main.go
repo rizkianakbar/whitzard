@@ -84,8 +84,8 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 	}
 
 	var tasks []func(context.Context) error
-	mailer, err := notify.NewSMTP(notify.SMTPConfig{
-		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, From: cfg.SMTPFrom,
+	mailer, err := notify.NewResend(notify.ResendConfig{
+		APIKey: cfg.ResendAPIKey, From: cfg.ResendFrom,
 	})
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, c
 	}
 }
 
-func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger, mailer *notify.SMTP) []func(context.Context) error {
+func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger, mailer *notify.Resend) []func(context.Context) error {
 	hub := api.NewHub(st, log.With("component", "hub"), mailer)
 	serve := func(ctx context.Context) error {
 		ev, err := evidence.NewDisk(cfg.EvidenceDir, cfg.MaxUploadBytes)
