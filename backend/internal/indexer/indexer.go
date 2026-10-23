@@ -118,7 +118,10 @@ func (ix *Indexer) SyncOnce(ctx context.Context) (uint64, error) {
 	safe := head - ix.cfg.Confirmations
 	for from <= safe {
 		to := min(from+ix.cfg.BatchSize-1, safe)
-		if err := ix.processRange(ctx, from, to); err != nil {
+		if err := ix.processRange(ctx, from, to); errors.Is(err, store.ErrRangeTaken) {
+			// Another indexer is ahead; the next pass starts from its cursor.
+			return cursor, nil
+		} else if err != nil {
 			return cursor, fmt.Errorf("blocks %d-%d: %w", from, to, err)
 		}
 		cursor, from = to, to+1
@@ -137,6 +140,9 @@ func (ix *Indexer) processRange(ctx context.Context, from, to uint64) error {
 	}
 	blockTimes := map[uint64]time.Time{}
 	return ix.store.InIndexTx(ctx, func(tx *store.IndexTx) error {
+		if err := tx.ClaimRange(ctx, ix.cfg.Name, from); err != nil {
+			return err
+		}
 		for _, l := range logs {
 			if l.Removed {
 				continue

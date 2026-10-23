@@ -240,7 +240,8 @@ func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, body)
 }
 
-// POST /requests/{id}/comments {body}: adds one discussion message.
+// POST /requests/{id}/comments {body}: adds one discussion message. Any registered member may
+// comment, Ready or not, in the snapshot or not.
 func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	req, ok := s.loadRequest(w, r)
 	if !ok {
@@ -262,6 +263,10 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	comment, err := s.store.AddComment(r.Context(), req.ID, caller(r), text)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusForbidden, "only registered members can comment (Registry.register)")
+		return
+	}
 	if err != nil {
 		s.internalError(w, r, err)
 		return

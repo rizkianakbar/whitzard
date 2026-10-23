@@ -208,7 +208,8 @@ func profileView(m *store.Member, viewer string) any {
 }
 
 // PUT /members/me {displayName, nickname, birthDate, city, email}: replaces the profile (missing
-// or empty fields are cleared), for registered members. Nothing here is verified.
+// or empty fields are cleared; email is required), for registered members. Nothing here is
+// verified, not even the email: a wrong one only means its notification emails go nowhere.
 func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DisplayName *string `json:"displayName"`
@@ -252,22 +253,24 @@ func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		}
 		p.BirthDate = &d
 	}
+	email := ""
 	if body.Email != nil {
-		v := strings.TrimSpace(*body.Email)
-		if v != "" {
-			parsed, err := mail.ParseAddress(v)
-			if err != nil || !strings.EqualFold(parsed.Address, v) {
-				writeError(w, http.StatusBadRequest, "email must be a valid address")
-				return
-			}
-			v = strings.ToLower(v)
-			if utf8.RuneCountInString(v) > 254 {
-				writeError(w, http.StatusBadRequest, "email is at most 254 characters")
-				return
-			}
-			p.Email = &v
-		}
+		email = strings.TrimSpace(*body.Email)
 	}
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if parsed, err := mail.ParseAddress(email); err != nil || !strings.EqualFold(parsed.Address, email) {
+		writeError(w, http.StatusBadRequest, "email must be a valid address")
+		return
+	}
+	if utf8.RuneCountInString(email) > 254 {
+		writeError(w, http.StatusBadRequest, "email is at most 254 characters")
+		return
+	}
+	email = strings.ToLower(email)
+	p.Email = &email
 
 	err := s.store.SetProfile(r.Context(), caller(r), p)
 	if errors.Is(err, store.ErrNotFound) {

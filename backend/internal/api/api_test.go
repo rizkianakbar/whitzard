@@ -12,7 +12,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -248,13 +250,17 @@ func TestMembers(t *testing.T) {
 	}
 
 	token := e.login(e.alice)
-	b, _ := json.Marshal(map[string]any{"displayName": "  Alice  "})
+	b, _ := json.Marshal(map[string]any{"displayName": "  Alice  ", "email": "alice@example.com"})
 	r := e.do("PUT", "/members/me", token, bytes.NewReader(b), "application/json")
 	expect(t, r, 200)
 	if r.json(t)["displayName"] != "Alice" {
 		t.Fatalf("displayName = %s", r.body)
 	}
-	put := func(token string, v any) response {
+	// put sends v with an email unless v sets one: the email is required.
+	put := func(token string, v map[string]any) response {
+		if _, ok := v["email"]; !ok {
+			v["email"] = "alice@example.com"
+		}
 		b, _ := json.Marshal(v)
 		return e.do("PUT", "/members/me", token, bytes.NewReader(b), "application/json")
 	}
@@ -267,6 +273,9 @@ func TestMembers(t *testing.T) {
 	expect(t, put(token, map[string]any{"birthDate": "2999-01-01"}), 400)
 	expect(t, put(token, map[string]any{"nickname": strings.Repeat("x", 31)}), 400)
 	expect(t, put(token, map[string]any{"email": "not-an-email"}), 400)
+	expect(t, put(token, map[string]any{"displayName": "Alice", "email": "  "}), 400)
+	noEmail, _ := json.Marshal(map[string]any{"displayName": "Alice"})
+	expect(t, e.do("PUT", "/members/me", token, bytes.NewReader(noEmail), "application/json"), 400)
 
 	// The birth date and email are only for alice; the city only for signed-in viewers.
 	bobToken := e.login(e.bob)
@@ -281,10 +290,9 @@ func TestMembers(t *testing.T) {
 	}
 
 	// Replacing the profile clears what is left out.
-	if p := put(token, map[string]any{"displayName": "Alice"}).json(t); p["nickname"] != nil || p["city"] != nil || p["birthDate"] != nil || p["email"] != nil {
+	if p := put(token, map[string]any{"displayName": "Alice"}).json(t); p["nickname"] != nil || p["city"] != nil || p["birthDate"] != nil || p["email"] != "alice@example.com" {
 		t.Fatalf("after replace = %v", p)
 	}
-	expect(t, put(token, map[string]any{"displayName": "Alice", "email": "alice@example.com"}), 200)
 	expect(t, put(bobToken, map[string]any{"displayName": "Bob", "email": "alice@example.com"}), 409)
 
 	long, _ := json.Marshal(map[string]any{"displayName": strings.Repeat("x", 51)})
@@ -449,10 +457,14 @@ func TestRequestFlow(t *testing.T) {
 	}
 	expect(t, e.post("/requests/1/comments", bobToken, map[string]string{"body": "  "}), 400)
 	expect(t, e.post("/requests/1/comments", "", map[string]string{"body": "x"}), 401)
+	// Any registered member may join in, even one who is not Ready (eve); a wallet that never
+	// registered may not.
+	expect(t, e.post("/requests/1/comments", e.login(e.eve), map[string]string{"body": "Ikut mendoakan."}), 201)
+	expect(t, e.post("/requests/1/comments", e.login(e.chain.Accounts[5]), map[string]string{"body": "x"}), 403)
 
 	detail = e.get("/requests/1", aliceToken).json(t)
 	comments := detail["comments"].([]any)
-	if len(comments) != 1 || comments[0].(map[string]any)["body"] == "" {
+	if len(comments) != 2 || comments[0].(map[string]any)["body"] == "" {
 		t.Fatalf("comments in detail = %v", comments)
 	}
 
@@ -639,6 +651,53 @@ func TestNotifications(t *testing.T) {
 	// The WebSocket needs a valid session.
 	if _, _, err := websocket.Dial(ctx, strings.Replace(e.srv.URL, "http", "ws", 1)+"/ws?token=bad", nil); err == nil {
 		t.Fatal("WebSocket without a valid token must be refused")
+	}
+}
+
+type fakeMailer struct {
+	mu   sync.Mutex
+	sent []string // recipients
+}
+
+func (m *fakeMailer) Send(_ context.Context, to, _, _ string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sent = append(m.sent, to)
+	return nil
+}
+
+func (m *fakeMailer) recipients() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.sent)
+}
+
+func TestNotificationEmails(t *testing.T) {
+	e := newEnv(t)
+	bobToken := e.login(e.bob)
+	b, _ := json.Marshal(map[string]any{"displayName": "Bob", "email": "bob@example.com"})
+	expect(t, e.do("PUT", "/members/me", bobToken, bytes.NewReader(b), "application/json"), 200)
+
+	// Two API processes listen on the same database; bob has no WebSocket open.
+	mail := &fakeMailer{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for range 2 {
+		go api.NewHub(e.st, quiet, mail).Run(ctx, e.st.Pool.Config().ConnString())
+	}
+	time.Sleep(200 * time.Millisecond) // let both LISTEN
+
+	e.chain.Send(e.chain.Escrow.OpenRequest(e.alice.Opts, testutil.Ether(90), 3600, [32]byte{1}, id(0)))
+	e.sync()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for len(mail.recipients()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond) // a second email would arrive by now
+	// carol and dave were notified too, but gave no email.
+	if got := mail.recipients(); !slices.Equal(got, []string{"bob@example.com"}) {
+		t.Fatalf("emails sent to %v, want bob once", got)
 	}
 }
 

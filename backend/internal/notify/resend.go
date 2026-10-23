@@ -33,8 +33,8 @@ func NewResend(cfg ResendConfig) (*Resend, error) {
 	}, nil
 }
 
-// Send delivers one plain-text email via the Resend API.
-func (r *Resend) Send(_ context.Context, to, subject, body string) error {
+// Send delivers one plain-text email via the Resend API, giving up when ctx ends.
+func (r *Resend) Send(ctx context.Context, to, subject, body string) error {
 	if subject == "" {
 		subject = "Whitzard notification"
 	}
@@ -44,6 +44,6 @@ func (r *Resend) Send(_ context.Context, to, subject, body string) error {
 		Subject: subject,
 		Text:    body,
 	}
-	_, err := r.client.Emails.Send(params)
+	_, err := r.client.Emails.SendWithContext(ctx, params)
 	return err
 }

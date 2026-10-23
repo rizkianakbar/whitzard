@@ -84,17 +84,11 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 	}
 
 	var tasks []func(context.Context) error
-	mailer, err := notify.NewResend(notify.ResendConfig{
-		APIKey: cfg.ResendAPIKey, From: cfg.ResendFrom,
-	})
-	if err != nil {
-		return err
-	}
 	switch command {
 	case "indexer":
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
 	case "api":
-		tasks = append(tasks, apiTasks(cfg, client, st, log, mailer)...)
+		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
 	case "keeper":
 		if cfg.KeeperKey == nil {
 			return errors.New("KEEPER_PRIVATE_KEY is required for the keeper")
@@ -102,7 +96,7 @@ func run(ctx context.Context, command string, log *slog.Logger) error {
 		tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
 	case "all":
 		tasks = append(tasks, indexerTask(cfg, client, st, log))
-		tasks = append(tasks, apiTasks(cfg, client, st, log, mailer)...)
+		tasks = append(tasks, apiTasks(cfg, client, st, log)...)
 		if cfg.KeeperKey != nil {
 			tasks = append(tasks, keeperTask(cfg, client, st, chainID, log))
 		} else {
@@ -157,7 +151,15 @@ func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, c
 	}
 }
 
-func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger, mailer *notify.Resend) []func(context.Context) error {
+func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger) []func(context.Context) error {
+	// Email is extra: a bad Resend setting only turns it off, never the API, indexer or keeper.
+	// mailer stays a nil interface when off; a nil *notify.Resend in it would look turned on.
+	var mailer api.Mailer
+	if m, err := notify.NewResend(notify.ResendConfig{APIKey: cfg.ResendAPIKey, From: cfg.ResendFrom}); err != nil {
+		log.Warn("notification email turned off", "err", err)
+	} else if m != nil {
+		mailer = m
+	}
 	hub := api.NewHub(st, log.With("component", "hub"), mailer)
 	serve := func(ctx context.Context) error {
 		ev, err := evidence.NewDisk(cfg.EvidenceDir, cfg.MaxUploadBytes)

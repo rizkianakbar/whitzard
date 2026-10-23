@@ -213,7 +213,9 @@ func (h *Hub) listen(ctx context.Context, databaseURL string) error {
 			h.log.Error("bad notification payload", "payload", msg.Payload)
 			continue
 		}
-		if !h.hasSubscribers(payload.Member) {
+		// Email goes out whether or not the member is online; the WebSocket only to those who are.
+		live := h.hasSubscribers(payload.Member)
+		if !live && h.mail == nil {
 			continue
 		}
 		n, err := h.store.GetNotification(ctx, payload.ID)
@@ -222,32 +224,35 @@ func (h *Hub) listen(ctx context.Context, databaseURL string) error {
 			continue
 		}
 		h.sendNotificationEmail(ctx, n)
-		h.deliver(n)
+		if live {
+			h.deliver(n)
+		}
 	}
 }
 
+// sendNotificationEmail emails n to its member in the background, if they gave an email and no
+// other API process has claimed this notification already.
 func (h *Hub) sendNotificationEmail(ctx context.Context, n *store.Notification) {
 	if h.mail == nil {
 		return
 	}
-	email, err := h.store.MemberEmail(ctx, n.Member)
+	to, err := h.store.ClaimNotificationEmail(ctx, n.ID)
 	if err != nil {
-		h.log.Error("load member email", "member", n.Member, "err", err)
+		h.log.Error("claim notification email", "id", n.ID, "err", err)
 		return
 	}
-	if email == nil || *email == "" {
+	if to == "" {
 		return
 	}
-	subject, body := n.Title, n.Description
+	body := n.Description
 	if n.RequestID != nil {
-		body = body + "\n\nRequest ID: " + strconv.FormatInt(*n.RequestID, 10)
+		body += "\n\nRequest ID: " + strconv.FormatInt(*n.RequestID, 10)
 	}
-	member := n.Member
-	go func(to, sub, content, member string) {
+	go func() {
 		sendCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := h.mail.Send(sendCtx, to, sub, content); err != nil {
-			h.log.Error("send notification email", "member", member, "to", to, "err", err)
+		if err := h.mail.Send(sendCtx, to, n.Title, body); err != nil {
+			h.log.Error("send notification email", "id", n.ID, "member", n.Member, "err", err)
 		}
-	}(*email, subject, body, member)
+	}()
 }

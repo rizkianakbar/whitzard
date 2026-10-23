@@ -137,12 +137,17 @@ func (s *Store) SetProfile(ctx context.Context, address string, p Profile) error
 	return nil
 }
 
-// MemberEmail returns a member's notification email, or ErrNotFound if the member does not exist.
-func (s *Store) MemberEmail(ctx context.Context, address string) (*string, error) {
-	var email *string
-	err := s.Pool.QueryRow(ctx, `SELECT email FROM members WHERE address = $1`, address).Scan(&email)
+// ClaimNotificationEmail marks notification `id` as emailed and returns its member's email, or ""
+// if the member has none or another process claimed it first, so each one is emailed at most once.
+func (s *Store) ClaimNotificationEmail(ctx context.Context, id int64) (string, error) {
+	var email string
+	err := s.Pool.QueryRow(ctx, `
+		UPDATE notifications n SET emailed_at = now()
+		FROM members m
+		WHERE n.id = $1 AND n.emailed_at IS NULL AND m.address = n.member AND m.email IS NOT NULL
+		RETURNING m.email`, id).Scan(&email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
+		return "", nil
 	}
 	return email, err
 }
@@ -489,11 +494,11 @@ func scanComment(row pgx.Row) (*Comment, error) {
 	return &c, err
 }
 
-// AddComment adds one message to a request's discussion.
+// AddComment adds one message to a request's discussion; ErrNotFound if `member` is not registered.
 func (s *Store) AddComment(ctx context.Context, requestID int64, member, body string) (*Comment, error) {
 	return scanComment(s.Pool.QueryRow(ctx, `
 		INSERT INTO request_comments (request_id, member, body)
-		VALUES ($1, $2, $3)
+		SELECT $1, address, $3 FROM members WHERE address = $2
 		RETURNING `+commentColumns, requestID, member, body))
 }
 

@@ -40,8 +40,8 @@ type Config struct {
 	MaxPhotoBytes  int64
 	MaxUploadBytes int64
 	SessionTTL     time.Duration
-	ResendAPIKey string
-	ResendFrom   string
+	ResendAPIKey   string
+	ResendFrom     string
 
 	KeeperKey          *ecdsa.PrivateKey // nil if KEEPER_PRIVATE_KEY is not set
 	KeeperPollInterval time.Duration
