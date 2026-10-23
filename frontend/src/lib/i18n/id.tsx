@@ -536,8 +536,10 @@ export const id = {
       placeholder: "Tulis komentar atau pertanyaan…",
       send: "Kirim komentar",
       sending: "Mengirim komentar",
-      empty: "Belum ada komentar.",
+      empty: "Belum ada komentar. Pertanyaan tentang permintaan ini bisa ditulis di sini.",
       posted: "Komentar terkirim.",
+      shortcut: "Ctrl/⌘ + Enter untuk mengirim",
+      requester: "Peminta",
     },
     history: {
       title: "Riwayat",

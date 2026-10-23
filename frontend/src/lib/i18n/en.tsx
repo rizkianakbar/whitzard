@@ -538,8 +538,10 @@ export const en: Dict = {
       placeholder: "Write a comment or question…",
       send: "Post comment",
       sending: "Posting comment",
-      empty: "No comments yet.",
+      empty: "No comments yet. Questions about this request go here.",
       posted: "Comment posted.",
+      shortcut: "Ctrl/⌘ + Enter to post",
+      requester: "Requester",
     },
     history: {
       title: "History",
