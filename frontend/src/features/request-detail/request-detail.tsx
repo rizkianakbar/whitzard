@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import type { Address } from "viem";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/features/members/member-avatar";
 import { useProfile } from "@/features/members/members.hooks";
@@ -39,7 +39,7 @@ import {
   sha256Hex,
 } from "@/features/request-detail/request-detail.lib";
 import { useActivity, useRequest } from "@/features/requests/requests.hooks";
-import { FundingProgress } from "@/features/requests/funding-progress";
+import { FundingProgress, FundingProgressSkeleton } from "@/features/requests/funding-progress";
 import { ShareGrid, ShareLegend } from "@/features/requests/share-grid";
 import { StatusBadge } from "@/features/requests/request-status";
 import { useSession } from "@/features/session/session.hooks";
@@ -64,7 +64,7 @@ export function RequestDetail(props: RequestDetailProps) {
   const { id } = props;
   const { t } = useI18n();
   const { data, error, isPending } = useRequest(id);
-  if (isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
+  if (isPending) return <RequestDetailSkeleton />;
   if (error) {
     return (
       <div className="flex max-w-xl flex-col gap-3 rounded-3xl border bg-card p-8">
@@ -79,6 +79,92 @@ export function RequestDetail(props: RequestDetailProps) {
     );
   }
   return <View detail={data} />;
+}
+
+/** The request page before the request has loaded: View's layout, card for card. */
+export function RequestDetailSkeleton() {
+  const { t } = useI18n();
+  return (
+    <div aria-busy="true" className="flex flex-col gap-8">
+      <header className="flex flex-col gap-3">
+        <Link
+          href="/requests"
+          className="pressable -ml-1.5 flex items-center gap-1 self-start rounded-full px-1.5 py-1 text-sm font-semibold text-batu hover:text-pandan"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          {t.request.back}
+        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <SkeletonText className="w-80 text-[32px] leading-[1.1] font-extrabold sm:text-[39px]" />
+          <Skeleton className="h-7 w-20 rounded-full" />
+        </div>
+        <div className="flex min-w-0 items-center gap-2.5 text-sm">
+          <Skeleton className="size-7 shrink-0 rounded-full" />
+          <SkeletonText className="w-56" />
+        </div>
+      </header>
+
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <section className="order-1 flex flex-col gap-6 rounded-2xl border bg-card p-6 sm:p-7">
+            <FundingProgressSkeleton size="lg" />
+            <div className="flex flex-col gap-4 rounded-xl bg-embun p-4 sm:p-5">
+              <div aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(32px,44px))] gap-2">
+                {Array.from({ length: 10 }, (_, i) => (
+                  <Skeleton key={i} className="aspect-square rounded-[10px]" />
+                ))}
+              </div>
+              <ShareLegend />
+            </div>
+            <div className="text-[13px] leading-relaxed">
+              <SkeletonText className="w-full" />
+              <SkeletonText className="w-1/2" />
+            </div>
+          </section>
+          <PanelSkeleton className="order-3" lines={3} />
+        </div>
+
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <aside className="order-2 flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(23_48_42/0.04),0_12px_32px_-12px_rgb(23_48_42/0.12)]">
+            <Skeleton className="size-11 rounded-full" />
+            <SkeletonText className="w-3/4 text-xl font-bold" />
+            <div className="leading-relaxed">
+              <SkeletonText className="w-full" />
+              <SkeletonText className="w-full" />
+              <SkeletonText className="w-2/3" />
+            </div>
+          </aside>
+          <PanelSkeleton className="order-4" lines={2} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type PanelSkeletonProps = {
+  lines: number;
+  className?: string;
+};
+
+/** A Panel with its header and a few lines of body greyed out. */
+function PanelSkeleton(props: PanelSkeletonProps) {
+  const { lines, className } = props;
+  return (
+    <section aria-hidden="true" className={cn("flex flex-col gap-5 rounded-2xl border bg-card p-6 sm:p-7", className)}>
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-9 shrink-0 rounded-xl" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1.5">
+          <SkeletonText className="w-40 text-lg leading-tight font-bold" />
+          <SkeletonText className="w-3/4 text-sm leading-relaxed" />
+        </div>
+      </div>
+      <div className="text-[17px] leading-[1.75]">
+        {Array.from({ length: lines }, (_, i) => (
+          <SkeletonText key={i} className={i === lines - 1 ? "w-2/3" : "w-full"} />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 type ViewProps = {

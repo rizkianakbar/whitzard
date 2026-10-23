@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { percentCollected } from "@/features/requests/requests.lib";
 import type { Request } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -53,6 +54,32 @@ export function FundingProgress(props: FundingProgressProps) {
           <span className="tabular">{r.snapshotSize}</span>,
         )}
       </span>
+    </div>
+  );
+}
+
+type FundingProgressSkeletonProps = {
+  size?: "md" | "lg";
+  className?: string;
+};
+
+/** FundingProgress while its request loads: the same rows at the same heights. */
+export function FundingProgressSkeleton(props: FundingProgressSkeletonProps) {
+  const { size = "md", className } = props;
+  const lg = size === "lg";
+  return (
+    <div aria-hidden="true" className={cn("flex flex-col", lg ? "gap-4" : "gap-2.5", className)}>
+      <div className="flex items-end justify-between gap-x-4">
+        <div className="flex flex-col gap-0.5">
+          {lg && <SkeletonText className="w-20 text-[13px] font-semibold" />}
+          <span className="leading-none">
+            <SkeletonText className={cn("inline-block font-extrabold", lg ? "w-56 text-[44px]" : "w-36 text-2xl")} />
+          </span>
+        </div>
+        <SkeletonText className={cn("w-10 font-bold", lg ? "text-xl" : "text-sm")} />
+      </div>
+      <Skeleton className={cn("rounded-full", lg ? "h-3" : "h-2")} />
+      <SkeletonText className={cn("w-44", lg ? "text-sm" : "text-[13px]")} />
     </div>
   );
 }

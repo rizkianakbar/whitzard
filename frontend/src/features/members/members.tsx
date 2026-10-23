@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Avatar } from "@/features/members/member-avatar";
 import { useMembers } from "@/features/members/members.hooks";
 import { callName } from "@/features/members/members.lib";
@@ -32,7 +32,7 @@ export function MemberDirectory() {
         <p className="text-sm text-batu">{isPending ? t.common.loading : t.members.summary(members.length, ready)}</p>
       </div>
       {isPending ? (
-        <Skeleton className="h-40 w-full rounded-2xl" />
+        <TilesSkeleton />
       ) : (
         <>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -52,6 +52,37 @@ export function MemberDirectory() {
         </>
       )}
     </section>
+  );
+}
+
+/** The directory before anything has loaded: same heading, a row of greyed-out tiles. */
+export function MemberDirectorySkeleton() {
+  const { t } = useI18n();
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-[25px] leading-tight font-extrabold">{t.members.title}</h2>
+        <p className="text-sm text-batu">{t.common.loading}</p>
+      </div>
+      <TilesSkeleton />
+    </section>
+  );
+}
+
+function TilesSkeleton() {
+  return (
+    <ul aria-hidden="true" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 4 }, (_, i) => (
+        <li key={i} className="flex items-center gap-3 rounded-2xl border bg-card p-4">
+          <Skeleton className="size-11 shrink-0 rounded-full" />
+          <div className="flex min-w-0 flex-1 flex-col leading-snug">
+            <SkeletonText className="w-3/4" />
+            <SkeletonText className="w-1/2 text-[13px]" />
+            <SkeletonText className="w-2/3 text-[13px]" />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 

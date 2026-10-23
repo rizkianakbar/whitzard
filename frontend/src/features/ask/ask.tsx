@@ -34,7 +34,7 @@ export function RequestForm() {
   const { data: me } = useMe();
   const { data: proof } = useProof();
   const eligibility = useEligibility();
-  if (!me || !proof || !eligibility) return <Skeleton className="h-96 w-full rounded-3xl" />;
+  if (!me || !proof || !eligibility) return <RequestFormSkeleton />;
 
   // Nothing to fill in yet: one centred message saying why, and where to go instead.
   if (!me.chain.registered) {
@@ -68,11 +68,67 @@ export function RequestForm() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex max-w-160 flex-col gap-2.5">
-        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{text.title}</h1>
-        <p className="leading-relaxed text-batu">{text.intro}</p>
-      </div>
+      <Intro />
       <Form proofId={BigInt(proof.proofId ?? 0)} meReady={me.chain.ready} />
+    </div>
+  );
+}
+
+/** The form before the member and their eligibility have loaded: static copy in place, inputs greyed out. */
+export function RequestFormSkeleton() {
+  const { t } = useI18n();
+  const text = t.ask;
+  return (
+    <div aria-busy="true" className="flex flex-col gap-8">
+      <Intro />
+      <div className="flex flex-wrap items-start gap-10">
+        <div aria-hidden="true" className="flex min-w-0 flex-[999_1_560px] flex-col gap-7 rounded-3xl border bg-card p-6 sm:p-8">
+          <Field id="title" label={text.fields.title}>
+            <Skeleton className="h-12 rounded-xl" />
+          </Field>
+          <Field id="description" label={text.fields.story} hint={text.fields.storyHint}>
+            <Skeleton className="h-32 rounded-xl" />
+          </Field>
+          <div className="flex flex-wrap gap-6">
+            <Field id="amount" label={text.fields.amount} className="flex-[1_1_220px]">
+              <Skeleton className="h-12 rounded-xl" />
+            </Field>
+            <div className="flex flex-[2_1_320px] flex-col gap-2">
+              {/* The real one is a <legend>, which sits outside the flex gap: only its margin counts. */}
+              <span className="font-semibold">{text.fields.duration}</span>
+              <div className="flex flex-wrap gap-2">
+                {durations.map((d) => (
+                  <Skeleton key={d.seconds} className="h-12 w-28 rounded-full" />
+                ))}
+              </div>
+            </div>
+          </div>
+          <Field id="file" label={text.fields.file}>
+            <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-dashed border-[#a7b8af] bg-embun p-6">
+              <Skeleton className="size-12 rounded-2xl" />
+              <span className="flex min-w-60 flex-1 flex-col gap-1">
+                <span className="font-semibold">{text.fields.filePick}</span>
+                <span className="text-[13px] leading-relaxed text-batu">{text.fields.fileHint}</span>
+              </span>
+            </div>
+          </Field>
+          <div className="flex flex-wrap items-center gap-4 border-t pt-6">
+            <Skeleton className="h-13 w-44 rounded-full" />
+            <span className="min-w-64 flex-1 text-[13px] leading-relaxed text-batu">{text.submitNote}</span>
+          </div>
+        </div>
+        <Preview />
+      </div>
+    </div>
+  );
+}
+
+function Intro() {
+  const { t } = useI18n();
+  return (
+    <div className="flex max-w-160 flex-col gap-2.5">
+      <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{t.ask.title}</h1>
+      <p className="leading-relaxed text-batu">{t.ask.intro}</p>
     </div>
   );
 }
@@ -263,33 +319,45 @@ function Form(props: FormProps) {
         </div>
       </form>
 
-      <aside aria-label={text.preview.label} className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-        <h2 className="text-xl font-bold">{text.preview.title}</h2>
-        <div className="flex flex-col gap-4.5 rounded-3xl border bg-card p-6">
-          {members !== undefined && members > 0 && (
-            <ShareGrid size={Math.min(members, 48)} contributed={0} declined={0} className="grid-cols-[repeat(auto-fill,minmax(24px,1fr))]" />
-          )}
-          <div className="flex flex-col gap-1">
-            <span className="tabular text-[31px] font-bold tracking-tight">{share ? `${fmt.whzd(share)} WHZD` : text.preview.fillAmount}</span>
-            <span className="text-[13px] leading-relaxed text-batu">
-              {members === undefined
-                ? text.preview.counting
-                : members > 0
-                  ? text.preview.perMember(members)
-                  : text.preview.noMembers}
-            </span>
-          </div>
-          <ul className="flex flex-col gap-2.5 text-[13px] leading-relaxed">
-            {text.preview.points.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </div>
-        <Link href="/requests" className={cn(buttonVariants({ variant: "link" }), "self-start px-0")}>
-          {text.preview.others}
-        </Link>
-      </aside>
+      <Preview members={members} share={share} />
     </div>
+  );
+}
+
+type PreviewProps = {
+  /** Members who would be asked; undefined while counting. */
+  members?: number;
+  share?: bigint | null;
+};
+
+/** What each member would be asked for, beside the form. */
+function Preview(props: PreviewProps) {
+  const { members, share } = props;
+  const { t, fmt } = useI18n();
+  const text = t.ask.preview;
+  return (
+    <aside aria-label={text.label} className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+      <h2 className="text-xl font-bold">{text.title}</h2>
+      <div className="flex flex-col gap-4.5 rounded-3xl border bg-card p-6">
+        {members !== undefined && members > 0 && (
+          <ShareGrid size={Math.min(members, 48)} contributed={0} declined={0} className="grid-cols-[repeat(auto-fill,minmax(24px,1fr))]" />
+        )}
+        <div className="flex flex-col gap-1">
+          <span className="tabular text-[31px] font-bold tracking-tight">{share ? `${fmt.whzd(share)} WHZD` : text.fillAmount}</span>
+          <span className="text-[13px] leading-relaxed text-batu">
+            {members === undefined ? text.counting : members > 0 ? text.perMember(members) : text.noMembers}
+          </span>
+        </div>
+        <ul className="flex flex-col gap-2.5 text-[13px] leading-relaxed">
+          {text.points.map((point) => (
+            <li key={point}>{point}</li>
+          ))}
+        </ul>
+      </div>
+      <Link href="/requests" className={cn(buttonVariants({ variant: "link" }), "self-start px-0")}>
+        {text.others}
+      </Link>
+    </aside>
   );
 }
 

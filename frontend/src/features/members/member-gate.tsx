@@ -19,6 +19,8 @@ function PageSkeleton() {
 
 type MemberGateProps = {
   joining?: boolean;
+  /** The page's own skeleton, so the swap to real content doesn't move anything. */
+  fallback?: ReactNode;
   children: ReactNode;
 };
 
@@ -28,7 +30,7 @@ type MemberGateProps = {
  * always renders its page and Next.js can validate every route for instant navigation.
  */
 export function MemberGate(props: MemberGateProps) {
-  const { joining = false, children } = props;
+  const { joining = false, fallback = <PageSkeleton />, children } = props;
   const router = useRouter();
   const { status } = useSession();
   const { data: me } = useMe();
@@ -39,6 +41,6 @@ export function MemberGate(props: MemberGateProps) {
     else if (registered === false && !joining) router.replace("/join");
   }, [status, registered, joining, router]);
 
-  if (status !== "signed-in" || !me || (!registered && !joining)) return <PageSkeleton />;
+  if (status !== "signed-in" || !me || (!registered && !joining)) return fallback;
   return children;
 }

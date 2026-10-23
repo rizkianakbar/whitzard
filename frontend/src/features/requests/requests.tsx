@@ -5,12 +5,12 @@ import Link from "next/link";
 import { ArrowRight, Search, X } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Avatar } from "@/features/members/member-avatar";
 import { useProfile } from "@/features/members/members.hooks";
 import { callName } from "@/features/members/members.lib";
 import { CountdownPill } from "@/features/requests/countdown";
-import { FundingProgress } from "@/features/requests/funding-progress";
+import { FundingProgress, FundingProgressSkeleton } from "@/features/requests/funding-progress";
 import { type RequestScope, useRequests } from "@/features/requests/requests.hooks";
 import { byDeadline, byEndedDesc, isLive, needsYou } from "@/features/requests/requests.lib";
 import { PastRequestRow } from "@/features/requests/past-request-row";
@@ -60,63 +60,34 @@ export function RequestList() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{text.title}</h1>
-          {!isPending && (
-            <p className="text-batu">
-              {forYou.length > 0
-                ? text.waitingYou(<strong className="tabular text-arang">{forYou.length}</strong>)
-                : live.length > 0
-                  ? text.running(<strong className="tabular text-arang">{live.length}</strong>)
-                  : text.noneRunning}
-            </p>
-          )}
-        </div>
-        <Link href="/ask" className={buttonVariants({ variant: "outline" })}>
-          {t.common.askForHelp}
-        </Link>
-      </div>
+      <Header>
+        {isPending ? (
+          <SkeletonText className="w-64" />
+        ) : (
+          <p className="text-batu">
+            {forYou.length > 0
+              ? text.waitingYou(<strong className="tabular text-arang">{forYou.length}</strong>)
+              : live.length > 0
+                ? text.running(<strong className="tabular text-arang">{live.length}</strong>)
+                : text.noneRunning}
+          </p>
+        )}
+      </Header>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <Segmented
-          label={text.scopeLabel}
-          options={scopes.map((id) => ({ id, label: text.scopes[id] }))}
-          value={scope}
-          onChange={(v) => {
-            setScope(v);
-            setShowAllPast(false);
-          }}
-        />
-        <Segmented label={text.stateLabel} options={states.map((id) => ({ id, label: text.states[id] }))} value={state} onChange={setState} />
-        <label className="relative flex-1 md:max-w-80 md:ml-auto">
-          <span className="sr-only">{text.search}</span>
-          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-batu" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={text.searchPlaceholder}
-            className="h-11 w-full rounded-full border bg-card pr-10 pl-10 text-base outline-none placeholder:text-batu focus-visible:border-ring [&::-webkit-search-cancel-button]:hidden"
-          />
-          {query && (
-            <button
-              type="button"
-              aria-label={text.clearSearch}
-              onClick={() => setQuery("")}
-              className="pressable absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-batu hover:bg-muted"
-            >
-              <X aria-hidden="true" className="size-4" />
-            </button>
-          )}
-        </label>
-      </div>
+      <Filters
+        scope={scope}
+        onScope={(v) => {
+          setScope(v);
+          setShowAllPast(false);
+        }}
+        state={state}
+        onState={setState}
+        query={query}
+        onQuery={setQuery}
+      />
 
       {isPending ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-72 rounded-2xl" />
-          <Skeleton className="h-72 rounded-2xl" />
-        </div>
+        <CardsSkeleton />
       ) : nothing ? (
         <p className="rounded-2xl border border-dashed bg-card p-8 leading-relaxed text-batu">
           {q
@@ -172,6 +143,128 @@ export function RequestList() {
         </div>
       )}
     </div>
+  );
+}
+
+/** The list's frame before anything has loaded: the same header, filters and cards, greyed out. */
+export function RequestListSkeleton() {
+  return (
+    <div className="flex flex-col gap-8">
+      <Header>
+        <SkeletonText className="w-64" />
+      </Header>
+      <div inert>
+        <Filters scope="all" onScope={noop} state="all" onState={noop} query="" onQuery={noop} />
+      </div>
+      <CardsSkeleton />
+    </div>
+  );
+}
+
+const noop = () => {};
+
+type HeaderProps = {
+  /** The summary line under the title. */
+  children: React.ReactNode;
+};
+
+function Header(props: HeaderProps) {
+  const { children } = props;
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{t.requests.title}</h1>
+        {children}
+      </div>
+      <Link href="/ask" className={buttonVariants({ variant: "outline" })}>
+        {t.common.askForHelp}
+      </Link>
+    </div>
+  );
+}
+
+type FiltersProps = {
+  scope: RequestScope;
+  onScope: (scope: RequestScope) => void;
+  state: State;
+  onState: (state: State) => void;
+  query: string;
+  onQuery: (query: string) => void;
+};
+
+function Filters(props: FiltersProps) {
+  const { scope, onScope, state, onState, query, onQuery } = props;
+  const { t } = useI18n();
+  const text = t.requests;
+  return (
+    <div className="flex flex-col gap-3 md:flex-row md:items-center">
+      <Segmented label={text.scopeLabel} options={scopes.map((id) => ({ id, label: text.scopes[id] }))} value={scope} onChange={onScope} />
+      <Segmented label={text.stateLabel} options={states.map((id) => ({ id, label: text.states[id] }))} value={state} onChange={onState} />
+      <label className="relative flex-1 md:max-w-80 md:ml-auto">
+        <span className="sr-only">{text.search}</span>
+        <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-batu" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={text.searchPlaceholder}
+          className="h-11 w-full rounded-full border bg-card pr-10 pl-10 text-base outline-none placeholder:text-batu focus-visible:border-ring [&::-webkit-search-cancel-button]:hidden"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label={text.clearSearch}
+            onClick={() => onQuery("")}
+            className="pressable absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-batu hover:bg-muted"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
+        )}
+      </label>
+    </div>
+  );
+}
+
+/** A section heading and two cards: what the first section of the list looks like once it loads. */
+function CardsSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-4">
+      <div className="flex items-center gap-2.5 text-xl font-extrabold">
+        <SkeletonText className="w-44" />
+        <Skeleton className="h-6 w-8 rounded-full" />
+      </div>
+      <ul className="grid gap-4 md:grid-cols-2">
+        <RequestCardSkeleton />
+        <RequestCardSkeleton />
+      </ul>
+    </div>
+  );
+}
+
+function RequestCardSkeleton() {
+  return (
+    <li className="flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-7 w-20 rounded-full" />
+        <Skeleton className="h-8 w-24 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <SkeletonText className="w-3/4 text-xl leading-snug font-bold" />
+        <div className="leading-relaxed">
+          <SkeletonText className="w-full" />
+          <SkeletonText className="w-2/3" />
+        </div>
+      </div>
+      <FundingProgressSkeleton className="mt-auto" />
+      <div className="flex items-center justify-between gap-3 border-t pt-4">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="size-8 rounded-full" />
+          <SkeletonText className="w-24 text-sm" />
+        </div>
+        <SkeletonText className="w-28 text-sm" />
+      </div>
+    </li>
   );
 }
 

@@ -7,14 +7,14 @@ import { writeContract } from "wagmi/actions";
 
 import { Carousel } from "@/components/carousel";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { MemberDirectory } from "@/features/members/members";
+import { MemberDirectory, MemberDirectorySkeleton } from "@/features/members/members";
 import { Avatar } from "@/features/members/member-avatar";
 import { useMe, useMemberStats, useProfile, useRefunds } from "@/features/members/members.hooks";
 import { callName, hasProfile, hasTokens } from "@/features/members/members.lib";
 import { CountdownPill } from "@/features/requests/countdown";
-import { FundingProgress } from "@/features/requests/funding-progress";
+import { FundingProgress, FundingProgressSkeleton } from "@/features/requests/funding-progress";
 import { useDecline, useEligibility, useRequests } from "@/features/requests/requests.hooks";
 import { byDeadline, isOpen } from "@/features/requests/requests.lib";
 import { StatusBadge, YourAnswer } from "@/features/requests/request-status";
@@ -37,22 +37,13 @@ function greeting(t: Dict): string {
 }
 
 export function Dashboard() {
-  const { t } = useI18n();
   const { data: me } = useMe();
-  if (!me) return null;
+  if (!me) return <DashboardSkeleton />;
   const name = me.profile?.nickname ?? me.profile?.displayName?.split(" ")[0];
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">
-          {greeting(t)}
-          {name ? `, ${name}` : ""}
-        </h1>
-        <Link href="/ask" className={buttonVariants({ variant: "outline" })}>
-          {t.common.askForHelp}
-        </Link>
-      </div>
+      <Greeting name={name} />
       <SetupBanner me={me} />
       <RefundNotice />
       <Wallet me={me} />
@@ -61,6 +52,62 @@ export function Dashboard() {
         <MyRequests />
       </div>
       <MemberDirectory />
+    </div>
+  );
+}
+
+/** The dashboard before the member has loaded: the same frame and headings, grey where data goes. */
+export function DashboardSkeleton() {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-col gap-8">
+      <Greeting loading />
+      <WalletSkeleton />
+      <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-8">
+        <section className="flex flex-col gap-4">
+          <SectionTitle id="waiting" description={t.dashboard.waiting.description}>
+            {t.dashboard.waiting.title}
+          </SectionTitle>
+          <ul className="flex">
+            <RequestCardSkeleton />
+          </ul>
+        </section>
+        <section className="flex flex-col gap-4">
+          <SectionTitle id="mine" description={t.dashboard.mine.description}>
+            {t.dashboard.mine.title}
+          </SectionTitle>
+          <ul className="flex flex-col gap-4">
+            <RequestCardSkeleton mine />
+          </ul>
+        </section>
+      </div>
+      <MemberDirectorySkeleton />
+    </div>
+  );
+}
+
+type GreetingProps = {
+  name?: string;
+  /** The skeleton prerenders, where the time of day is unknown: grey out the line instead. */
+  loading?: boolean;
+};
+
+function Greeting(props: GreetingProps) {
+  const { name, loading } = props;
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      {loading ? (
+        <SkeletonText className="w-72 text-[39px] leading-tight font-extrabold" />
+      ) : (
+        <h1 className="text-[39px] leading-tight font-extrabold text-pandan">
+          {greeting(t)}
+          {name ? `, ${name}` : ""}
+        </h1>
+      )}
+      <Link href="/ask" className={buttonVariants({ variant: "outline" })}>
+        {t.common.askForHelp}
+      </Link>
     </div>
   );
 }
@@ -163,6 +210,47 @@ function Wallet(props: WalletProps) {
             <span id="ready-help" className="text-[13px] leading-snug text-white/70">
               {ready.busy ? t.tx.phase[ready.phase] : me.chain.ready ? text.on : empty ? text.empty : text.off}
             </span>
+          </div>
+        </div>
+        <CanRequest />
+      </div>
+    </section>
+  );
+}
+
+/** The balance card before the member has loaded: labels in place, the numbers and switch greyed out. */
+function WalletSkeleton() {
+  const { t } = useI18n();
+  const text = t.dashboard.wallet;
+  return (
+    <section
+      aria-label={text.label}
+      aria-busy="true"
+      className="flex flex-col gap-6 rounded-3xl bg-pandan-deep grain grain-light p-6 text-white [--skeleton:rgb(255_255_255/0.15)] sm:p-7"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm text-white/70">{text.label}</span>
+            <SkeletonText className="w-60 text-[49px] leading-none" />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Skeleton className="h-11 w-28 rounded-full bg-white/15" />
+            <span className="text-sm text-white/70">{text.testToken}</span>
+          </div>
+        </div>
+        <dl className="grid min-w-64 grid-cols-2 gap-x-8 gap-y-1 sm:gap-x-12">
+          <Figure label={text.given} />
+          <Figure label={text.received} />
+        </dl>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex items-center gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
+          <Skeleton className="h-8 w-13 shrink-0 rounded-full bg-white/15" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="font-semibold">{t.dashboard.ready.label}</span>
+            <SkeletonText className="w-4/5 text-[13px] leading-snug" />
           </div>
         </div>
         <CanRequest />
@@ -327,7 +415,9 @@ function Waiting() {
         {text.title}
       </SectionTitle>
       {isPending ? (
-        <Skeleton className="h-40 w-full rounded-3xl" />
+        <ul className="flex">
+          <RequestCardSkeleton />
+        </ul>
       ) : live.length === 0 ? (
         <EmptyState icon={<Users className="size-6" />} title={text.emptyTitle}>
           {text.emptyBody}
@@ -432,6 +522,45 @@ function RequestCard(props: RequestCardProps) {
   );
 }
 
+type RequestCardSkeletonProps = {
+  mine?: boolean;
+};
+
+/** RequestCard while the list loads, row for row; `mine` picks the footer, as on the real card. */
+function RequestCardSkeleton(props: RequestCardSkeletonProps) {
+  const { mine } = props;
+  return (
+    <li aria-hidden="true" className="flex w-full shrink-0 flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-11 rounded-full" />
+          <div className="flex flex-col leading-snug">
+            <SkeletonText className="w-28" />
+            <SkeletonText className="w-20 text-sm" />
+          </div>
+        </div>
+        <Skeleton className="h-8 w-24 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <SkeletonText className="w-3/4 text-xl leading-snug font-bold" />
+        <SkeletonText className="w-full leading-relaxed" />
+      </div>
+      <FundingProgressSkeleton className="rounded-xl bg-embun p-4" />
+      {mine ? (
+        <div className="flex items-center justify-between gap-3 border-t pt-5.5">
+          <SkeletonText className="w-48 text-sm" />
+          <SkeletonText className="w-24 text-sm" />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Skeleton className="h-11 w-full rounded-full sm:w-44" />
+          <Skeleton className="h-11 w-full rounded-full sm:w-32" />
+        </div>
+      )}
+    </li>
+  );
+}
+
 type DeclineButtonProps = {
   id: number;
 };
@@ -471,7 +600,9 @@ function MyRequests() {
         {text.title}
       </SectionTitle>
       {isPending ? (
-        <Skeleton className="h-48 w-full rounded-2xl" />
+        <ul className="flex flex-col gap-4">
+          <RequestCardSkeleton mine />
+        </ul>
       ) : live.length === 0 ? (
         <EmptyState
           icon={<HandHeart className="size-6" />}

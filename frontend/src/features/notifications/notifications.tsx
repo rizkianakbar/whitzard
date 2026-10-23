@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonText } from "@/components/ui/skeleton";
 import { useMarkRead, useNotifications } from "@/features/notifications/notifications.hooks";
 import { notificationText } from "@/features/notifications/notifications.lib";
 import type { Notification } from "@/lib/api";
@@ -56,6 +56,45 @@ export function NotificationItem(props: NotificationItemProps) {
   );
 }
 
+type NotificationsSkeletonProps = {
+  count: number;
+  compact?: boolean;
+};
+
+/** NotificationItem rows while the list loads, at the same padding and line heights. */
+export function NotificationsSkeleton(props: NotificationsSkeletonProps) {
+  const { count, compact } = props;
+  return (
+    <ul aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <li key={i} className={cn(i > 0 && "border-t")}>
+          <div className={cn("flex", compact ? "gap-3 px-4 py-3" : "gap-4 p-5")}>
+            <span className="mt-2 size-2 shrink-0" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <SkeletonText className={cn("w-1/2 font-semibold", compact && "text-[15px] leading-snug")} />
+              <SkeletonText className={cn("w-11/12", compact ? "text-sm leading-snug" : "leading-relaxed")} />
+              <SkeletonText className={cn("w-16", compact ? "text-xs" : "text-[13px]")} />
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The notifications page before anything has loaded. */
+export function NotificationListSkeleton() {
+  const { t } = useI18n();
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <h1 className="text-[39px] leading-tight font-extrabold text-pandan">{t.notifications.title}</h1>
+      <div className="overflow-hidden rounded-3xl border bg-card">
+        <NotificationsSkeleton count={4} />
+      </div>
+    </div>
+  );
+}
+
 export function NotificationList() {
   const { t } = useI18n();
   const markRead = useMarkRead();
@@ -74,7 +113,9 @@ export function NotificationList() {
         )}
       </div>
       {isPending ? (
-        <Skeleton className="h-64 w-full rounded-3xl" />
+        <div className="overflow-hidden rounded-3xl border bg-card">
+          <NotificationsSkeleton count={4} />
+        </div>
       ) : !data?.length ? (
         <p className="rounded-3xl border border-dashed bg-card p-8 leading-relaxed text-batu">
           {t.notifications.empty}

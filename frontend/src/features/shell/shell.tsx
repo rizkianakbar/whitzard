@@ -20,11 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar } from "@/features/members/member-avatar";
 import { useMe } from "@/features/members/members.hooks";
 import { callName } from "@/features/members/members.lib";
-import { NotificationItem } from "@/features/notifications/notifications";
+import { NotificationItem, NotificationsSkeleton } from "@/features/notifications/notifications";
 import { useMarkRead, useNotifications } from "@/features/notifications/notifications.hooks";
 import { useSession } from "@/features/session/session.hooks";
 import { TopUpDialog } from "@/features/top-up/top-up";
@@ -212,10 +211,7 @@ function NotificationBell() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isPending ? (
-            <div className="flex flex-col gap-2 p-4">
-              <Skeleton className="h-14 w-full rounded-xl" />
-              <Skeleton className="h-14 w-full rounded-xl" />
-            </div>
+            <NotificationsSkeleton count={3} compact />
           ) : latest.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm leading-relaxed text-batu">
               {t.shell.bellEmpty}
