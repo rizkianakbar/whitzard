@@ -49,7 +49,7 @@ export function Carousel(props: CarouselProps) {
       <ul
         ref={track}
         onScroll={onScroll}
-        className="relative flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scrollbar-none [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </ul>

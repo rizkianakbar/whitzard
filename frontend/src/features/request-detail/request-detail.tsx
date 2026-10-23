@@ -496,7 +496,7 @@ function CommentItem(props: CommentItemProps) {
             {now ? fmt.timeAgo(comment.createdAt, now) : fmt.stamp(comment.createdAt)}
           </time>
         </div>
-        <p className="text-[15px] leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">{comment.body}</p>
+        <p className="text-[15px] leading-relaxed whitespace-pre-line wrap-anywhere">{comment.body}</p>
       </div>
     </li>
   );
@@ -607,7 +607,7 @@ function History(props: HistoryProps) {
         {shown.map((e, i) => (
           <Fragment key={e.key}>
             <li className="relative flex gap-3 pb-4 last:pb-0">
-              {i < shown.length - 1 && <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-[13px] w-0.5 rounded-full bg-garis" />}
+              {i < shown.length - 1 && <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-3.25 w-0.5 rounded-full bg-garis" />}
               <span aria-hidden="true" className={cn("flex size-7 shrink-0 items-center justify-center rounded-full", e.tone)}>
                 {e.icon}
               </span>
@@ -625,7 +625,7 @@ function History(props: HistoryProps) {
             </li>
             {i === 0 && folded > 0 && (
               <li className="relative flex gap-3 pb-4">
-                <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-[13px] w-0.5 rounded-full bg-garis" />
+                <span aria-hidden="true" className="absolute top-8 bottom-0.5 left-3.25 w-0.5 rounded-full bg-garis" />
                 <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-garis text-[11px] font-bold text-batu">
                   +{folded}
                 </span>

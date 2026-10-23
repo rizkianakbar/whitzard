@@ -155,10 +155,10 @@ function Marquee(props: MarqueeProps) {
 function MarkSeparator() {
   return (
     <span aria-hidden="true" className="grid size-3.5 shrink-0 grid-cols-2 gap-0.5">
-      <span className="rounded-[2px] bg-white/45" />
-      <span className="rounded-[2px] bg-white/45" />
-      <span className="rounded-[2px] bg-white/45" />
-      <span className="rounded-[2px] bg-kunyit" />
+      <span className="rounded-xs bg-white/45" />
+      <span className="rounded-xs bg-white/45" />
+      <span className="rounded-xs bg-white/45" />
+      <span className="rounded-xs bg-kunyit" />
     </span>
   );
 }
