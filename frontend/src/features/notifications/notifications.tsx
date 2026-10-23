@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-
 import { Button } from "@/components/ui/button";
 import { SkeletonText } from "@/components/ui/skeleton";
 import { useMarkRead, useNotifications } from "@/features/notifications/notifications.hooks";
 import { notificationText } from "@/features/notifications/notifications.lib";
+import { RequestLink } from "@/features/requests/request-link";
 import type { Notification } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { useNow } from "@/lib/now";
@@ -36,8 +35,8 @@ export function NotificationItem(props: NotificationItemProps) {
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {n.requestId ? (
-          <Link
-            href={`/requests/${n.requestId}`}
+          <RequestLink
+            id={n.requestId}
             onClick={() => {
               if (!n.isRead) markRead.mutate([n]);
               onOpen?.();
@@ -45,7 +44,7 @@ export function NotificationItem(props: NotificationItemProps) {
             className={cn("font-semibold hover:underline", compact && "text-[15px] leading-snug")}
           >
             {title}
-          </Link>
+          </RequestLink>
         ) : (
           <span className={cn("font-semibold", compact && "text-[15px] leading-snug")}>{title}</span>
         )}

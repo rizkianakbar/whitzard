@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useConfig, useConnection } from "wagmi";
 import { disconnect, signMessage } from "wagmi/actions";
 import type { Address, Hex } from "viem";
@@ -83,13 +84,18 @@ export function SessionProvider(props: SessionProviderProps) {
     () => undefined,
   );
 
-  // A stored token may have been revoked or the backend reset: check it once per wallet.
+  // A stored token may have been revoked or the backend reset. Rather than spend a request
+  // checking it, the first query the backend rejects with 401 signs the wallet out.
+  const queryClient = useQueryClient();
   useEffect(() => {
     if (!address || !token) return;
-    api.member("me", token).catch((error) => {
+    return queryClient.getQueryCache().subscribe((event) => {
+      // Only the failure itself: a refetch of a query that failed before would still carry the old error.
+      if (event.type !== "updated" || event.action.type !== "error") return;
+      const { error } = event.action;
       if (error instanceof ApiError && error.status === 401) write(address, null);
     });
-  }, [address, token]);
+  }, [queryClient, address, token]);
 
   const status: Session["status"] = settling
     ? "loading"

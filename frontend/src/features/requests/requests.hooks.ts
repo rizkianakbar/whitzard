@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Address } from "viem";
 import { toast } from "sonner";
 
 import { useProof } from "@/features/members/members.hooks";
@@ -13,35 +14,60 @@ import { keys, viewer } from "@/lib/query-keys";
 
 export type RequestScope = "all" | "mine" | "for-me";
 
-export function useRequests(scope: RequestScope) {
-  const { address, token } = useSession();
-  return useQuery({
+// Query definitions, shared by the hooks below and by prefetching, so both use the same cache entry.
+
+export const requestsQuery = (scope: RequestScope, address: Address | undefined, token: string | null) =>
+  queryOptions({
     queryKey: [...keys.requests, scope, viewer(address, token)],
     queryFn: async () =>
       (await api.requests(scope === "mine" ? { requester: address } : scope === "for-me" ? { member: "me" } : {}, token)).requests,
     enabled: !!token,
   });
+
+export const requestQuery = (id: number, address: Address | undefined, token: string | null) =>
+  queryOptions({
+    queryKey: [...keys.request(id), viewer(address, token)],
+    queryFn: () => api.request(id, token),
+    enabled: !!token,
+  });
+
+/** Under the request's key, so every refresh of the request refreshes its activity too. */
+export const activityQuery = (id: number, address: Address | undefined, token: string | null) =>
+  queryOptions({
+    queryKey: [...keys.request(id), "activity", viewer(address, token)],
+    queryFn: () => api.activity(id, token!),
+    enabled: !!token,
+  });
+
+export function useRequests(scope: RequestScope) {
+  const { address, token } = useSession();
+  return useQuery(requestsQuery(scope, address, token));
 }
 
 /** `refetchInterval` keeps polling while the caller is mounted, e.g. while a payout is on its way. */
 export function useRequest(id: number, refetchInterval?: number) {
   const { address, token } = useSession();
-  return useQuery({
-    queryKey: [...keys.request(id), viewer(address, token)],
-    queryFn: () => api.request(id, token),
-    enabled: !!token,
-    refetchInterval,
-  });
+  return useQuery({ ...requestQuery(id, address, token), refetchInterval });
 }
 
-/** Under the request's key, so every refresh of the request refreshes its activity too. */
 export function useActivity(id: number) {
   const { address, token } = useSession();
-  return useQuery({
-    queryKey: [...keys.request(id), "activity", viewer(address, token)],
-    queryFn: () => api.activity(id, token!),
-    enabled: !!token,
-  });
+  return useQuery(activityQuery(id, address, token));
+}
+
+/**
+ * Starts loading a request page the moment the member shows intent (hover, focus, touch), so the
+ * page usually has its data by the time the click lands. Spread the result onto the link.
+ */
+export function usePrefetchRequest(id: number) {
+  const { address, token } = useSession();
+  const queryClient = useQueryClient();
+  const prefetch = () => {
+    if (!token) return;
+    void queryClient.prefetchQuery(requestQuery(id, address, token));
+    void queryClient.prefetchQuery(activityQuery(id, address, token));
+  };
+  return { onPointerEnter: prefetch, onFocus: prefetch, onTouchStart: prefetch };
 }
 
 /**

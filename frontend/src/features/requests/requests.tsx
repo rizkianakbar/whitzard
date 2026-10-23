@@ -16,6 +16,7 @@ import { byDeadline, byEndedDesc, isLive, needsYou } from "@/features/requests/r
 import { PastRequestRow } from "@/features/requests/past-request-row";
 import { StatusBadge, YourAnswer } from "@/features/requests/request-status";
 import { useSession } from "@/features/session/session.hooks";
+import { RequestLink } from "@/features/requests/request-link";
 import type { Request } from "@/lib/api";
 import { shortAddress } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
@@ -339,12 +340,12 @@ function RequestCard(props: RequestCardProps) {
       </div>
       <div className="flex flex-col gap-1.5">
         {/* The whole card is the link target; the stretched ::after covers it. */}
-        <Link
-          href={`/requests/${r.id}`}
+        <RequestLink
+          id={r.id}
           className="text-xl leading-snug font-bold text-balance after:absolute after:inset-0 after:rounded-2xl group-hover:underline"
         >
           {r.title ?? t.common.request(r.id)}
-        </Link>
+        </RequestLink>
         {r.description && <p className="line-clamp-2 leading-relaxed text-batu">{r.description}</p>}
       </div>
       <FundingProgress request={r} className="mt-auto" />

@@ -81,6 +81,18 @@ export function RequestDetail(props: RequestDetailProps) {
   return <View detail={data} />;
 }
 
+type RequestPrefetchProps = {
+  id: number;
+};
+
+/** Starts loading the request while something else (the member check) is still pending. Renders nothing. */
+export function RequestPrefetch(props: RequestPrefetchProps) {
+  const { id } = props;
+  useRequest(id);
+  useActivity(id);
+  return null;
+}
+
 /** The request page before the request has loaded: View's layout, card for card. */
 export function RequestDetailSkeleton() {
   const { t } = useI18n();

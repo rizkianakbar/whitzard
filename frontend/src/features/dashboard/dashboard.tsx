@@ -21,6 +21,7 @@ import { StatusBadge, YourAnswer } from "@/features/requests/request-status";
 import { TopUpDialog } from "@/features/top-up/top-up";
 import { BusyLabel, TxLabel } from "@/features/tx/tx-label";
 import { useTx } from "@/features/tx/tx.hooks";
+import { RequestLink } from "@/features/requests/request-link";
 import { api, type Member, type Request } from "@/lib/api";
 import { escrow, registry } from "@/lib/contracts";
 import { shortAddress } from "@/lib/format";
@@ -332,9 +333,9 @@ function RefundNotice() {
           <RotateCcw aria-hidden="true" className="size-5" />
           <p className="min-w-72 flex-1">
             {t.dashboard.refund.body(
-              <Link href={`/requests/${refund.requestId}`} className="font-semibold underline underline-offset-4">
+              <RequestLink id={Number(refund.requestId)} className="font-semibold underline underline-offset-4">
                 {t.common.request(Number(refund.requestId))}
-              </Link>,
+              </RequestLink>,
               <strong className="tabular">{fmt.whzd(refund.amount)} WHZD</strong>,
             )}
           </p>
@@ -479,9 +480,9 @@ function RequestCard(props: RequestCardProps) {
         {sending ? <StatusBadge request={r} /> : <CountdownPill deadline={r.deadline} />}
       </div>
       <div className="flex flex-col gap-1.5">
-        <Link href={`/requests/${r.id}`} className="text-xl leading-snug font-bold text-balance hover:underline">
+        <RequestLink id={r.id} className="text-xl leading-snug font-bold text-balance hover:underline">
           {r.title ?? t.common.request(r.id)}
-        </Link>
+        </RequestLink>
         {r.description && <p className="line-clamp-1 leading-relaxed text-batu">{r.description}</p>}
       </div>
       <FundingProgress request={r} className="rounded-xl bg-embun p-4" />
@@ -491,16 +492,16 @@ function RequestCard(props: RequestCardProps) {
             <Send aria-hidden="true" className="size-4 shrink-0" />
             {sending ? t.dashboard.card.sendingToYou : t.dashboard.card.autoToYou}
           </span>
-          <Link href={`/requests/${r.id}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
+          <RequestLink id={r.id} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-pandan">
             {t.common.seeHistory}
             <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+          </RequestLink>
         </div>
       ) : open ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Link href={`/requests/${r.id}`} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
+          <RequestLink id={r.id} className={cn(buttonVariants(), "tabular w-full sm:w-auto")}>
             {t.common.help(fmt.whzd(r.share))}
-          </Link>
+          </RequestLink>
           <DeclineButton id={r.id} />
         </div>
       ) : (

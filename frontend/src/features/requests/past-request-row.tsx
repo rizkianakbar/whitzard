@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { Check, ChevronRight, Clock, X } from "lucide-react";
 
 import { endedAt } from "@/features/requests/requests.lib";
 import { StatusBadge } from "@/features/requests/request-status";
+import { RequestLink } from "@/features/requests/request-link";
 import type { Request } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,7 @@ export function PastRequestRow(props: PastRequestRowProps) {
 
   return (
     <li className={cn(!first && "border-t")}>
-      <Link href={`/requests/${r.id}`} className="group flex items-center gap-4 p-4 transition-colors hover:bg-muted/60 sm:px-5">
+      <RequestLink id={r.id} className="group flex items-center gap-4 p-4 transition-colors hover:bg-muted/60 sm:px-5">
         <span aria-hidden="true" className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", outcome.tone)}>
           {outcome.icon}
         </span>
@@ -57,7 +57,7 @@ export function PastRequestRow(props: PastRequestRowProps) {
           aria-hidden="true"
           className="size-4 shrink-0 text-batu transition-transform duration-200 ease-out group-hover:translate-x-0.5"
         />
-      </Link>
+      </RequestLink>
     </li>
   );
 }
