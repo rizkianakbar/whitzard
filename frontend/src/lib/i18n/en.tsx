@@ -238,7 +238,6 @@ export const en: Dict = {
   },
 
   landing: {
-    disclaimer: "Whitzard is not an insurance company and offers no insurance products. WHZD is a test token with no monetary value.",
     footer: "A prototype for a Computer Science thesis at Bina Nusantara University: automated escrow for disbursing health aid between community members.",
     navLabel: "On this page",
     nav: { how: "How it works", compare: "What's different", join: "How to join", faq: "FAQ" },
@@ -419,7 +418,6 @@ export const en: Dict = {
       received: "You received",
       receivedNote: (funded: number) => `${n(funded, "request")} funded`,
       neverAsked: "Never asked yet",
-      refunded: (amount: ReactNode) => <>{amount} back from cancelled requests</>,
     },
     ready: {
       label: "Ready to help",

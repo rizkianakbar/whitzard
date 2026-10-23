@@ -6,11 +6,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+type CarouselProps = {
+  label: string;
+  children: ReactNode;
+};
+
 /**
  * One card at a time, swiped (native scroll snapping, so touch and trackpads feel right) or paged
  * with the arrows and dots. Each child should be an <li> that sets its own width (w-full).
  */
-export function Carousel({ label, children }: { label: string; children: ReactNode }) {
+export function Carousel(props: CarouselProps) {
+  const { label, children } = props;
   const { t } = useI18n();
   const track = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
@@ -80,7 +86,15 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
   );
 }
 
-function Arrow({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+type ArrowProps = {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+};
+
+function Arrow(props: ArrowProps) {
+  const { label, disabled, onClick, children } = props;
   return (
     <button
       type="button"

@@ -5,8 +5,14 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+type LogoProps = {
+  href?: string;
+  inverted?: boolean;
+};
+
 /** The mark echoes the share grid: four equal shares, one being filled. */
-export function Logo({ href = "/", inverted = false }: { href?: string; inverted?: boolean }) {
+export function Logo(props: LogoProps) {
+  const { href = "/", inverted = false } = props;
   return (
     <Link href={href} className="flex items-center gap-2.5 rounded-md">
       <span aria-hidden="true" className="grid size-6 grid-cols-2 gap-0.75">
@@ -20,8 +26,13 @@ export function Logo({ href = "/", inverted = false }: { href?: string; inverted
   );
 }
 
+type TestnetPillProps = {
+  className?: string;
+};
+
 /** Always visible while Whitzard runs on a test network. */
-export function TestnetPill({ className }: { className?: string }) {
+export function TestnetPill(props: TestnetPillProps) {
+  const { className } = props;
   const { t } = useI18n();
   return (
     <span className={cn("inline-flex items-center rounded-full bg-kunyit-soft px-2.5 py-1 text-xs font-bold text-kunyit-ink", className)}>

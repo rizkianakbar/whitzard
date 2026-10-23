@@ -1,22 +1,33 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { WagmiProvider } from "wagmi";
 
-import { notificationText } from "@/components/notification-list";
 import { Toaster } from "@/components/ui/sonner";
-import type { Notification } from "@/lib/api";
-import { appConfig } from "@/lib/config";
-import { type Locale, LocaleProvider, useI18n } from "@/lib/i18n";
-import { keys } from "@/lib/queries";
-import { SessionProvider, useSession } from "@/lib/session";
+import { useLiveNotifications } from "@/features/notifications/notifications.hooks";
+import { SessionProvider } from "@/features/session/session";
+import { errorMessage } from "@/lib/errors";
+import { i18nFor, type Locale, LocaleProvider } from "@/lib/i18n";
 import { wagmiConfig } from "@/lib/wagmi";
 
-export function Providers({ locale, children }: { locale: Locale; children: ReactNode }) {
+type ProvidersProps = {
+  locale: Locale;
+  children: ReactNode;
+};
+
+export function Providers(props: ProvidersProps) {
+  const { locale, children } = props;
   const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { staleTime: 10_000, retry: 1 } } }),
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
+        // Every failed mutation (ours and wagmi's: connect, switch network) tells the member why, in
+        // their language, so call sites don't each need a try/catch. A language switch reloads the
+        // page, so the locale is fixed for this client's lifetime.
+        mutationCache: new MutationCache({ onError: (error) => void toast.error(errorMessage(error, i18nFor(locale).t)) }),
+      }),
   );
   return (
     <LocaleProvider locale={locale}>
@@ -34,47 +45,8 @@ export function Providers({ locale, children }: { locale: Locale; children: Reac
   );
 }
 
-/** Keeps a WebSocket open while signed in: each new notification refreshes data and shows a toast. */
+// Its own component, so a notification re-renders only this (nothing), not the whole tree.
 function LiveNotifications() {
-  const { token, address } = useSession();
-  const i18n = useI18n();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!token) return;
-    let socket: WebSocket | null = null;
-    let retry: ReturnType<typeof setTimeout> | undefined;
-    let closed = false;
-    let attempts = 0;
-
-    const connect = () => {
-      socket = new WebSocket(`${appConfig.apiUrl.replace(/^http/, "ws")}/ws?token=${encodeURIComponent(token)}`);
-      socket.onopen = () => {
-        attempts = 0;
-      };
-      socket.onmessage = (event) => {
-        const n = JSON.parse(String(event.data)) as Notification;
-        void queryClient.invalidateQueries({ queryKey: keys.notifications });
-        void queryClient.invalidateQueries({ queryKey: ["requests"] });
-        void queryClient.invalidateQueries({ queryKey: keys.refunds });
-        if (n.requestId) void queryClient.invalidateQueries({ queryKey: keys.request(n.requestId) });
-        if (address) void queryClient.invalidateQueries({ queryKey: keys.member(address) });
-        const { title, description } = notificationText(n, i18n);
-        toast(title, { description });
-      };
-      socket.onclose = () => {
-        if (closed) return;
-        attempts += 1;
-        retry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempts));
-      };
-    };
-    connect();
-    return () => {
-      closed = true;
-      clearTimeout(retry);
-      socket?.close();
-    };
-  }, [token, address, queryClient, i18n]);
-
+  useLiveNotifications();
   return null;
 }

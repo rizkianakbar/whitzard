@@ -67,6 +67,11 @@ export function LocaleProvider({ locale, children }: { locale: Locale; children:
   return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
 
+/** Outside React (e.g. the query client's error handler); components use useI18n(). */
+export function i18nFor(locale: Locale): I18n {
+  return bundles[locale];
+}
+
 export function useI18n(): I18n {
   return bundles[useContext(LocaleContext)];
 }

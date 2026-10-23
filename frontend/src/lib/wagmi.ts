@@ -4,12 +4,10 @@ import { injected } from "wagmi/connectors/injected";
 import { mock } from "wagmi/connectors/mock";
 import type { Address } from "viem";
 
-import { appConfig } from "@/lib/config";
-
-export const chain = appConfig.chainId === hardhat.id ? hardhat : sepolia;
+import { appConfig, chain } from "@/lib/config";
 
 /** Hardhat's well-known test accounts #1–#5 (account #0 deploys, #9 is the keeper). */
-export const devAccounts: Address[] = [
+const devAccounts: Address[] = [
   "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
   "0x90F79bf6EB2c4f870365E785982E1f101E93b906",

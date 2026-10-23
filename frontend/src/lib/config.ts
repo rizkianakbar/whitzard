@@ -1,4 +1,5 @@
 import { type Address, getAddress, isAddress } from "viem";
+import { hardhat, sepolia } from "viem/chains";
 
 // NEXT_PUBLIC_* values are inlined at build time, so each must be referenced literally.
 function address(name: string, value: string | undefined): Address {
@@ -9,6 +10,9 @@ function address(name: string, value: string | undefined): Address {
 }
 
 const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
+
+/** The one chain the app runs on: Sepolia, or a local Hardhat node in development. */
+export const chain = chainId === hardhat.id ? hardhat : sepolia;
 
 export const appConfig = {
   apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080").replace(/\/$/, ""),

@@ -236,7 +236,6 @@ export const id = {
   },
 
   landing: {
-    disclaimer: "Whitzard bukan perusahaan asuransi dan tidak menawarkan produk asuransi. WHZD adalah token uji tanpa nilai uang.",
     footer: "Prototipe untuk skripsi Ilmu Komputer, Universitas Bina Nusantara: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
     navLabel: "Halaman ini",
     nav: { how: "Cara kerja", compare: "Bedanya", join: "Cara bergabung", faq: "Tanya jawab" },
@@ -417,7 +416,6 @@ export const id = {
       received: "Kamu terima",
       receivedNote: (funded: number) => `${funded} permintaan tersalurkan`,
       neverAsked: "Belum pernah mengajukan",
-      refunded: (amount: ReactNode) => <>{amount} kembali dari permintaan yang dibatalkan</>,
     },
     ready: {
       label: "Siap membantu",

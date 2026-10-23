@@ -46,7 +46,8 @@ export type Contribution = {
 export type RequestDetail = {
   request: Request;
   responses: Record<SnapshotResponse, number>;
-  comments: RequestComment[];
+  /** null when there are none yet. */
+  comments: RequestComment[] | null;
   you?: {
     isRequester: boolean;
     inSnapshot: boolean;
@@ -164,16 +165,22 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init: RequestInit & { token?: string | null } = {}): Promise<T> {
+async function send(path: string, init: RequestInit & { token?: string | null } = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.token) headers.set("Authorization", `Bearer ${init.token}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const res = await fetch(appConfig.apiUrl + path, { ...init, headers });
-  if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => ({}));
-  // Without a message from the backend, errorMessage() says it in the member's language.
-  if (!res.ok) throw new ApiError(res.status, body.error ?? "");
-  return body as T;
+  if (!res.ok) {
+    // Without a message from the backend, errorMessage() says it in the member's language.
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.error ?? "");
+  }
+  return res;
+}
+
+async function call<T>(path: string, init?: RequestInit & { token?: string | null }): Promise<T> {
+  const res = await send(path, init);
+  return res.status === 204 ? (undefined as T) : res.json();
 }
 
 export const api = {
@@ -196,13 +203,8 @@ export const api = {
   },
   deletePhoto: (token: string) => call<MemberProfile>("/members/me/photo", { method: "DELETE", token }),
   /** `hash` versions the URL: the backend lets browsers cache a photo for a day. */
-  photo: async (token: string, address: Address, hash: string) => {
-    const res = await fetch(`${appConfig.apiUrl}/members/${address}/photo?v=${hash}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new ApiError(res.status, "");
-    return res.blob();
-  },
+  photo: async (token: string, address: Address, hash: string) =>
+    (await send(`/members/${address}/photo?v=${hash}`, { token })).blob(),
   stats: () => call<Stats>("/stats"),
   proof: (token: string) => call<Proof>("/members/me/proof", { token }),
   refunds: (token: string) => call<Refunds>("/members/me/refunds", { token }),
@@ -236,14 +238,7 @@ export const api = {
       token,
       body: JSON.stringify({ body }),
     }),
-  evidence: async (token: string, id: number) => {
-    const res = await fetch(`${appConfig.apiUrl}/requests/${id}/evidence`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, body.error ?? "");
-    }
-    return { blob: await res.blob(), hash: res.headers.get("X-Evidence-Sha256") };
-  },
+  evidence: async (token: string, id: number) => (await send(`/requests/${id}/evidence`, { token })).blob(),
 
   notifications: (token: string, opts: { unread?: boolean; limit?: number } = {}) => {
     const params = new URLSearchParams();
