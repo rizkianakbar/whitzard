@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -205,39 +207,54 @@ func (s *Server) handleListRequests(w http.ResponseWriter, r *http.Request) {
 
 // GET /requests/{id} → the request, its snapshot response counts and the caller's own position.
 func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
-	req, ok := s.loadRequest(w, r)
+	id, ok := requestID(w, r)
 	if !ok {
 		return
 	}
-	counts, err := s.store.SnapshotCounts(r.Context(), req.ID)
-	if err != nil {
-		s.internalError(w, r, err)
-		return
-	}
-	body := map[string]any{"request": s.view(req), "responses": counts}
-	comments, err := s.store.ListComments(r.Context(), req.ID)
-	if err != nil {
-		s.internalError(w, r, err)
-		return
-	}
-	body["comments"] = comments
+	// The five queries only need the id, so they run side by side: one database round trip
+	// instead of five in a row (the database may be far away).
+	ctx, me := r.Context(), caller(r)
+	var (
+		wg                                            sync.WaitGroup
+		req                                           *store.Request
+		counts                                        map[string]int
+		comments                                      []*store.Comment
+		response                                      string
+		contribution                                  *store.Contribution
+		reqErr, countsErr, commentsErr, respErr, cErr error
+	)
+	wg.Go(func() { req, reqErr = s.store.GetRequest(ctx, id) })
+	wg.Go(func() { counts, countsErr = s.store.SnapshotCounts(ctx, id) })
+	wg.Go(func() { comments, commentsErr = s.store.ListComments(ctx, id) })
+	wg.Go(func() { response, respErr = s.store.SnapshotResponse(ctx, id, me) })
+	wg.Go(func() { contribution, cErr = s.store.GetContribution(ctx, id, me) })
+	wg.Wait()
 
-	me := caller(r)
+	if errors.Is(reqErr, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, requestNotFound)
+		return
+	}
+	if err := cmp.Or(reqErr, countsErr, commentsErr, ignoreNotFound(respErr), ignoreNotFound(cErr)); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+
 	you := map[string]any{"isRequester": me == req.Requester, "inSnapshot": false, "response": nil, "contribution": nil}
-	if response, err := s.store.SnapshotResponse(r.Context(), req.ID, me); err == nil {
+	if respErr == nil {
 		you["inSnapshot"], you["response"] = true, response
-	} else if !errors.Is(err, store.ErrNotFound) {
-		s.internalError(w, r, err)
-		return
 	}
-	if c, err := s.store.GetContribution(r.Context(), req.ID, me); err == nil {
-		you["contribution"] = c
-	} else if !errors.Is(err, store.ErrNotFound) {
-		s.internalError(w, r, err)
-		return
+	if cErr == nil {
+		you["contribution"] = contribution
 	}
-	body["you"] = you
-	writeJSON(w, http.StatusOK, body)
+	writeJSON(w, http.StatusOK, map[string]any{"request": s.view(req), "responses": counts, "comments": comments, "you": you})
+}
+
+// ignoreNotFound treats "no such row" as no error, for lookups whose absence is an answer.
+func ignoreNotFound(err error) error {
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	return err
 }
 
 // POST /requests/{id}/comments {body}: adds one discussion message. Any registered member may
@@ -374,15 +391,26 @@ func (s *Server) handleRespond(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) loadRequest(w http.ResponseWriter, r *http.Request) (*store.Request, bool) {
+const requestNotFound = "request not found (it may not be indexed yet)"
+
+// requestID is the {id} path value, or a 400 if it isn't a positive number.
+func requestID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		writeError(w, http.StatusBadRequest, "request id must be a positive number")
+		return 0, false
+	}
+	return id, true
+}
+
+func (s *Server) loadRequest(w http.ResponseWriter, r *http.Request) (*store.Request, bool) {
+	id, ok := requestID(w, r)
+	if !ok {
 		return nil, false
 	}
 	req, err := s.store.GetRequest(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "request not found (it may not be indexed yet)")
+		writeError(w, http.StatusNotFound, requestNotFound)
 		return nil, false
 	}
 	if err != nil {

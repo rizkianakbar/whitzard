@@ -70,6 +70,7 @@ type Server struct {
 	hub      *Hub
 	log      *slog.Logger
 	now      func() time.Time
+	sessions sessionCache
 }
 
 // New builds the server; photos should accept images only (PhotoTypes). Run hub.Run separately
@@ -148,7 +149,15 @@ func (s *Server) authed(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) sessionAddress(ctx context.Context, token string) (string, error) {
-	return s.store.SessionAddress(ctx, auth.HashToken(token))
+	hash := auth.HashToken(token)
+	if address, ok := s.sessions.get(hash, s.now()); ok {
+		return address, nil
+	}
+	address, err := s.store.SessionAddress(ctx, hash)
+	if err == nil {
+		s.sessions.put(hash, address, s.now())
+	}
+	return address, err
 }
 
 // caller is the signed-in address (lowercase); only valid inside `authed` handlers.

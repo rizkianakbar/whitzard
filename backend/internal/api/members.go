@@ -1,12 +1,15 @@
 package api
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -80,10 +83,12 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 // POST /auth/logout
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if err := s.store.DeleteSession(r.Context(), auth.HashToken(token)); err != nil {
+	hash := auth.HashToken(token)
+	if err := s.store.DeleteSession(r.Context(), hash); err != nil {
 		s.internalError(w, r, err)
 		return
 	}
+	s.sessions.forget(hash)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -117,39 +122,44 @@ func (s *Server) handleGetMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := s.store.GetMember(r.Context(), lower)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.internalError(w, r, err)
-		return
-	}
-
-	// Each read runs only if the previous ones succeeded; the first error is reported.
+	// Every page waits on this, so the profile and the seven chain reads run side by side: one
+	// round trip to the database and the RPC instead of eight in a row. The first error is reported.
 	opts := &bind.CallOpts{Context: r.Context()}
-	var state memberChainState
-	var readErr error
-	read := func(f func() error) {
-		if readErr == nil {
-			readErr = f()
-		}
+	var (
+		wg         sync.WaitGroup
+		profile    *store.Member
+		profileErr error
+		state      memberChainState
+		errs       [7]error
+	)
+	wg.Go(func() { profile, profileErr = s.store.GetMember(r.Context(), lower) })
+	readBool := func(i int, dst *bool, f func(*bind.CallOpts, common.Address) (bool, error)) {
+		wg.Go(func() { *dst, errs[i] = f(opts, addr) })
 	}
-	readInt := func(dst *string, f func(*bind.CallOpts, common.Address) (*big.Int, error)) {
-		read(func() error {
+	readInt := func(i int, dst *string, f func(*bind.CallOpts, common.Address) (*big.Int, error)) {
+		wg.Go(func() {
 			v, err := f(opts, addr)
 			if err == nil {
 				*dst = v.String()
 			}
-			return err
+			errs[i] = err
 		})
 	}
-	read(func() (err error) { state.Registered, err = s.chain.Registry.IsRegistered(opts, addr); return })
-	read(func() (err error) { state.Ready, err = s.chain.Registry.IsReady(opts, addr); return })
-	read(func() (err error) { state.HasParticipated, err = s.chain.Registry.HasParticipated(opts, addr); return })
-	readInt(&state.RequestCount, s.chain.Registry.RequestCount)
-	readInt(&state.Balance, s.chain.Token.BalanceOf)
-	readInt(&state.FaucetClaimed, s.chain.Token.ClaimedTotal)
-	readInt(&state.FaucetNextClaimAt, s.chain.Token.NextClaimAt)
-	if readErr != nil {
-		s.chainError(w, r, readErr)
+	readBool(0, &state.Registered, s.chain.Registry.IsRegistered)
+	readBool(1, &state.Ready, s.chain.Registry.IsReady)
+	readBool(2, &state.HasParticipated, s.chain.Registry.HasParticipated)
+	readInt(3, &state.RequestCount, s.chain.Registry.RequestCount)
+	readInt(4, &state.Balance, s.chain.Token.BalanceOf)
+	readInt(5, &state.FaucetClaimed, s.chain.Token.ClaimedTotal)
+	readInt(6, &state.FaucetNextClaimAt, s.chain.Token.NextClaimAt)
+	wg.Wait()
+
+	if profileErr != nil && !errors.Is(profileErr, store.ErrNotFound) {
+		s.internalError(w, r, profileErr)
+		return
+	}
+	if err := cmp.Or(errs[:]...); err != nil {
+		s.chainError(w, r, err)
 		return
 	}
 
@@ -393,6 +403,9 @@ func (s *Server) handleMemberStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
+// proofBatch is how many proof candidates are checked against the chain at once.
+const proofBatch = 5
+
 // GET /members/me/proof → the proofId to pass to Escrow.openRequest. The first request needs no
 // proof (0). Otherwise the newest contribution the chain accepts is returned, or null if none.
 func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
@@ -400,9 +413,19 @@ func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
 	addr, _, _ := parseAddress(me)
 	opts := &bind.CallOpts{Context: r.Context()}
 
-	count, err := s.chain.Registry.RequestCount(opts, addr)
-	if err != nil {
-		s.chainError(w, r, err)
+	// The chain's request count and the database's candidates don't depend on each other.
+	var (
+		wg            sync.WaitGroup
+		count         *big.Int
+		countErr      error
+		candidates    []int64
+		candidatesErr error
+	)
+	wg.Go(func() { count, countErr = s.chain.Registry.RequestCount(opts, addr) })
+	wg.Go(func() { candidates, candidatesErr = s.store.ProofCandidates(r.Context(), me, 20) })
+	wg.Wait()
+	if countErr != nil {
+		s.chainError(w, r, countErr)
 		return
 	}
 	if count.Sign() == 0 {
@@ -415,20 +438,29 @@ func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	candidates, err := s.store.ProofCandidates(r.Context(), me, 20)
-	if err != nil {
-		s.internalError(w, r, err)
+	if candidatesErr != nil {
+		s.internalError(w, r, candidatesErr)
 		return
 	}
-	for _, id := range candidates {
-		ok, err := s.chain.Escrow.CanOpenRequest(opts, addr, big.NewInt(id))
-		if err != nil {
-			s.chainError(w, r, err)
-			return
+	// Newest first, a few at a time: usually the first batch answers in one round trip, and the
+	// public RPC isn't hit with all twenty at once. Within a batch the order still decides.
+	for batch := range slices.Chunk(candidates, proofBatch) {
+		oks := make([]bool, len(batch))
+		errs := make([]error, len(batch))
+		var wg sync.WaitGroup
+		for i, id := range batch {
+			wg.Go(func() { oks[i], errs[i] = s.chain.Escrow.CanOpenRequest(opts, addr, big.NewInt(id)) })
 		}
-		if ok {
-			writeJSON(w, http.StatusOK, map[string]any{"needed": true, "proofId": big.NewInt(id).String(), "canOpenRequest": true})
-			return
+		wg.Wait()
+		for i, id := range batch {
+			if errs[i] != nil {
+				s.chainError(w, r, errs[i])
+				return
+			}
+			if oks[i] {
+				writeJSON(w, http.StatusOK, map[string]any{"needed": true, "proofId": big.NewInt(id).String(), "canOpenRequest": true})
+				return
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"needed": true, "proofId": nil, "canOpenRequest": false})
