@@ -1,10 +1,12 @@
 "use client";
 
 import { type ReactNode, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMe } from "@/features/members/members.hooks";
+import { membersQuery, useMe } from "@/features/members/members.hooks";
+import { requestsQuery } from "@/features/requests/requests.hooks";
 import { useSession } from "@/features/session/session.hooks";
 
 function PageSkeleton() {
@@ -32,9 +34,19 @@ type MemberGateProps = {
 export function MemberGate(props: MemberGateProps) {
   const { joining = false, fallback = <PageSkeleton />, children } = props;
   const router = useRouter();
-  const { status } = useSession();
+  const queryClient = useQueryClient();
+  const { status, address, token } = useSession();
   const { data: me } = useMe();
   const registered = me?.chain.registered;
+
+  // The page's own queries only start once it renders, after the member has loaded. Start the
+  // ones most pages need now, alongside it: names everywhere, and the two request lists.
+  useEffect(() => {
+    if (!token) return;
+    void queryClient.prefetchQuery(membersQuery(address, token));
+    void queryClient.prefetchQuery(requestsQuery("for-me", address, token));
+    void queryClient.prefetchQuery(requestsQuery("mine", address, token));
+  }, [queryClient, address, token]);
 
   useEffect(() => {
     if (status === "disconnected" || status === "signed-out") router.replace("/");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
 
 import { useSession } from "@/features/session/session.hooks";
@@ -17,14 +17,17 @@ export function useMe() {
   });
 }
 
-function useMembersQuery<T>(select: (members: MemberProfile[]) => T) {
-  const { address, token } = useSession();
-  return useQuery({
+/** Every registered member's profile; shared with prefetching, so both use the same cache entry. */
+export const membersQuery = (address: Address | undefined, token: string | null) =>
+  queryOptions({
     queryKey: [...keys.members, viewer(address, token)],
     queryFn: async () => (await api.members(token!)).members,
     enabled: !!token,
-    select,
   });
+
+function useMembersQuery<T>(select: (members: MemberProfile[]) => T) {
+  const { address, token } = useSession();
+  return useQuery({ ...membersQuery(address, token), select });
 }
 
 const all = (members: MemberProfile[]) => members;
