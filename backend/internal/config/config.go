@@ -40,6 +40,8 @@ type Config struct {
 	MaxPhotoBytes  int64
 	MaxUploadBytes int64
 	SessionTTL     time.Duration
+	ResendAPIKey   string
+	ResendFrom     string
 
 	KeeperKey          *ecdsa.PrivateKey // nil if KEEPER_PRIVATE_KEY is not set
 	KeeperPollInterval time.Duration
@@ -78,6 +80,8 @@ func Load() (*Config, error) {
 	c.PhotoDir = get("PHOTO_DIR", "./data/photos")
 	c.MaxPhotoBytes = int64(uintVar("MAX_PHOTO_BYTES", 2<<20, &errs))
 	c.SessionTTL = duration("SESSION_TTL", "168h", &errs)
+	c.ResendAPIKey = os.Getenv("RESEND_API_KEY")
+	c.ResendFrom = os.Getenv("RESEND_FROM")
 
 	if v := os.Getenv("KEEPER_PRIVATE_KEY"); v != "" {
 		key, err := crypto.HexToECDSA(strings.TrimPrefix(v, "0x"))

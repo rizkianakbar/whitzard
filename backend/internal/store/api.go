@@ -65,6 +65,7 @@ type Member struct {
 	Nickname          *string    `json:"nickname"`
 	BirthDate         *time.Time `json:"-"` // only for the member themself; see Profile.BirthDate
 	City              *string    `json:"city"`
+	Email             *string    `json:"-"`
 	Photo             *string    `json:"photo"` // SHA-256 of the photo, also a cache key; null if none
 	PhotoType         *string    `json:"-"`
 	Ready             bool       `json:"ready"`
@@ -75,14 +76,14 @@ type Member struct {
 }
 
 const memberColumns = `
-	address, display_name, nickname, birth_date, city, photo_hash, photo_type,
+	address, display_name, nickname, birth_date, city, email, photo_hash, photo_type,
 	ready, registered_at_block, created_at,
 	(SELECT count(*) FROM contributions c WHERE c.member = m.address AND NOT c.refunded),
 	(SELECT count(*) FROM requests r WHERE r.requester = m.address AND r.status <> 'cancelled')`
 
 func scanMember(row pgx.Row) (*Member, error) {
 	var m Member
-	err := row.Scan(&m.Address, &m.DisplayName, &m.Nickname, &m.BirthDate, &m.City, &m.Photo, &m.PhotoType,
+	err := row.Scan(&m.Address, &m.DisplayName, &m.Nickname, &m.BirthDate, &m.City, &m.Email, &m.Photo, &m.PhotoType,
 		&m.Ready, &m.RegisteredAtBlock, &m.CreatedAt, &m.Contributions, &m.Requests)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -119,13 +120,14 @@ type Profile struct {
 	Nickname    *string
 	BirthDate   *time.Time
 	City        *string
+	Email       *string
 }
 
 // SetProfile replaces a registered member's profile (not the photo); ErrNotFound if not registered.
 func (s *Store) SetProfile(ctx context.Context, address string, p Profile) error {
 	tag, err := s.Pool.Exec(ctx, `
-		UPDATE members SET display_name = $2, nickname = $3, birth_date = $4, city = $5, updated_at = now()
-		WHERE address = $1`, address, p.DisplayName, p.Nickname, p.BirthDate, p.City)
+		UPDATE members SET display_name = $2, nickname = $3, birth_date = $4, city = $5, email = $6, updated_at = now()
+		WHERE address = $1`, address, p.DisplayName, p.Nickname, p.BirthDate, p.City, p.Email)
 	if err != nil {
 		return err
 	}
@@ -133,6 +135,21 @@ func (s *Store) SetProfile(ctx context.Context, address string, p Profile) error
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ClaimNotificationEmail marks notification `id` as emailed and returns its member's email, or ""
+// if the member has none or another process claimed it first, so each one is emailed at most once.
+func (s *Store) ClaimNotificationEmail(ctx context.Context, id int64) (string, error) {
+	var email string
+	err := s.Pool.QueryRow(ctx, `
+		UPDATE notifications n SET emailed_at = now()
+		FROM members m
+		WHERE n.id = $1 AND n.emailed_at IS NULL AND m.address = n.member AND m.email IS NOT NULL
+		RETURNING m.email`, id).Scan(&email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return email, err
 }
 
 // SetPhoto sets (or, with a nil hash, removes) a registered member's photo; ErrNotFound if not registered.
@@ -455,6 +472,58 @@ func (s *Store) MarkRead(ctx context.Context, id int64, member string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// Comment is one discussion message on a request.
+type Comment struct {
+	ID        int64     `json:"id"`
+	RequestID int64     `json:"requestId"`
+	Member    string    `json:"member"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+const commentColumns = `id, request_id, member, body, created_at`
+
+func scanComment(row pgx.Row) (*Comment, error) {
+	var c Comment
+	err := row.Scan(&c.ID, &c.RequestID, &c.Member, &c.Body, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return &c, err
+}
+
+// AddComment adds one message to a request's discussion; ErrNotFound if `member` is not registered.
+func (s *Store) AddComment(ctx context.Context, requestID int64, member, body string) (*Comment, error) {
+	return scanComment(s.Pool.QueryRow(ctx, `
+		INSERT INTO request_comments (request_id, member, body)
+		SELECT $1, address, $3 FROM members WHERE address = $2
+		RETURNING `+commentColumns, requestID, member, body))
+}
+
+// ListComments returns a request's discussion messages, oldest first.
+func (s *Store) ListComments(ctx context.Context, requestID int64) ([]*Comment, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT `+commentColumns+` FROM request_comments
+		WHERE request_id = $1
+		ORDER BY created_at, id`, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Comment
+	for rows.Next() {
+		c, err := scanComment(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	if out == nil {
+		out = []*Comment{}
+	}
+	return out, rows.Err()
 }
 
 // ResponsesFor returns `member`'s snapshot response for each of `requestIDs` they are in.

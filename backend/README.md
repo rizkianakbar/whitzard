@@ -56,7 +56,7 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | --- | --- |
 | `GET /members` 🔒 | `{members: [profile]}`: every registered member, ready ones first (profiles only; chain state per member) |
 | `GET /members/{address}` (or `/members/me` 🔒) | `{address, profile, chain}`: profile is null before registering; `chain` = registered, ready, hasParticipated, requestCount, balance, faucetClaimed, faucetNextClaimAt (live) |
-| `PUT /members/me` 🔒 `{displayName, nickname, birthDate, city}` | replace the profile (registered members); missing fields are cleared, `birthDate` is `YYYY-MM-DD`. Self-declared, never verified. `birthDate` is returned only to the member themself, `city` only to signed-in viewers |
+| `PUT /members/me` 🔒 `{displayName, nickname, birthDate, city, email}` | replace the profile (registered members); missing fields are cleared, `birthDate` is `YYYY-MM-DD`, `email` is required and used for email notifications. Self-declared, never verified. `birthDate` and `email` are returned only to the member themself, `city` only to signed-in viewers |
 | `PUT /members/me/photo` 🔒 multipart `file` | set the profile photo (PNG, JPEG or WebP, `MAX_PHOTO_BYTES`); `profile.photo` is its SHA-256 |
 | `DELETE /members/me/photo` 🔒 | remove the profile photo |
 | `GET /members/{address}/photo` 🔒 | the photo, for signed-in viewers |
@@ -71,7 +71,8 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | --- | --- |
 | `POST /requests` 🔒 multipart `title`, `description`, `file` | `{draftId, evidenceHash, …}`: then send `Escrow.openRequest(amount, duration, evidenceHash, proofId)` from the wallet |
 | `GET /requests?requester=&member=me&before=&limit=` 🔒 | newest first; with `member=me` each request also has `yourResponse` |
-| `GET /requests/{id}` 🔒 | `{request, responses, you}`: `status` is open / funding / finalized / expired / cancelled, plus `awaitingFinalize` |
+| `GET /requests/{id}` 🔒 | `{request, responses, comments, you}`: `status` is open / funding / finalized / expired / cancelled, plus `awaitingFinalize` |
+| `POST /requests/{id}/comments` 🔒 `{body}` | add one discussion comment (`body` max 1000 chars); any registered member, Ready or not |
 | `GET /requests/{id}/activity` 🔒 | `{activity: [{type, member, amount, txHash, at}]}`: contributions and refunds, oldest first; `type` is contributed / refunded. Who declined or did not answer is only counted, never named |
 | `GET /requests/{id}/evidence` 🔒 | the document, only for the requester and snapshot members; `X-Evidence-Sha256` = on-chain hash |
 | `POST /requests/{id}/contribute` 🔒 `{response: "participate" \| "decline"}` | records the answer; the contribution itself is `Escrow.contributeWithPermit` from the wallet |
@@ -84,4 +85,4 @@ Errors are `{"error": "…"}`. 🔒 = needs `Authorization: Bearer <token>`.
 | `POST /notifications/{id}/read` 🔒 | mark as read |
 | `GET /ws?token=<token>` | WebSocket: each new notification is pushed as JSON |
 
-Types: `request_opened`, `contribution_received`, `request_cancelled`, `request_finalized` (to the requester), `request_forwarded` (to the contributors), `request_expired`. `amount` (wei, or null) is the share asked for, the contribution received, or the total paid out; `title` and `description` are Indonesian text, kept for clients that do not write their own.
+Types: `request_opened`, `contribution_received`, `request_cancelled`, `request_finalized` (to the requester), `request_forwarded` (to the contributors), `request_expired`. `amount` (wei, or null) is the share asked for, the contribution received, or the total paid out; `title` and `description` are Indonesian text, kept for clients that do not write their own. When [Resend](https://resend.com) is configured (`RESEND_API_KEY`, `RESEND_FROM`), each new notification is also emailed to the member's profile email, at most once even with several API processes. Email is best-effort: a bad Resend setting or a wrong address is only logged and never affects the API, indexer or keeper. Live pushes and emails rely on PostgreSQL LISTEN/NOTIFY, which transaction poolers (e.g. Supabase port 6543) do not support: use a direct connection or a session pooler (Supabase port 5432).

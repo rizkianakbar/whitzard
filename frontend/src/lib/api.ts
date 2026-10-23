@@ -46,12 +46,21 @@ export type Contribution = {
 export type RequestDetail = {
   request: Request;
   responses: Record<SnapshotResponse, number>;
+  comments: RequestComment[];
   you?: {
     isRequester: boolean;
     inSnapshot: boolean;
     response: SnapshotResponse | null;
     contribution: Contribution | null;
   };
+};
+
+export type RequestComment = {
+  id: number;
+  requestId: number;
+  member: Address;
+  body: string;
+  createdAt: string;
 };
 
 /** Self-declared and never verified. */
@@ -61,6 +70,8 @@ export type MemberProfile = {
   nickname: string | null;
   /** YYYY-MM-DD; only present on your own profile. */
   birthDate?: string | null;
+  /** Only present on your own profile. */
+  email?: string | null;
   /** Only shown to signed-in viewers. */
   city: string | null;
   /** SHA-256 of the photo (also a cache key), or null. */
@@ -91,6 +102,7 @@ export type ProfileInput = {
   nickname: string | null;
   birthDate: string | null;
   city: string | null;
+  email: string | null;
 };
 
 export type Stats = {
@@ -217,6 +229,12 @@ export const api = {
       method: "POST",
       token,
       body: JSON.stringify({ response }),
+    }),
+  comment: (token: string, id: number, body: string) =>
+    call<RequestComment>(`/requests/${id}/comments`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ body }),
     }),
   evidence: async (token: string, id: number) => {
     const res = await fetch(`${appConfig.apiUrl}/requests/${id}/evidence`, { headers: { Authorization: `Bearer ${token}` } });

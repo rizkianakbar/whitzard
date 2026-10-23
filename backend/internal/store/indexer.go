@@ -34,6 +34,30 @@ func (s *Store) InIndexTx(ctx context.Context, fn func(*IndexTx) error) error {
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error { return fn(&IndexTx{tx: tx}) })
 }
 
+// ErrRangeTaken means another indexer already committed the block range.
+var ErrRangeTaken = errors.New("block range already indexed by another indexer")
+
+// ClaimRange makes this batch the only writer of indexer `name` until it commits, and returns
+// ErrRangeTaken if the cursor has already reached `from`. Two indexers on one database (say,
+// two machines running `all`) would otherwise both apply the same logs and notify twice.
+func (t *IndexTx) ClaimRange(ctx context.Context, name string, from uint64) error {
+	if _, err := t.tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('indexer:' || $1))`, name); err != nil {
+		return err
+	}
+	var block int64
+	err := t.tx.QueryRow(ctx, `SELECT block FROM indexer_cursor WHERE name = $1`, name).Scan(&block)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if uint64(block) >= from {
+		return ErrRangeTaken
+	}
+	return nil
+}
+
 // SetCursor records that every block up to and including `block` has been processed.
 func (t *IndexTx) SetCursor(ctx context.Context, name string, block uint64) error {
 	_, err := t.tx.Exec(ctx, `

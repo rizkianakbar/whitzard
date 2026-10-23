@@ -215,6 +215,12 @@ func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := map[string]any{"request": s.view(req), "responses": counts}
+	comments, err := s.store.ListComments(r.Context(), req.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	body["comments"] = comments
 
 	me := caller(r)
 	you := map[string]any{"isRequester": me == req.Requester, "inSnapshot": false, "response": nil, "contribution": nil}
@@ -232,6 +238,40 @@ func (s *Server) handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	body["you"] = you
 	writeJSON(w, http.StatusOK, body)
+}
+
+// POST /requests/{id}/comments {body}: adds one discussion message. Any registered member may
+// comment, Ready or not, in the snapshot or not.
+func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
+	req, ok := s.loadRequest(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Body string `json:"body"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	text := strings.TrimSpace(body.Body)
+	if text == "" {
+		writeError(w, http.StatusBadRequest, "comment body is required")
+		return
+	}
+	if utf8.RuneCountInString(text) > 1000 {
+		writeError(w, http.StatusBadRequest, "comment body is at most 1000 characters")
+		return
+	}
+	comment, err := s.store.AddComment(r.Context(), req.ID, caller(r), text)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusForbidden, "only registered members can comment (Registry.register)")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, comment)
 }
 
 // GET /requests/{id}/activity → the request's contributions and refunds with their transactions,

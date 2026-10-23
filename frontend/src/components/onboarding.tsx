@@ -45,7 +45,7 @@ function Steps({ me }: { me: Member }) {
   const [readyLater, setReadyLater] = useState(false);
   const done: Record<StepId, boolean> = {
     join: me.chain.registered,
-    profile: !!me.profile?.displayName,
+    profile: !!me.profile?.displayName && !!me.profile?.email,
     balance: BigInt(me.chain.faucetClaimed) > 0n || BigInt(me.chain.balance) > 0n,
     ready: me.chain.ready || readyLater,
   };

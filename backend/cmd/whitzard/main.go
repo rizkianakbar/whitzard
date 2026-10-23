@@ -28,6 +28,7 @@ import (
 	"github.com/rizkianakbar/whitzard/backend/internal/evidence"
 	"github.com/rizkianakbar/whitzard/backend/internal/indexer"
 	"github.com/rizkianakbar/whitzard/backend/internal/keeper"
+	"github.com/rizkianakbar/whitzard/backend/internal/notify"
 	"github.com/rizkianakbar/whitzard/backend/internal/store"
 )
 
@@ -151,7 +152,15 @@ func keeperTask(cfg *config.Config, client *ethclient.Client, st *store.Store, c
 }
 
 func apiTasks(cfg *config.Config, client *ethclient.Client, st *store.Store, log *slog.Logger) []func(context.Context) error {
-	hub := api.NewHub(st, log.With("component", "hub"))
+	// Email is extra: a bad Resend setting only turns it off, never the API, indexer or keeper.
+	// mailer stays a nil interface when off; a nil *notify.Resend in it would look turned on.
+	var mailer api.Mailer
+	if m, err := notify.NewResend(notify.ResendConfig{APIKey: cfg.ResendAPIKey, From: cfg.ResendFrom}); err != nil {
+		log.Warn("notification email turned off", "err", err)
+	} else if m != nil {
+		mailer = m
+	}
+	hub := api.NewHub(st, log.With("component", "hub"), mailer)
 	serve := func(ctx context.Context) error {
 		ev, err := evidence.NewDisk(cfg.EvidenceDir, cfg.MaxUploadBytes)
 		if err != nil {

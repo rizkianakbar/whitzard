@@ -117,14 +117,20 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 type Hub struct {
 	store *store.Store
 	log   *slog.Logger
+	mail  Mailer
 
 	mu   sync.Mutex
 	subs map[string]map[chan *store.Notification]struct{}
 }
 
+// Mailer sends notification emails.
+type Mailer interface {
+	Send(ctx context.Context, to, subject, body string) error
+}
+
 // NewHub creates a hub; call Run to start listening.
-func NewHub(st *store.Store, log *slog.Logger) *Hub {
-	return &Hub{store: st, log: log, subs: map[string]map[chan *store.Notification]struct{}{}}
+func NewHub(st *store.Store, log *slog.Logger, mail Mailer) *Hub {
+	return &Hub{store: st, log: log, mail: mail, subs: map[string]map[chan *store.Notification]struct{}{}}
 }
 
 // Subscribe returns a channel of `member`'s new notifications. The channel is closed if the
@@ -207,7 +213,9 @@ func (h *Hub) listen(ctx context.Context, databaseURL string) error {
 			h.log.Error("bad notification payload", "payload", msg.Payload)
 			continue
 		}
-		if !h.hasSubscribers(payload.Member) {
+		// Email goes out whether or not the member is online; the WebSocket only to those who are.
+		live := h.hasSubscribers(payload.Member)
+		if !live && h.mail == nil {
 			continue
 		}
 		n, err := h.store.GetNotification(ctx, payload.ID)
@@ -215,6 +223,36 @@ func (h *Hub) listen(ctx context.Context, databaseURL string) error {
 			h.log.Error("load notification", "id", payload.ID, "err", err)
 			continue
 		}
-		h.deliver(n)
+		h.sendNotificationEmail(ctx, n)
+		if live {
+			h.deliver(n)
+		}
 	}
+}
+
+// sendNotificationEmail emails n to its member in the background, if they gave an email and no
+// other API process has claimed this notification already.
+func (h *Hub) sendNotificationEmail(ctx context.Context, n *store.Notification) {
+	if h.mail == nil {
+		return
+	}
+	to, err := h.store.ClaimNotificationEmail(ctx, n.ID)
+	if err != nil {
+		h.log.Error("claim notification email", "id", n.ID, "err", err)
+		return
+	}
+	if to == "" {
+		return
+	}
+	body := n.Description
+	if n.RequestID != nil {
+		body += "\n\nRequest ID: " + strconv.FormatInt(*n.RequestID, 10)
+	}
+	go func() {
+		sendCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := h.mail.Send(sendCtx, to, n.Title, body); err != nil {
+			h.log.Error("send notification email", "id", n.ID, "member", n.Member, "err", err)
+		}
+	}()
 }

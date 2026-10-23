@@ -31,13 +31,18 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
   const [nickname, setNickname] = useState(p?.nickname ?? "");
   const [birthDate, setBirthDate] = useState(p?.birthDate ?? "");
   const [city, setCity] = useState(p?.city ?? "");
+  const [email, setEmail] = useState(p?.email ?? "");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
-  const { errors, validateAll, change, blur } = useFieldErrors({ displayName, birthDate }, (field, v) => {
+  const { errors, validateAll, change, blur } = useFieldErrors({ displayName, birthDate, email }, (field, v) => {
     if (field === "displayName") return v.displayName.trim() ? null : text.nameRequired;
+    if (field === "email") {
+      if (!v.email.trim()) return text.emailRequired;
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email.trim()) ? null : text.emailInvalid;
+    }
     return v.birthDate && v.birthDate > today ? text.birthFuture : null;
   });
 
@@ -72,6 +77,7 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
         nickname: nickname.trim() || null,
         birthDate: birthDate || null,
         city: city.trim() || null,
+        email: email.trim() || null,
       });
       if (photo) await api.setPhoto(token!, photo);
       await queryClient.invalidateQueries({ queryKey: keys.member(me.address) });
@@ -153,6 +159,21 @@ export function ProfileForm({ me, submitLabel, onSaved }: { me: Member; submitLa
         </Field>
         <Field id="nickname" label={text.nickname} hint={text.nicknameHint}>
           <Input id="nickname" value={nickname} maxLength={30} autoComplete="nickname" onChange={(e) => setNickname(e.target.value)} />
+        </Field>
+        <Field id="email" label={text.email} hint={text.emailHint} error={errors.email}>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            maxLength={254}
+            autoComplete="email"
+            onChange={(e) => {
+              setEmail(e.target.value);
+              change("email", e.target.value);
+            }}
+            onBlur={() => blur("email")}
+            aria-invalid={!!errors.email}
+          />
         </Field>
         <Field id="city" label={text.city} hint={text.cityHint}>
           <Input id="city" value={city} maxLength={60} autoComplete="address-level2" onChange={(e) => setCity(e.target.value)} />

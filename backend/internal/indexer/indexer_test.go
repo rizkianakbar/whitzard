@@ -193,6 +193,40 @@ func TestIndexerIsIdempotentAcrossRestarts(t *testing.T) {
 	}
 }
 
+func TestConcurrentIndexersApplyEachRangeOnce(t *testing.T) {
+	c := testutil.NewChain(t, 6, true)
+	st := testutil.NewStore(t)
+	scenario(t, c, st)
+
+	// Two processes on one database (e.g. two machines running `all`) race over the same blocks.
+	errs := make(chan error, 2)
+	for range 2 {
+		ix := newIndexer(t, c, st, indexer.Config{Name: "test", BatchSize: 2})
+		go func() {
+			_, err := ix.SyncOnce(context.Background())
+			errs <- err
+		}()
+	}
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Same notifications as one indexer on a fresh database.
+	alone := testutil.NewStore(t)
+	if _, err := newIndexer(t, c, alone, indexer.Config{Name: "test"}).SyncOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := scalar[int](t, alone, `SELECT count(*) FROM notifications`)
+	if got := scalar[int](t, st, `SELECT count(*) FROM notifications`); got != want {
+		t.Fatalf("%d notifications, want %d", got, want)
+	}
+	if got := scalar[string](t, st, `SELECT collected::text FROM requests WHERE id = 1`); got != testutil.Ether(60).String() {
+		t.Fatalf("collected = %s", got)
+	}
+}
+
 func TestIndexerStaysBehindConfirmations(t *testing.T) {
 	c := testutil.NewChain(t, 2, true)
 	st := testutil.NewStore(t)

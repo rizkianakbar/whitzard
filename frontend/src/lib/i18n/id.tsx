@@ -530,6 +530,17 @@ export const id = {
       open: "Lihat dokumen",
       note: "Sidik (SHA-256) dokumen dicatat di blockchain saat permintaan dibuat. Sebelum dibuka, dokumen diperiksa dengan sidik itu, jadi kamu tahu dokumennya tidak diganti.",
     },
+    discussion: {
+      title: "Diskusi",
+      description: "Ruang tanya jawab antaranggota tentang permintaan ini.",
+      placeholder: "Tulis komentar atau pertanyaan…",
+      send: "Kirim komentar",
+      sending: "Mengirim komentar",
+      empty: "Belum ada komentar. Pertanyaan tentang permintaan ini bisa ditulis di sini.",
+      posted: "Komentar terkirim.",
+      shortcut: "Ctrl/⌘ + Enter untuk mengirim",
+      requester: "Peminta",
+    },
     history: {
       title: "Riwayat",
       description: (chain: string, explorer: boolean) =>
@@ -785,6 +796,8 @@ export const id = {
     form: {
       photoTooLarge: "Foto lebih dari 2 MB.",
       nameRequired: "Isi nama lengkapmu.",
+      emailRequired: "Isi emailmu.",
+      emailInvalid: "Format email tidak valid.",
       birthFuture: "Tanggal lahir tidak boleh di masa depan.",
       saved: "Profil tersimpan.",
       photoRemoved: "Foto dihapus.",
@@ -797,6 +810,8 @@ export const id = {
       displayName: "Nama lengkap",
       nickname: "Nama panggilan",
       nicknameHint: "Dipakai untuk menyapamu.",
+      email: "Email",
+      emailHint: "Untuk menerima notifikasi lewat email.",
       city: "Kota atau kabupaten",
       cityHint: "Terlihat oleh anggota lain.",
       birthDate: "Tanggal lahir",

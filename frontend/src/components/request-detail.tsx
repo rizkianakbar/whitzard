@@ -16,6 +16,7 @@ import {
   History as HistoryIcon,
   Hourglass,
   LoaderCircle,
+  MessageCircle,
   RotateCcw,
   ShieldCheck,
   TriangleAlert,
@@ -47,7 +48,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, ApiError, type RequestDetail as Detail } from "@/lib/api";
+import { Textarea } from "@/components/ui/textarea";
+import { api, ApiError, type RequestComment, type RequestDetail as Detail } from "@/lib/api";
 import { appConfig } from "@/lib/config";
 import { escrow, token } from "@/lib/contracts";
 import { errorMessage } from "@/lib/errors";
@@ -145,6 +147,7 @@ function View({ detail }: { detail: Detail }) {
           )}
 
           <Evidence detail={detail} requesterName={name} />
+          <Discussion detail={detail} />
         </div>
 
         {/* Right column: where the request stands. Actions first, then what has happened so far. */}
@@ -269,6 +272,136 @@ function Evidence({ detail, requesterName }: { detail: Detail; requesterName: st
       </div>
       <p className="text-[13px] leading-relaxed text-batu">{text.note}</p>
     </Panel>
+  );
+}
+
+// ---------------------------------------------------------------- discussion
+
+const COMMENT_MAX = 1000;
+const COMMENTS_PREVIEW = 5;
+
+function Discussion({ detail }: { detail: Detail }) {
+  const { t } = useI18n();
+  const text = t.request.discussion;
+  const { token: session, address: me } = useSession();
+  const { data: self } = useMember(me);
+  const queryClient = useQueryClient();
+  const now = useNow();
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const { id, requester } = detail.request;
+  // Oldest first, like a conversation; long threads start collapsed to the latest few.
+  const comments = detail.comments ?? [];
+  const shown = showAll ? comments : comments.slice(-COMMENTS_PREVIEW);
+  const value = body.trim();
+  const length = [...value].length; // characters, as the backend counts them
+
+  const submit = async () => {
+    if (!value || sending) return;
+    setSending(true);
+    try {
+      const comment = await api.comment(session!, id, value);
+      // Add it to the cached request instead of refetching the whole page.
+      queryClient.setQueriesData<Detail>({ queryKey: keys.request(id) }, (old) =>
+        old && !old.comments?.some((c) => c.id === comment.id) ? { ...old, comments: [...(old.comments ?? []), comment] } : old,
+      );
+      setBody("");
+      toast.success(text.posted);
+    } catch (error) {
+      toast.error(errorMessage(error, t));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Panel
+      id="discussion"
+      icon={<MessageCircle className="size-4.5" />}
+      title={comments.length ? `${text.title} (${comments.length})` : text.title}
+      description={text.description}
+      className="order-4"
+    >
+      <form
+        className="flex gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <Avatar address={me} profile={self?.profile} className="mt-1 size-9 shrink-0 text-[12px] max-sm:hidden" />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <Textarea
+            value={body}
+            maxLength={COMMENT_MAX}
+            rows={3}
+            className="min-h-24"
+            placeholder={text.placeholder}
+            aria-label={text.placeholder}
+            disabled={sending}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <span className={cn("text-xs text-batu tabular", length > COMMENT_MAX - 100 && "font-semibold text-arang")}>
+              {length > COMMENT_MAX - 200 ? `${length}/${COMMENT_MAX}` : text.shortcut}
+            </span>
+            <Button type="submit" disabled={sending || !value}>
+              <BusyLabel busy={sending ? text.sending : null}>{text.send}</BusyLabel>
+            </Button>
+          </div>
+        </div>
+      </form>
+
+      {comments.length === 0 ? (
+        <p className="border-t pt-5 text-sm text-batu">{text.empty}</p>
+      ) : (
+        <div className="flex flex-col gap-3 border-t pt-4">
+          {comments.length > COMMENTS_PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="pressable self-start rounded-full px-1 font-semibold text-pandan underline underline-offset-4"
+            >
+              {showAll ? t.common.showLess : t.common.showAll(comments.length)}
+            </button>
+          )}
+          <ol className="flex flex-col divide-y">
+            {shown.map((comment) => (
+              <CommentItem key={comment.id} comment={comment} byRequester={comment.member === requester} now={now} />
+            ))}
+          </ol>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function CommentItem({ comment, byRequester, now }: { comment: RequestComment; byRequester: boolean; now: number }) {
+  const { t, fmt } = useI18n();
+  const { data: member } = useMember(comment.member);
+  return (
+    <li className="flex gap-3 py-4 first:pt-0 last:pb-0">
+      <Avatar address={comment.member} profile={member?.profile} className="size-9 shrink-0 text-[12px]" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+          <Who address={comment.member} />
+          {byRequester && (
+            <span className="rounded-full bg-pandan-soft px-2 py-0.5 text-[11px] font-bold text-pandan">{t.request.discussion.requester}</span>
+          )}
+          <time className="text-[13px] text-batu" dateTime={comment.createdAt} title={fmt.date(comment.createdAt)}>
+            {now ? fmt.timeAgo(comment.createdAt, now) : fmt.stamp(comment.createdAt)}
+          </time>
+        </div>
+        <p className="text-[15px] leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">{comment.body}</p>
+      </div>
+    </li>
   );
 }
 
