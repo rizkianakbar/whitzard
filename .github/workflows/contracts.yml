@@ -1,0 +1,36 @@
+name: Contracts
+
+# Runs the Hardhat tests (unit, fuzz, invariant, integration). Never deploys anything.
+on:
+  push:
+    branches: [main]
+    paths: ["blockchain/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["blockchain/**", ".github/workflows/contracts.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: blockchain
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: blockchain/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm hardhat build
+      - run: pnpm hardhat test

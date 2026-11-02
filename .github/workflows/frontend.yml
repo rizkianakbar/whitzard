@@ -1,0 +1,45 @@
+name: Frontend
+
+# Lint, type check, unit tests and a production build. Vercel does the actual deploys.
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # The public Sepolia contracts (addresses in the README); the build refuses to run without them.
+      NEXT_PUBLIC_CHAIN_ID: "11155111"
+      NEXT_PUBLIC_TOKEN_ADDRESS: "0x903709b3c1849BD243682D1Ba254767B93E37449"
+      NEXT_PUBLIC_REGISTRY_ADDRESS: "0xED0466f45E9aD8593315D8eFd648E4C236cb3105"
+      NEXT_PUBLIC_ESCROW_ADDRESS: "0x2e902611e0Ab6Ae51BA191608b8FcA89487484AF"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm test
+      - run: pnpm build

@@ -1,0 +1,50 @@
+name: Backend
+
+# gofmt, go vet and the Go tests against a throwaway PostgreSQL. Never deploys anything.
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      # Same credentials and port as backend/docker-compose.yml, so the tests' default URL works.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: whitzard
+          POSTGRES_PASSWORD: whitzard
+          POSTGRES_DB: whitzard
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U whitzard -d whitzard"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "Run gofmt on:"; echo "$unformatted"; exit 1; fi
+      - run: go vet ./...
+      - run: go test ./...
