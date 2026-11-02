@@ -238,7 +238,7 @@ export const en: Dict = {
   },
 
   landing: {
-    footer: "A prototype for a Computer Science thesis at Bina Nusantara University: automated escrow for disbursing health aid between community members.",
+    footer: "A prototype: automated escrow for disbursing health aid between community members.",
     navLabel: "On this page",
     nav: { how: "How it works", compare: "What's different", join: "How to join", faq: "FAQ" },
     hero: {
@@ -721,7 +721,7 @@ export const en: Dict = {
     success: "100 WHZD added to your balance.",
     noticeTitle: "This is a test version",
     notice: (chain: string) =>
-      `Whitzard is being tested on the ${chain} network as part of a thesis project. WHZD here has no monetary value, can't be bought, and can't be cashed out. You never need to pay anything.`,
+      `Whitzard is being tested on the ${chain} network as a prototype. WHZD here has no monetary value, can't be bought, and can't be cashed out. You never need to pay anything.`,
     current: (amount: ReactNode) => <>Your balance is {amount}.</>,
     faucet: "Free from the test faucet. Once every 24 hours, up to 1,000 WHZD per wallet.",
     claim: "Claim 100 free WHZD",

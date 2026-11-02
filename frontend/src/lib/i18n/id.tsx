@@ -236,7 +236,7 @@ export const id = {
   },
 
   landing: {
-    footer: "Prototipe untuk skripsi Ilmu Komputer, Universitas Bina Nusantara: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
+    footer: "Sebuah prototipe: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
     navLabel: "Halaman ini",
     nav: { how: "Cara kerja", compare: "Bedanya", join: "Cara bergabung", faq: "Tanya jawab" },
     hero: {
@@ -719,7 +719,7 @@ export const id = {
     success: "100 WHZD masuk ke saldomu.",
     noticeTitle: "Ini versi uji coba",
     notice: (chain: string) =>
-      `Whitzard sedang diuji di jaringan ${chain}, bagian dari penelitian skripsi. WHZD di sini tidak bernilai uang, tidak bisa dibeli, dan tidak bisa dicairkan. Kamu tidak perlu membayar apa pun.`,
+      `Whitzard sedang diuji di jaringan ${chain}, sebagai prototipe. WHZD di sini tidak bernilai uang, tidak bisa dibeli, dan tidak bisa dicairkan. Kamu tidak perlu membayar apa pun.`,
     current: (amount: ReactNode) => <>Saldomu sekarang {amount}.</>,
     faucet: "Gratis dari faucet uji coba. Sekali setiap 24 jam, paling banyak 1.000 WHZD per dompet.",
     claim: "Ambil 100 WHZD gratis",

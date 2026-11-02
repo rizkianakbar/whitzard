@@ -1,5 +1,5 @@
 // Package indexer mirrors the Registry and Escrow events into PostgreSQL and creates the
-// notifications they trigger (thesis §3.3.1: event indexer).
+// notifications they trigger (event indexer).
 //
 // It reads logs in block ranges up to `head - Confirmations` (a simple guard against chain
 // reorganisations), applies each range in one database transaction together with the new cursor,

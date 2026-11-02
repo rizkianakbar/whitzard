@@ -1,6 +1,6 @@
 // Package evidence stores evidence documents (e.g. hospital bills) off-chain, on local disk,
 // named by their SHA-256. The same hash is what the requester puts on-chain as `evidenceHash`,
-// so anyone holding the document can check it was not changed (thesis §3.3.1).
+// so anyone holding the document can check it was not changed.
 //
 // These are health documents (UU 27/2022): callers must check access before Open, and nothing
 // here logs their contents.

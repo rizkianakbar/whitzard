@@ -12,7 +12,7 @@ interface ITokenReceiver {
 /// @title HookToken
 /// @notice TEST ONLY, never deployed to Sepolia. An ERC-20 that calls the recipient back after
 ///         every transfer (like ERC-777 / ERC-1363 hooks), giving a malicious recipient a chance to
-///         re-enter the contract that is paying it (RM3). Recipients opt in with {setHook};
+///         re-enter the contract that is paying it. Recipients opt in with {setHook};
 ///         anyone can mint.
 contract HookToken is ERC20 {
     /// @notice Whether `account` is called back on incoming transfers.

@@ -25,7 +25,7 @@ const (
 // requestView is a request as the API shows it.
 type requestView struct {
 	*store.Request
-	// Status follows the contract (thesis Tabel 3.4): open, funding, finalized, expired, cancelled.
+	// Status follows the contract: open, funding, finalized, expired, cancelled.
 	// After the deadline a funded request stays "funding" until finalize, with AwaitingFinalize set.
 	Status           string `json:"status"`
 	AwaitingFinalize bool   `json:"awaitingFinalize"`
@@ -352,7 +352,7 @@ func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /requests/{id}/contribute {response: "participate" | "decline"}: records the member's
-// answer (thesis entity 4). The contribution itself is a wallet transaction; once the indexer
+// answer. The contribution itself is a wallet transaction; once the indexer
 // sees it, the response becomes "contributed" and can no longer change.
 func (s *Server) handleRespond(w http.ResponseWriter, r *http.Request) {
 	req, ok := s.loadRequest(w, r)

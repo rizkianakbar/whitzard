@@ -1,6 +1,6 @@
 # Whitzard — Smart Contracts
 
-The on-chain part of [Whitzard](../README.md), and the main contribution of the thesis.
+The on-chain part of [Whitzard](../README.md), and the core of the project.
 
 **Stack:** Solidity 0.8.37 · OpenZeppelin Contracts 5.7 · Hardhat 3 · viem · pnpm
 
@@ -61,7 +61,7 @@ Interface: [`contracts/interfaces/IEscrow.sol`](contracts/interfaces/IEscrow.sol
 | Refund     | `claimRefund(id)`: exactly your share back                   | each contributor         | after a cancel       |
 
 - **Snapshot:** the Ready members at `block.number - 1`, minus the requester. `share = amount / n`,
-  rounded down. With `useReadyFilter = false`, every registered member counts instead (RM5).
+  rounded down. With `useReadyFilter = false`, every registered member counts instead.
 - **Status:** `Open` → `Funding` → `Finalized` or `Expired` (nothing collected), or `Cancelled`.
 - **Pending refunds for the UI:** `pendingRefunds(member, ids)`, with the ids taken from the
   member's `Contributed` logs.
@@ -73,9 +73,9 @@ Interface: [`contracts/interfaces/IEscrow.sol`](contracts/interfaces/IEscrow.sol
 | ------------------------ | ------------------------------------------------------------------------------- |
 | `DirectTransferBaseline` | K3: the non-escrow baseline (each member sends straight to the requester)       |
 | `NaiveSnapshotEscrow`    | K3c: snapshot by looping over members, gas grows ~27,100 per member             |
-| `HookToken`              | RM3: an ERC-20 that calls the receiver back, so it can re-enter                 |
-| `VulnerableEscrow`       | RM3: pays before recording it, no guard; the attack drains it                   |
-| `ReentrancyAttacker`     | RM3: re-enters `finalize` / `claimRefund`; fails against `Escrow`               |
+| `HookToken`              | K2: an ERC-20 that calls the receiver back, so it can re-enter                  |
+| `VulnerableEscrow`       | K2: pays before recording it, no guard; the attack drains it                   |
+| `ReentrancyAttacker`     | K2: re-enters `finalize` / `claimRefund`; fails against `Escrow`               |
 
 ## Gas report
 
@@ -83,7 +83,7 @@ Interface: [`contracts/interfaces/IEscrow.sol`](contracts/interfaces/IEscrow.sol
 pnpm hardhat run scripts/gas-report.ts      # writes reports/gas-report.md and .json
 ```
 
-Real transaction gas for the thesis tables: per function, full cycle vs direct transfer, `openRequest`
+Real transaction gas: per function, full cycle vs direct transfer, `openRequest`
 vs snapshot size (the naive design stops fitting in one transaction at 614 members, because of the
 EIP-7825 per-transaction cap of 16,777,216 gas), and with vs without the Ready filter. For the
 value-to-gas ratio (K4c), also set `REF_GAS_PRICE_GWEI`, `REF_ETH_PRICE` and `REF_TOKEN_PRICE`.
@@ -111,7 +111,7 @@ pnpm hardhat test --coverage
 | Solidity (forge-std) | `contracts/*.t.sol` | Every behavior and revert, fuzz and invariants (10,000 runs each) |
 | TypeScript (viem)    | `test/*.ts`         | Chain-level flows: events across blocks, wallet-signed permits    |
 
-Tests are tagged with the thesis evaluation criteria (`// K1` … `// K4`):
+Tests are tagged with the project's evaluation criteria (`// K1` … `// K4`):
 **K1** functional · **K2** robustness · **K3** cost and time · **K4** effect of the Ready status.
 
 ## Deploy to Sepolia

@@ -12,7 +12,7 @@ import {HookToken} from "./test/HookToken.sol";
 import {VulnerableEscrow} from "./test/VulnerableEscrow.sol";
 import {ReentrancyAttacker, IPayingEscrow} from "./test/ReentrancyAttacker.sol";
 
-/// @dev RM3: a malicious requester / contributor re-enters the paying function from a token
+/// @dev A malicious requester / contributor re-enters the paying function from a token
 ///      callback. It drains `VulnerableEscrow`, and gets nothing extra from `Escrow`.
 contract ReentrancyTest is Test {
     uint64 constant DURATION = 1 days;

@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 /// @title DirectTransferBaseline
 /// @notice TEST ONLY, never deployed to Sepolia. Non-escrow baseline for the gas comparison
-///         (RM4 / K3): each member sends their contribution straight to the requester. No
+///         (K3): each member sends their contribution straight to the requester. No
 ///         snapshot, no pool, no deadline, no rules.
 contract DirectTransferBaseline {
     using SafeERC20 for IERC20;

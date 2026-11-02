@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title VulnerableEscrow
 /// @notice TEST ONLY, never deployed to Sepolia. A deliberately broken escrow for the reentrancy
-///         experiment (RM3): `finalize` sends the funds **before** marking the request finalized
+///         experiment: `finalize` sends the funds **before** marking the request finalized
 ///         and has no reentrancy guard, so a requester who is called back during the transfer can
 ///         call `finalize` again and be paid again, out of other requests' pools.
 contract VulnerableEscrow {

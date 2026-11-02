@@ -21,7 +21,7 @@ export default defineConfig({
   },
   test: {
     solidity: {
-      // Thesis Bab III: at least 10,000 runs per fuzz/invariant property.
+      // At least 10,000 runs per fuzz/invariant property.
       fuzz: {
         runs: 10_000,
       },

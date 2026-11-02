@@ -11,8 +11,8 @@ import {DirectTransferBaseline} from "./test/DirectTransferBaseline.sol";
 import {NaiveSnapshotEscrow} from "./test/NaiveSnapshotEscrow.sol";
 
 /// @dev The comparison contracts behave as described, and the snapshot cost of the naive design
-///      grows with the member count while Escrow's checkpoint lookup stays flat (RM4c).
-///      Thesis-ready numbers (real transaction gas) come from `scripts/gas-report.ts`.
+///      grows with the member count while Escrow's checkpoint lookup stays flat.
+///      Real transaction-gas numbers (real transaction gas) come from `scripts/gas-report.ts`.
 contract BaselinesTest is Test {
     WhitzardToken token;
     Registry registry;
@@ -101,7 +101,7 @@ contract BaselinesTest is Test {
         naive.openRequest(1 ether);
     }
 
-    // ---------------------------------------------------------------- scaling (RM4c)
+    // ---------------------------------------------------------------- scaling
 
     function _escrowOpenGas(address requester) internal returns (uint256 used) {
         vm.prank(requester);

@@ -120,6 +120,11 @@ const me = await api("/members/me", { token: aliceT });
 assert.equal(me.json.chain.registered, true);
 assert.equal(me.json.chain.ready, true);
 ok(`alice: registered, Ready, balance ${me.json.chain.balance}`);
+// The API reads membership from the indexed mirror, which may still be a block behind.
+await until("the indexer to pick up the members", async () => {
+  const list = await api("/members", { token: aliceT });
+  return list.json.members.length === 4;
+});
 
 step("bob listens for live notifications");
 const live: any[] = [];
@@ -184,7 +189,7 @@ step("the deadline passes; the keeper finalizes");
 const before = await token.read.balanceOf([alice.account.address]);
 await timeTravel(601);
 const finalized = await until("the keeper to finalize", async () => {
-  const r = await api(`/requests/${id}`);
+  const r = await api(`/requests/${id}`, { token: aliceT });
   return r.json.request.status === "finalized" && r.json;
 }, 60_000);
 assert.ok(finalized.request.finalizedTx);
@@ -196,7 +201,7 @@ ok("alice received exactly 60 WHZD (partial funding is still paid out) and was n
 step("a cancelled request: contributors claim their refund");
 await send(escrow.write.openRequest([parseEther("30"), 600n, `0x${"11".repeat(32)}`, 0n], { account: bob.account }));
 const cancelId = await escrow.read.requestCount();
-await until("the second request", async () => (await api(`/requests/${cancelId}`)).status === 200);
+await until("the second request", async () => (await api(`/requests/${cancelId}`, { token: bobT })).status === 200);
 await send(token.write.approve([escrow.address, parseEther("10")], { account: carol.account }));
 await send(escrow.write.contribute([cancelId], { account: carol.account }));
 await send(escrow.write.cancelRequest([cancelId], { account: bob.account }));

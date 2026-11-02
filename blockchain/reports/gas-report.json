@@ -9,21 +9,21 @@
     },
     {
       "contributors": 3,
-      "permitCycle": "650578",
+      "permitCycle": "650590",
       "approveCycle": "696052",
       "transfer": "105402",
       "baseline": "124698"
     },
     {
       "contributors": 10,
-      "permitCycle": "1627250",
+      "permitCycle": "1627238",
       "approveCycle": "1727726",
       "transfer": "351340",
       "baseline": "415660"
     },
     {
       "contributors": 50,
-      "permitCycle": "7208214",
+      "permitCycle": "7208250",
       "approveCycle": "7623006",
       "transfer": "1756700",
       "baseline": "2078300"

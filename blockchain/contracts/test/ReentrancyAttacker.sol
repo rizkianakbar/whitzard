@@ -12,7 +12,7 @@ interface IPayingEscrow {
 }
 
 /// @title ReentrancyAttacker
-/// @notice TEST ONLY, never deployed to Sepolia. A malicious requester / contributor (RM3). When
+/// @notice TEST ONLY, never deployed to Sepolia. A malicious requester / contributor. When
 ///         the escrow pays it in {HookToken}, it is called back and calls the same paying function
 ///         again, as long as the escrow still holds enough to pay it once more.
 /// @dev With `swallowFailures` set, a failed re-entry is caught and counted so the outer payout

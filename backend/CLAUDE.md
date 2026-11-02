@@ -1,7 +1,7 @@
 # CLAUDE.md — Backend
 
-Demo-support backend for the thesis (see `../CLAUDE.md` and `../docs/thesis.pdf` §3.3). Not the
-main contribution — keep it simple, correct and well tested — but it must never weaken the
+Demo-support backend for Whitzard (see `../CLAUDE.md`). Not the
+core of the project — keep it simple, correct and well tested — but it must never weaken the
 contracts' guarantees.
 
 ## Stack

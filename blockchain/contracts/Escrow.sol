@@ -86,7 +86,7 @@ contract Escrow is IEscrow, ReentrancyGuard {
 
     /// @param token_ The contribution token; must support EIP-2612 for `contributeWithPermit`.
     /// @param registry_ The Registry; its `setEscrow` must be called with this contract.
-    /// @param useReadyFilter_ Snapshot Ready members (true) or all registered members (false, RM5).
+    /// @param useReadyFilter_ Snapshot Ready members (true) or all registered members (false).
     constructor(IERC20 token_, IRegistry registry_, bool useReadyFilter_) {
         if (address(token_) == address(0) || address(registry_) == address(0))
             revert ZeroAddress();

@@ -1,5 +1,5 @@
-// Package keeper sends Escrow.finalize for requests whose deadline has passed (thesis §3.3.1:
-// keeper scheduler). It uses its own wallet, which only pays gas: finalize can be called by
+// Package keeper sends Escrow.finalize for requests whose deadline has passed (keeper
+// scheduler). It uses its own wallet, which only pays gas: finalize can be called by
 // anyone and can only send the pool to the requester, so this key has no power over member funds.
 package keeper
 

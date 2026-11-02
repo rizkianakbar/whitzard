@@ -918,7 +918,7 @@ contract EscrowTest is EscrowFixture {
         assertEq(total, 20 ether);
     }
 
-    // ---------------------------------------------------------------- RM5: no Ready filter
+    // ---------------------------------------------------------------- no Ready filter
 
     // K4: without the filter the snapshot is every registered member, Ready or not.
     function test_NoReadyFilterUsesRegisteredMembers() public {

@@ -1,4 +1,4 @@
-// Package api is the REST + WebSocket API for the frontend (thesis §3.3.5, part 2). It serves
+// Package api is the REST + WebSocket API for the frontend. It serves
 // off-chain data (profiles, evidence documents, responses, notifications) and the indexed mirror
 // of the chain. It never sends transactions: members sign those in their own wallets.
 package api

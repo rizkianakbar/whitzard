@@ -2,7 +2,7 @@
 pragma solidity 0.8.37;
 
 /// @title NaiveSnapshotEscrow
-/// @notice TEST ONLY, never deployed to Sepolia. The design Whitzard avoids (RM4c / K3): the
+/// @notice TEST ONLY, never deployed to Sepolia. The design Whitzard avoids (K3): the
 ///         snapshot is taken by looping over every member in `openRequest` and writing each Ready
 ///         member into storage. Its gas grows linearly with the number of members, so past some
 ///         size the transaction no longer fits in a block. Only the snapshot step is modelled;

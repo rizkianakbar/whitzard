@@ -1,7 +1,6 @@
 # Whitzard
 
 **Automated escrow smart contract for transparent community health aid.**
-Skripsi project, Computer Science, Binus University.
 
 A member asks for help. Every member who is _Ready_ at that moment chips in the same fixed share.
 An Escrow contract holds the money and pays it to the requester when the request's time is up.
@@ -25,7 +24,6 @@ No admin, no voting, no manual approval: the rules are the code, and every step 
 | [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests               | Solidity, Hardhat 3, viem   | Contracts done |
 | [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper, evidence  | Go, go-ethereum, PostgreSQL | Done           |
 | [`frontend/`](frontend/)     | Demo UI: wallet sign-in, requests, history, dashboard   | Next.js, wagmi              | Working demo   |
-| [`docs/`](docs/)             | [Thesis](docs/thesis.pdf): the design source of truth   |                             |                |
 
 The backend never holds member keys or moves funds. Users sign every transaction in their own wallet.
 

@@ -1,4 +1,4 @@
-// Gas report for the thesis (K3 a–c, K4 a–b; K4 c when reference prices are given).
+// Gas report (K3 a–c, K4 a–b; K4 c when reference prices are given).
 //
 //   pnpm hardhat run scripts/gas-report.ts
 //   REF_GAS_PRICE_GWEI=… REF_ETH_PRICE=… REF_TOKEN_PRICE=… pnpm hardhat run scripts/gas-report.ts
@@ -364,7 +364,7 @@ if (gasPriceGwei && ethPrice && tokenPrice) {
   }
   out();
 } else {
-  out("K4c (contribution value / gas cost) needs the Bab III reference prices: rerun with");
+  out("K4c (contribution value / gas cost) needs reference prices: rerun with");
   out("`REF_GAS_PRICE_GWEI`, `REF_ETH_PRICE` and `REF_TOKEN_PRICE` set.");
   out();
 }

@@ -7,7 +7,7 @@ pragma solidity 0.8.37;
 ///         deadline. The requester may cancel before the deadline; contributors then claim refunds.
 ///         Read by the backend indexer, the keeper and the frontend.
 interface IEscrow {
-    /// @notice Request status (thesis Tabel 3.4).
+    /// @notice Request status.
     /// @dev Open/Funding: before the deadline, without/with contributions. After the deadline a
     ///      request with funds stays Funding until `finalize` moves it to Finalized; one without
     ///      funds reads as Expired. Cancelled: the requester cancelled before the deadline.
@@ -174,7 +174,7 @@ interface IEscrow {
     /// @notice Maximum request duration.
     function MAX_DURATION() external view returns (uint64);
 
-    /// @notice Whether snapshots use Ready members (true) or all registered members (false, RM5).
+    /// @notice Whether snapshots use Ready members (true) or all registered members (false).
     function useReadyFilter() external view returns (bool);
 
     /// @notice Number of requests ever opened (the latest id).

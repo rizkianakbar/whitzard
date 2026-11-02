@@ -1,4 +1,4 @@
--- Off-chain mirror of the Whitzard contracts (thesis §3.3.4), plus what the indexer, auth and
+-- Off-chain mirror of the Whitzard contracts, plus what the indexer, auth and
 -- keeper need. Addresses and hashes are lowercase 0x-hex text; token amounts are numeric(78,0) so a
 -- full uint256 fits.
 
@@ -96,7 +96,7 @@ CREATE TABLE contributions (
 CREATE INDEX contributions_member ON contributions (member);
 
 -- Snapshot members of each request and their response, so "did not respond" and "explicitly
--- declined" can be told apart (thesis entity 4).
+-- declined" can be told apart.
 CREATE TABLE snapshot_members (
     request_id    bigint NOT NULL REFERENCES requests (id),
     member        eth_address NOT NULL,
