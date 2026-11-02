@@ -29,7 +29,7 @@ jobs:
       NEXT_PUBLIC_ESCROW_ADDRESS: "0x2e902611e0Ab6Ae51BA191608b8FcA89487484AF"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10
