@@ -6,6 +6,11 @@ A member asks for help. Every member who is _Ready_ at that moment chips in the 
 An Escrow contract holds the money and pays it to the requester when the request's time is up.
 No admin, no voting, no manual approval: the rules are the code, and every step is on-chain.
 
+![Whitzard landing page](docs/images/landing.png)
+
+Whitzard is a finished MVP: a working proof that the idea holds up end to end. It runs on the Sepolia
+testnet with tokens that have no monetary value, and there are no plans to take it to mainnet or real money.
+
 ## How it works
 
 1. **Get tokens.** Members claim test tokens from the public faucet.
@@ -16,6 +21,28 @@ No admin, no voting, no manual approval: the rules are the code, and every step 
 5. **Finalize.** After the deadline anyone can call `finalize()`, and the requester receives everything collected,
    even if the request was only partly funded.
 6. **Or cancel.** Before the deadline the requester can cancel, and each contributor claims their share back.
+
+## Screenshots
+
+The app supports English and Indonesian; these screenshots show the Indonesian version.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/dashboard.png" alt="Member dashboard: balance, Ready toggle, open requests"><br><sub><b>Dashboard</b>: balance, Ready status, and requests waiting for your share.</sub></td>
+    <td width="50%"><img src="docs/images/new-request.png" alt="Form to open a new request"><br><sub><b>New request</b>: story, amount, duration and evidence; the share per member is shown live.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/request-funding.png" alt="Request being funded"><br><sub><b>Collecting</b>: one box per member in the snapshot, a countdown, and the on-chain history.</sub></td>
+    <td width="50%"><img src="docs/images/request-finalized.png" alt="Finalized request"><br><sub><b>Sent</b>: after the deadline the contract pays the requester, with a link to the transfer.</sub></td>
+  </tr>
+</table>
+
+<details>
+<summary>Contract tests: 131 passing, 99% line coverage</summary>
+
+![pnpm hardhat test --coverage output](docs/images/test-coverage.png)
+
+</details>
 
 ## Repository
 
