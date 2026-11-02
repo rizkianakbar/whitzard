@@ -1,0 +1,8 @@
+# Each project has its own .gitignore; this covers the whole repo.
+.DS_Store
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/*
+!.vscode/extensions.json
