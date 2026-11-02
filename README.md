@@ -1,5 +1,7 @@
 # Whitzard
 
+![Solidity](https://img.shields.io/badge/Solidity-0.8.37-363636?logo=solidity) ![Go](https://img.shields.io/badge/Go-backend-00ADD8?logo=go&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-frontend-000000?logo=nextdotjs) ![Network: Sepolia](https://img.shields.io/badge/network-Sepolia%20testnet-6B7280)
+
 **Automated escrow smart contract for transparent community health aid.**
 
 A member asks for help. Every member who is _Ready_ at that moment chips in the same fixed share.
@@ -46,11 +48,12 @@ The app supports English and Indonesian; these screenshots show the Indonesian v
 
 ## Repository
 
-| Folder                       | What                                                    | Stack                       | Status         |
-| ---------------------------- | ------------------------------------------------------- | --------------------------- | -------------- |
-| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests               | Solidity, Hardhat 3, viem   | Contracts done |
-| [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper, evidence  | Go, go-ethereum, PostgreSQL | Done           |
-| [`frontend/`](frontend/)     | Demo UI: wallet sign-in, requests, history, dashboard   | Next.js, wagmi              | Working demo   |
+| Folder                       | What                                                   | Stack                       | Status         |
+| ---------------------------- | ------------------------------------------------------ | --------------------------- | -------------- |
+| [`blockchain/`](blockchain/) | Token, Registry, Escrow contracts + tests              | Solidity, Hardhat 3, viem   | Contracts done |
+| [`backend/`](backend/)       | REST API, event indexer, `finalize()` keeper, evidence | Go, go-ethereum, PostgreSQL | Done           |
+| [`frontend/`](frontend/)     | Demo UI: wallet sign-in, requests, history, dashboard  | Next.js, wagmi              | Working demo   |
+| [`docs/`](docs/)             | [Architecture](docs/architecture.md) and [design decisions](docs/design-decisions.md) |  |  |
 
 The backend never holds member keys or moves funds. Users sign every transaction in their own wallet.
 
