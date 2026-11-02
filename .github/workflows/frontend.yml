@@ -40,6 +40,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm exec tsc --noEmit
+      # Next generates the PageProps/LayoutProps route types; a fresh checkout doesn't have them yet.
+      - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
