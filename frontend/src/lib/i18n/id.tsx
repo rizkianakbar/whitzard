@@ -236,7 +236,7 @@ export const id = {
   },
 
   landing: {
-    footer: "Sebuah prototipe: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
+    footer: "MVP yang sudah berjalan: escrow otomatis untuk penyaluran bantuan kesehatan antaranggota.",
     navLabel: "Halaman ini",
     nav: { how: "Cara kerja", compare: "Bedanya", join: "Cara bergabung", faq: "Tanya jawab" },
     hero: {
@@ -265,7 +265,7 @@ export const id = {
       "Bisa dicek siapa saja",
       "Uang kembali kalau batal",
       "Bukan asuransi",
-      "Gratis selama uji coba",
+      "MVP di jaringan uji",
     ],
     newWay: {
       title: "Cara baru saling bantu biaya berobat",
@@ -346,7 +346,7 @@ export const id = {
     join: {
       title: "Cara bergabung",
       body: (chain: string) =>
-        `Masih uji coba, jadi gratis dicoba. Whitzard berjalan di ${chain}, jaringan uji Ethereum, dan token WHZD yang dipakai untuk iuran tidak bernilai uang.`,
+        `Whitzard adalah MVP yang sudah selesai, dibuat untuk membuktikan idenya berjalan dari awal sampai akhir. Whitzard berjalan di ${chain}, jaringan uji Ethereum, dengan token WHZD yang tidak bernilai uang, jadi kamu bisa mencoba seluruh alurnya tanpa mengeluarkan uang sungguhan.`,
       time: "Sekitar lima menit.",
       steps: (chain: string): { title: string; body: string; link?: string }[] => [
         {
@@ -367,11 +367,15 @@ export const id = {
       items: [
         {
           q: "Apakah Whitzard asuransi?",
-          a: "Bukan. Tidak ada premi, polis, atau janji pertanggungan. Iuran dikumpulkan setelah ada permintaan, dan setiap anggota bebas memilih membantu atau tidak. Karena mekanisme seperti ini bisa menyerupai asuransi bila memakai uang sungguhan, Whitzard saat ini hanya berjalan dengan token uji.",
+          a: "Bukan. Tidak ada premi, polis, atau janji pertanggungan. Iuran dikumpulkan setelah ada permintaan, dan setiap anggota bebas memilih membantu atau tidak.",
         },
         {
-          q: "Apakah saya perlu membayar?",
-          a: "Tidak. Selama uji coba, semua iuran memakai token WHZD yang tidak bernilai uang, dan biaya jaringan dibayar dengan ETH uji yang gratis.",
+          q: "Apakah Whitzard layanan sungguhan?",
+          a: "Bukan. Whitzard adalah MVP yang sudah selesai: bukti nyata bahwa bantuan kesehatan antaranggota bisa dikumpulkan dan disalurkan oleh smart contract, tanpa admin di tengah. Whitzard berjalan di Sepolia, jaringan uji Ethereum, jadi setiap langkahnya (bergabung, meminta, iuran, penyaluran, dan pengembalian dana) benar-benar berjalan, tetapi tanpa uang sungguhan. Tidak ada rencana membawanya ke mainnet atau memakai uang sungguhan. Itu akan membawa urusan hukum (mekanisme seperti ini bisa menyerupai asuransi), pemeriksaan tagihan medis di dunia nyata, dan audit keamanan, yang semuanya di luar cakupan proyek ini.",
+        },
+        {
+          q: "Apakah saya perlu membayar untuk mencoba?",
+          a: "Tidak. WHZD adalah token uji yang tidak bernilai uang: tidak bisa dibeli maupun dicairkan. Kamu mengambilnya dari faucet bawaan, dan biaya jaringan dibayar dengan ETH uji Sepolia yang gratis. Mencoba Whitzard tidak memakan biaya apa pun.",
         },
         {
           q: "Siapa yang memutuskan dana dicairkan?",
@@ -717,9 +721,9 @@ export const id = {
     prompt: "Isi 100 WHZD",
     promptDetail: "Token uji gratis masuk ke dompetmu; kamu hanya membayar biaya jaringan.",
     success: "100 WHZD masuk ke saldomu.",
-    noticeTitle: "Ini versi uji coba",
+    noticeTitle: "Ini demo MVP",
     notice: (chain: string) =>
-      `Whitzard sedang diuji di jaringan ${chain}, sebagai prototipe. WHZD di sini tidak bernilai uang, tidak bisa dibeli, dan tidak bisa dicairkan. Kamu tidak perlu membayar apa pun.`,
+      `Whitzard adalah MVP yang berjalan di jaringan uji ${chain}, bukan layanan sungguhan. WHZD di sini tidak bernilai uang, tidak bisa dibeli, dan tidak bisa dicairkan. Kamu tidak perlu membayar apa pun.`,
     current: (amount: ReactNode) => <>Saldomu sekarang {amount}.</>,
     faucet: "Gratis dari faucet uji coba. Sekali setiap 24 jam, paling banyak 1.000 WHZD per dompet.",
     claim: "Ambil 100 WHZD gratis",

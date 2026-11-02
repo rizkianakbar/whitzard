@@ -238,7 +238,7 @@ export const en: Dict = {
   },
 
   landing: {
-    footer: "A prototype: automated escrow for disbursing health aid between community members.",
+    footer: "A working MVP: automated escrow for disbursing health aid between community members.",
     navLabel: "On this page",
     nav: { how: "How it works", compare: "What's different", join: "How to join", faq: "FAQ" },
     hero: {
@@ -267,7 +267,7 @@ export const en: Dict = {
       "Anyone can check",
       "Money back if cancelled",
       "Not insurance",
-      "Free while in testing",
+      "A working MVP on testnet",
     ],
     newWay: {
       title: "A new way to share medical costs",
@@ -348,7 +348,7 @@ export const en: Dict = {
     join: {
       title: "How to join",
       body: (chain: string) =>
-        `Still in testing, so it's free to try. Whitzard runs on ${chain}, an Ethereum test network, and the WHZD tokens used for contributions have no monetary value.`,
+        `Whitzard is a finished MVP, built to show the idea works from start to finish. It runs on ${chain}, an Ethereum test network, with WHZD tokens that have no monetary value, so you can try the whole flow without spending real money.`,
       time: "About five minutes.",
       steps: (chain: string): { title: string; body: string; link?: string }[] => [
         {
@@ -369,11 +369,15 @@ export const en: Dict = {
       items: [
         {
           q: "Is Whitzard insurance?",
-          a: "No. There's no premium, no policy and no promise of cover. Contributions are collected after a request, and every member is free to help or not. Because an arrangement like this could resemble insurance if it used real money, Whitzard currently runs on test tokens only.",
+          a: "No. There's no premium, no policy and no promise of cover. Contributions are collected after a request, and every member is free to help or not.",
         },
         {
-          q: "Do I have to pay?",
-          a: "No. During testing, all contributions use WHZD tokens with no monetary value, and network fees are paid with free test ETH.",
+          q: "Is Whitzard a live service?",
+          a: "No. Whitzard is a finished MVP: a working proof that health aid between community members can be pooled and paid out by a smart contract, with no admin in the middle. It runs on Sepolia, an Ethereum test network, so every step (joining, asking, contributing, payout and refunds) really works, but no real money is involved. There are no plans to move it to mainnet or use real money. That would bring legal questions (an arrangement like this can resemble insurance), real-world checks on medical bills, and security audits, all beyond the scope of this project.",
+        },
+        {
+          q: "Do I have to pay to try it?",
+          a: "No. WHZD is a test token with no monetary value: it can't be bought or cashed out. You claim it from the built-in faucet, and network fees are paid with free Sepolia test ETH. Trying Whitzard costs nothing.",
         },
         {
           q: "Who decides when the funds are released?",
@@ -719,9 +723,9 @@ export const en: Dict = {
     prompt: "Top up 100 WHZD",
     promptDetail: "Free test tokens go to your wallet; you only pay the network fee.",
     success: "100 WHZD added to your balance.",
-    noticeTitle: "This is a test version",
+    noticeTitle: "This is an MVP demo",
     notice: (chain: string) =>
-      `Whitzard is being tested on the ${chain} network as a prototype. WHZD here has no monetary value, can't be bought, and can't be cashed out. You never need to pay anything.`,
+      `Whitzard is a working MVP on the ${chain} test network, not a live service. WHZD here has no monetary value, can't be bought, and can't be cashed out. You never need to pay anything.`,
     current: (amount: ReactNode) => <>Your balance is {amount}.</>,
     faucet: "Free from the test faucet. Once every 24 hours, up to 1,000 WHZD per wallet.",
     claim: "Claim 100 free WHZD",
