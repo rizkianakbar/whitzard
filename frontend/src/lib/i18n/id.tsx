@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
  */
 export const id = {
   meta: {
+    title: "Whitzard: saling bantu biaya berobat lewat smart contract",
     description: "Saling bantu biaya berobat antaranggota, dengan iuran yang sama dan tercatat untuk semua.",
     titles: {
       ask: "Ajukan bantuan",

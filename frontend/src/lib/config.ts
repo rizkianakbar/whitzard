@@ -15,6 +15,8 @@ const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
 export const chain = chainId === hardhat.id ? hardhat : sepolia;
 
 export const appConfig = {
+  /** Public origin of the site, for canonical URLs, the sitemap and link previews. */
+  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
   apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080").replace(/\/$/, ""),
   chainId,
   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || undefined,

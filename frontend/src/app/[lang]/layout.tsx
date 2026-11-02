@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { lang } from "next/root-params";
 
 import { Providers } from "@/components/providers";
+import { appConfig } from "@/lib/config";
 import { dictionary } from "@/lib/i18n/server";
 import { isLocale, locales } from "@/lib/i18n/config";
 import "../globals.css";
@@ -17,9 +18,23 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const { meta } = await dictionary();
+  const locale = await lang();
   return {
-    title: { default: "Whitzard", template: "%s | Whitzard" },
-    description: (await dictionary()).meta.description,
+    metadataBase: new URL(appConfig.siteUrl),
+    title: { default: meta.title, template: "%s | Whitzard" },
+    description: meta.description,
+    applicationName: "Whitzard",
+    keywords: ["Whitzard", "escrow", "smart contract", "health aid", "medical bills", "mutual aid", "Ethereum", "Sepolia"],
+    openGraph: {
+      type: "website",
+      siteName: "Whitzard",
+      title: meta.title,
+      description: meta.description,
+      locale: locale === "id" ? "id_ID" : "en_US",
+      images: [{ url: "/og.png", width: 1200, height: 630, alt: meta.title }],
+    },
+    twitter: { card: "summary_large_image", title: meta.title, description: meta.description, images: ["/og.png"] },
   };
 }
 

@@ -7,6 +7,7 @@ const n = (count: number, one: string, many = `${one}s`) => `${count} ${count ==
 
 export const en: Dict = {
   meta: {
+    title: "Whitzard: share medical bills, held by a smart contract",
     description: "Members share the cost of each other's medical bills, each chipping in the same amount, on a public record.",
     titles: {
       ask: "Ask for help",
